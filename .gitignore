@@ -1,0 +1,80 @@
+# Dependencias
+node_modules/
+.pnp
+.pnp.js
+.yarn/
+!.yarn/patches
+!.yarn/releases
+!.yarn/plugins
+!.yarn/sdks
+!.yarn/versions
+
+# Build
+dist/
+build/
+lib/
+*.tsbuildinfo
+.turbo/
+
+# Env y secretos (nunca deberían tener contenido real, pero por las dudas)
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.crt
+*.p12
+secrets/
+credentials.json
+trusted-device.json
+gavriel-password
+gavriel-*password*
+*.secret
+
+# Logs (incluye writes.log de las tools de escritura)
+*.log
+logs/
+writes.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Tests / coverage
+coverage/
+.nyc_output/
+*.lcov
+
+# Caches
+.cache/
+.eslintcache
+.npm/
+
+# Editor / IDE
+.vscode/*
+!.vscode/extensions.json
+.idea/
+*.swp
+*.swo
+*~
+
+# SO
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+Thumbs.db
+ehthumbs.db
+
+# Runtime / debug
+*.pid
+*.pid.lock
+.node_repl_history
+
+# Paquetes empaquetados
+*.tgz
+.yarn-integrity
+
+# Artefactos de análisis / trabajo temporal de fases (bundle descargado, notas)
+analysis/
