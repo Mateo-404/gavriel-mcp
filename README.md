@@ -1,10 +1,7 @@
 # Gavriel MCP
 
 Servidor MCP local (TypeScript) que expone la API de **Gavriel** — sistema de
-monitoreo de alarmas de Marinozzi Sistemas de Seguridad — como herramientas
-para agentes de IA (OpenCode, Claude Desktop).
-
-Uso personal: corre en la estación de trabajo de Mateo, vía transporte stdio.
+monitoreo de alarmas — como herramientas para agentes de IA (OpenCode, Claude Desktop).
 
 ## Requisitos
 
@@ -31,6 +28,12 @@ cp .env.example .env   # completar GAVRIEL_EMAIL y GAVRIEL_PASSWORD
 | `GAVRIEL_TRUSTED_DEVICE_TOKEN` | no | — (fallback dev; normalmente en keyring) |
 | `GAVRIEL_API_BASE` | no | `https://app.gavriel.com.ar/api` |
 | `GAVRIEL_MCP_LOG_DIR` | no | `~/.local/share/gavriel-mcp` |
+
+### Configuración del rol de servicio
+El rol de servicio está definido en `PROPUESTA_ROL_SERVICIO.md`. La configuración recomendada es:
+- Usar el rol `MCP Service` como default (no usar la cuenta Admin completa).
+- Si no se está usando el rol de servicio, la configuración es un ejemplo de acceso local.
+- Cualquier uso del rol Admin se documenta en `PROPUESTA_ROL_SERVICIO.md` como opción avanzada.
 
 El JWT se cachea **en memoria** (nunca en disco) y se renueva ~5 min antes de
 expirar o ante un 401. La API renueva el token vía el header `x-new-token`, que
@@ -75,9 +78,9 @@ secret:
   "mcp": {
     "gavriel": {
       "type": "local",
-      "command": ["node", "/home/marinozzi/proyectos/gavriel-mcp/dist/index.js"],
+      "command": ["node", "/ruta/al/proyecto/gavriel-mcp/dist/index.js"],
       "environment": {
-        "GAVRIEL_EMAIL": "mgariboglio@marinozzi.com.ar"
+        "GAVRIEL_EMAIL": "user@example.com"
       },
       "enabled": true
     }
@@ -192,3 +195,8 @@ Hyper-V.
 - El gate de `confirm` evita ejecuciones accidentales; el control de *cuándo*
   se usan las escrituras queda a nivel de skill/prompt del agente, no
   bloqueado en el código (decisión del dueño del proyecto).
+- **Respuestas no parseables**: ocasionalmente el backend puede devolver HTTP 200
+  con un body truncado o inválido. Esta tool lo detecta (`writeStatus:
+  "applied_response_unparseable"`), loguea el body crudo y re-lee el recurso
+  para verificar el estado real. No asumir éxito ni fallo ante ese status:
+  consultar el `verifiedState` devuelto o re-consultar el recurso.
