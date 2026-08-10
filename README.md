@@ -30,10 +30,15 @@ cp .env.example .env   # completar GAVRIEL_EMAIL y GAVRIEL_PASSWORD
 | `GAVRIEL_MCP_LOG_DIR` | no | `~/.local/share/gavriel-mcp` |
 
 ### Configuración del rol de servicio
-El rol de servicio está definido en `PROPUESTA_ROL_SERVICIO.md`. La configuración recomendada es:
-- Usar el rol `MCP Service` como default (no usar la cuenta Admin completa).
-- Si no se está usando el rol de servicio, la configuración es un ejemplo de acceso local.
-- Cualquier uso del rol Admin se documenta en `PROPUESTA_ROL_SERVICIO.md` como opción avanzada.
+
+El rol de servicio está definido en `PROPUESTA_ROL_SERVICIO.md`. La
+configuración recomendada es usar el rol `MCP Service` (solo lectura) como
+default.
+
+> **Nota:** hoy el MCP se loguea con una cuenta `Admin` (CRUD completo). Ese
+> es el estado actual **no deseado** que la propuesta de rol busca reemplazar,
+> no un modo de uso soportado. Configurar la cuenta `Admin` solo tiene sentido
+> como paso previo hasta crear el rol `MCP Service`.
 
 El JWT se cachea **en memoria** (nunca en disco) y se renueva ~5 min antes de
 expirar o ante un 401. La API renueva el token vía el header `x-new-token`, que
