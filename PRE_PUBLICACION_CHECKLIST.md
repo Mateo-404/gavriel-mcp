@@ -38,7 +38,7 @@
 - Los greps finales (IPs internas, emails, rutas, apellidos) no tienen
   coincidencias. Los **3 hallazgos reales** de PII y su corrección:
   1. `PROPUESTA_ROL_SERVICIO.md` (líneas 109 y 129): email de cuenta de servicio
-     real (`mcp@marinozzi.com.ar`) → `service_user@example.com`. Escapó a la
+     de dominio interno → `service_user@example.com`. Escapó a la
      primera pasada; detectado y corregido en la verificación final.
   2. `PRE_PUBLICACION_CHECKLIST.md`: el propio checklist filtraba la PII que
      documentaba (emails reales, rutas `/home/...`, apellidos, email de
