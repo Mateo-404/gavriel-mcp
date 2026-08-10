@@ -70,9 +70,18 @@ ser Admin; cualquier usuario autenticado los alcanza):
 | `/activities` (hijos de ticket) | `list_activities_by_ticket`, `get_activity_stats`, `mark_activity_read/unread`, `update_activity`, `add_ticket_activity` |
 | Catálogos sin módulo: `device-connection-types`, `device-taxonomies`, `intervention-categories`, `activities/type-options`, `events-types/gavriel-intervention` | resources de catálogo |
 | `/auth/profile` | `get_my_profile` |
+| GET libre con whitelist | `get` (lee cualquier path de la whitelist de lectura; no usa módulo específico) |
 
 Si el backend decide gatear estos con un permiso nuevo, ese permiso tendría
 que agregarse a este rol; hoy no existe la clave.
+
+> **Nota sobre confirmación**: esta matriz se derivó del payload `permissions`
+> del rol Admin actual (emitido por el backend en `login`/`profile`). Los
+> endpoints y payloads de escritura citados están confirmados contra el bundle
+> del frontend (ver `AGENTS.md`), no contra llamadas vivas al backend. Los
+> módulos marcados con `—` (integrations, file-storage, integration-credentials)
+> **no tienen tools implementadas** (Tier 3) y su permiso es inferido de la
+> matriz Admin, no probado.
 
 ## Rol propuesto — "MCP Service" (solo lectura)
 
