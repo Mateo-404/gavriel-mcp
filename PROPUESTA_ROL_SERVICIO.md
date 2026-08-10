@@ -106,7 +106,7 @@ Exactamente esto, nada más:
 ```
 
 Usuario: una sola cuenta humana tipo servicio, p. ej.
-`mcp@marinozzi.com.ar`, con **2FA activo** y el rol `MCP Service`.
+`service_user@example.com`, con **2FA activo** y el rol `MCP Service`.
 
 ## Nota sobre escrituras
 
@@ -126,8 +126,8 @@ quiere que la cuenta de servicio escriba, se habilitan solo estos módulos:
 
 ## Decision pendiente
 
-1. ¿Se crea el rol `MCP Service` y el usuario `mcp@marinozzi.com.ar` (manual,
-   en Gavriel)?
+1. ¿Se crea el rol `MCP Service` y el usuario `service_user@example.com`
+   (manual, en Gavriel)?
 2. ¿Solo lectura (recomendado) o con el set de escrituras de la tabla de
    arriba?
 3. Cuando exista, el MCP pasa a loguearse con esa cuenta (solo cambia

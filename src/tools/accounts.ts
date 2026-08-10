@@ -23,7 +23,7 @@ export function registerAccountTools(server: McpServer, client: GavrielClient): 
       let id = args.id;
       if (looksLikeAccountNumber) {
         try {
-          // El ID interno es del estilo "clf6cc0hapnmduexn9p"; un número corto
+          // El ID interno es del estilo "xxxxxxxxxxxxxxx"; un número corto
           // es un número de cuenta. Resolverlo por búsqueda antes de fallar.
           const res = await client.get("/accounts", { search: id, limit: 5 });
           const list = Array.isArray(res.data) ? res.data : (res.data as { data?: unknown[] } | null)?.data ?? [];
@@ -41,7 +41,7 @@ export function registerAccountTools(server: McpServer, client: GavrielClient): 
           if (looksLikeAccountNumber) {
             return err(
               `La cuenta "${args.id}" parece un NÚMERO de cuenta, no un ID interno ` +
-                `(ej "clf6cc0hapnmduexn9p"). Buscala primero con list_accounts ` +
+                `(ej "xxxxxxxxxxxxxxx"). Buscala primero con list_accounts ` +
                 `(search: "${args.id}") y usá el id resultante. Detalle: ${String(detail).slice(0, 200)}`,
             );
           }
@@ -52,7 +52,7 @@ export function registerAccountTools(server: McpServer, client: GavrielClient): 
         if (looksLikeAccountNumber) {
           return err(
             `La cuenta "${args.id}" parece un NÚMERO de cuenta, no un ID interno ` +
-              `(ej "clf6cc0hapnmduexn9p"). Buscala primero con list_accounts ` +
+              `(ej "xxxxxxxxxxxxxxx"). Buscala primero con list_accounts ` +
               `(search: "${args.id}") y usá el id resultante. Detalle: ${(e as Error).message}`,
           );
         }
