@@ -1,0 +1,12 @@
+#!/usr/bin/env node
+// Fake `which` para que scripts/selfcheck.mjs pueda controlar
+// determinísticamente si src/secrets.ts detecta el keyring del sistema como
+// disponible, sin depender de si el host que corre los tests tiene
+// `secret-tool` instalado de verdad (el propio README pide instalarlo, así
+// que no podemos asumir que está ausente). Solo entiende `which secret-tool`;
+// cualquier otro uso no debería darse en este código.
+const target = process.argv[2];
+if (target === "secret-tool" && process.env.FAKE_SECRET_TOOL_AVAILABLE === "1") {
+  process.exit(0);
+}
+process.exit(1);
