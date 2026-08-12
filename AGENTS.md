@@ -144,6 +144,9 @@ archivos) están en `TIER3_PENDIENTE.md`: **documentados pero no implementados**
   real (muestra fija de datos). Compara estructura estable (ignora orden de
   arrays, `updatedAt` y celdas horarias de drift), no el JSON exacto. Necesita
   el `.env` y conexión a `app.gavriel.com.ar`.
+- CI (`.github/workflows/ci.yml`): typecheck + build + selfcheck en cada push
+  y PR. No corre `regression` (necesita credenciales y red) ni pega contra
+  `app.gavriel.com.ar` de ninguna forma.
 
 ## Reglas de proyecto
 
