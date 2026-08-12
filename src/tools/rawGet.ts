@@ -3,7 +3,8 @@ import { ok, err } from "./shared.js";
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 
-const READ_PREFIXES = [
+// Exportado para poder recorrerlo desde tests (ver isAllowed más abajo).
+export const READ_PREFIXES = [
   "/account-contacts",
   "/account-users",
   "/accounts",
@@ -53,7 +54,9 @@ const READ_PREFIXES = [
   "/partitions",
 ] as const;
 
-function isAllowed(path: string): boolean {
+// Exportada solo para poder testear la whitelist directamente desde
+// scripts/selfcheck.mjs sin tener que simular un McpServer completo.
+export function isAllowed(path: string): boolean {
   if (!path.startsWith("/")) return false;
   return READ_PREFIXES.some((p) => path === p || path.startsWith(`${p}/`));
 }
