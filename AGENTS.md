@@ -139,7 +139,9 @@ archivos) están en `TIER3_PENDIENTE.md`: **documentados pero no implementados**
 
 - `npm run selfcheck`: suite rápida offline (preview sin ejecutar,
   `applied_response_unparseable`, re-lectura a padre, 4xx genuinos,
-  serialización de la cola). 9/9 verde = invariantes core OK.
+  serialización de la cola, reintentos/backoff de gavrielClient en 401/429/5xx
+  y errores de red). Todo en verde = invariantes core OK (el conteo de checks
+  crece con el tiempo; no hardcodear el número acá).
 - `npm run regression`: comparación tool vs endpoint crudo contra el backend
   real (muestra fija de datos). Compara estructura estable (ignora orden de
   arrays, `updatedAt` y celdas horarias de drift), no el JSON exacto. Necesita
