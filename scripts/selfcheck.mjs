@@ -1,13 +1,19 @@
 // Self-check unitario (sin red): force el path `applied_response_unparseable`
-// de requireConfirm, verifica la cola de escrituras y buildQueryString.
+// de requireConfirm, verifica la cola de escrituras, buildQueryString, la
+// whitelist de `get` y el orden de resolución de secretos.
 // Uso: npm run selfcheck   (requiere build previo)
 import assert from "node:assert/strict";
-import { mkdtempSync, rmSync, readFileSync } from "node:fs";
+import { mkdtempSync, rmSync, readFileSync, writeFileSync, mkdirSync } from "node:fs";
+import { spawnSync } from "node:child_process";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
 import { setLogDir } from "../dist/auditLog.js";
 import { requireConfirm } from "../dist/tools/writeHelpers.js";
 import { buildQueryString, GavrielClient } from "../dist/gavrielClient.js";
+import { isAllowed, READ_PREFIXES } from "../dist/tools/rawGet.js";
+
+const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
 
 const logDir = mkdtempSync(join(tmpdir(), "gavriel-selfcheck-"));
 setLogDir(logDir);
@@ -41,12 +47,35 @@ t("buildQueryString: vacío sin params", () => {
   assert.equal(buildQueryString({}), "");
 });
 
-tAsync("preview: sin confirm no ejecuta", async () => {
+t("whitelist de `get`: cada prefijo declarado se permite a sí mismo", () => {
+  for (const p of READ_PREFIXES) {
+    assert.ok(isAllowed(p), `${p} debería estar permitido`);
+  }
+});
+t("whitelist de `get`: subpaths de un prefijo permitido pasan", () => {
+  assert.ok(isAllowed("/tickets/clxyz"));
+  assert.ok(isAllowed("/accounts/123/notes"));
+});
+t("whitelist de `get`: prefijo no declarado se rechaza", () => {
+  assert.equal(isAllowed("/billing"), false);
+  assert.equal(isAllowed("/admin/users"), false);
+});
+t("whitelist de `get`: match parcial de nombre no cuenta como prefijo", () => {
+  // "/ticketsfoo" no es "/tickets" ni "/tickets/..." — el check exige
+  // separador de path, no solo startsWith en crudo.
+  assert.equal(isAllowed("/ticketsfoo"), false);
+  assert.equal(isAllowed("/accountsxyz/1"), false);
+});
+t("whitelist de `get`: path sin barra inicial se rechaza", () => {
+  assert.equal(isAllowed("tickets"), false);
+});
+
+await tAsync("preview: sin confirm no ejecuta", async () => {
   const r = await requireConfirm(false, PREVIEW_EXEC, mockClient, async () => { throw new Error("no debería ejecutar"); });
   assert.equal(r.preview, true);
 });
 
-tAsync("2xx con body no parseable => applied_response_unparseable + re-lectura", async () => {
+await tAsync("2xx con body no parseable => applied_response_unparseable + re-lectura", async () => {
   const r = await requireConfirm(
     true,
     { tool: "update_ticket", method: "PATCH", path: "/tickets/clxyz", params: { status: "open" } },
@@ -62,7 +91,7 @@ tAsync("2xx con body no parseable => applied_response_unparseable + re-lectura",
     "el body crudo debe quedar en writes.log");
 });
 
-tAsync("PATCH con path de acción => re-lectura al recurso padre", async () => {
+await tAsync("PATCH con path de acción => re-lectura al recurso padre", async () => {
   const r = await requireConfirm(
     true,
     { tool: "mark_activity_read", method: "PATCH", path: "/activities/clabc/mark-as-read", params: { readAt: "x" } },
@@ -72,7 +101,7 @@ tAsync("PATCH con path de acción => re-lectura al recurso padre", async () => {
   assert.equal(r.verifiedState.reRead.path, "/activities/clabc");
 });
 
-tAsync("POST con respuesta corrupta => verifiedState null (no hay id para releer)", async () => {
+await tAsync("POST con respuesta corrupta => verifiedState null (no hay id para releer)", async () => {
   const r = await requireConfirm(
     true,
     { tool: "create_ticket", method: "POST", path: "/tickets", params: { title: "x" } },
@@ -83,7 +112,7 @@ tAsync("POST con respuesta corrupta => verifiedState null (no hay id para releer
   assert.equal(r.verifiedState, null);
 });
 
-tAsync("4xx real => error genuino, no se disfraza ni relee", async () => {
+await tAsync("4xx real => error genuino, no se disfraza ni relee", async () => {
   const r = await requireConfirm(
     true,
     PREVIEW_EXEC,
@@ -94,7 +123,7 @@ tAsync("4xx real => error genuino, no se disfraza ni relee", async () => {
   assert.equal(r.status, 409);
 });
 
-tAsync("cola de escrituras: 5 PATCH en paralelo se serializan (máx 1 en vuelo)", async () => {
+await tAsync("cola de escrituras: 5 PATCH en paralelo se serializan (máx 1 en vuelo)", async () => {
   let inFlight = 0, maxInFlight = 0;
   const client = new GavrielClient({
     GAVRIEL_API_BASE: "http://localhost:1/api",
@@ -113,5 +142,128 @@ tAsync("cola de escrituras: 5 PATCH en paralelo se serializan (máx 1 en vuelo)"
   assert.ok(maxInFlight <= 1, `maxInFlight=${maxInFlight}`);
 });
 
+// --- secrets.ts: orden de resolución keyring > env > archivo legacy ---
+// Corre cada escenario en un proceso hijo (scripts/fixtures/secrets-probe.mjs
+// + scripts/fixtures/fake-secret-tool/) porque hasSecretTool() cachea el
+// resultado de detectar `secret-tool` a nivel de módulo: dentro de un mismo
+// proceso no se puede alternar la disponibilidad del keyring entre checks.
+const FAKE_BIN = join(SCRIPT_DIR, "fixtures", "fake-secret-tool");
+const PROBE = join(SCRIPT_DIR, "fixtures", "secrets-probe.mjs");
+const secretsTmp = mkdtempSync(join(tmpdir(), "gavriel-selfcheck-secrets-"));
+
+function makeHome(files = {}) {
+  const home = mkdtempSync(join(secretsTmp, "home-"));
+  for (const [relPath, content] of Object.entries(files)) {
+    const full = join(home, relPath);
+    mkdirSync(dirname(full), { recursive: true });
+    writeFileSync(full, content, "utf8");
+  }
+  return home;
+}
+
+function runProbe(mode, email, { home, keyringAvailable, keyringState, extraEnv = {} }) {
+  const env = { ...process.env };
+  env.PATH = `${FAKE_BIN}:${process.env.PATH}`;
+  env.HOME = home;
+  env.FAKE_SECRET_TOOL_AVAILABLE = keyringAvailable ? "1" : "0";
+  env.FAKE_KEYRING_STATE = keyringState;
+  delete env.GAVRIEL_PASSWORD;
+  delete env.GAVRIEL_TRUSTED_DEVICE_TOKEN;
+  delete env.PROBE_TOKEN_VALUE;
+  Object.assign(env, extraEnv);
+  const res = spawnSync(process.execPath, [PROBE, mode, email ?? ""], { env, encoding: "utf8", timeout: 5000 });
+  if (res.status !== 0) {
+    throw new Error(`probe (${mode}) status=${res.status} stderr=${res.stderr || res.error}`);
+  }
+  return JSON.parse(res.stdout).result;
+}
+
+const SECRETS_EMAIL = "test@example.com";
+
+t("secrets: password usa el keyring si está disponible, aunque haya env y archivo legacy", () => {
+  const home = makeHome({ ".secrets/gavriel-password": "legacy-pass" });
+  const state = join(secretsTmp, "state-1.json");
+  writeFileSync(state, JSON.stringify({ "gavriel-mcp:password": "keyring-pass" }));
+  const result = runProbe("password", null, {
+    home, keyringAvailable: true, keyringState: state,
+    extraEnv: { GAVRIEL_PASSWORD: "env-pass" },
+  });
+  assert.equal(result, "keyring-pass");
+});
+
+t("secrets: sin keyring, password usa la env var antes que el archivo legacy", () => {
+  const home = makeHome({ ".secrets/gavriel-password": "legacy-pass" });
+  const state = join(secretsTmp, "state-2.json");
+  const result = runProbe("password", null, {
+    home, keyringAvailable: false, keyringState: state,
+    extraEnv: { GAVRIEL_PASSWORD: "env-pass" },
+  });
+  assert.equal(result, "env-pass");
+});
+
+t("secrets: sin keyring ni env, password cae al archivo legacy", () => {
+  const home = makeHome({ ".secrets/gavriel-password": "legacy-pass" });
+  const state = join(secretsTmp, "state-3.json");
+  const result = runProbe("password", null, { home, keyringAvailable: false, keyringState: state });
+  assert.equal(result, "legacy-pass");
+});
+
+t("secrets: sin ninguna fuente, password resuelve null", () => {
+  const home = makeHome({});
+  const state = join(secretsTmp, "state-4.json");
+  const result = runProbe("password", null, { home, keyringAvailable: false, keyringState: state });
+  assert.equal(result, null);
+});
+
+t("secrets: trusted_device_token respeta el mismo orden (keyring > env > legacy)", () => {
+  const home = makeHome({
+    ".local/share/gavriel-mcp/trusted-device.json": JSON.stringify({ [SECRETS_EMAIL]: "legacy-token" }),
+  });
+  const state = join(secretsTmp, "state-5.json");
+  writeFileSync(state, JSON.stringify({ "gavriel-mcp:trusted_device_token": "keyring-token" }));
+  const result = runProbe("token", SECRETS_EMAIL, {
+    home, keyringAvailable: true, keyringState: state,
+    extraEnv: { GAVRIEL_TRUSTED_DEVICE_TOKEN: "env-token" },
+  });
+  assert.equal(result, "keyring-token");
+});
+
+t("secrets: token legacy normaliza el email (case/espacios) al leer", () => {
+  const home = makeHome({
+    ".local/share/gavriel-mcp/trusted-device.json": JSON.stringify({ [SECRETS_EMAIL]: "legacy-token" }),
+  });
+  const state = join(secretsTmp, "state-6.json");
+  const result = runProbe("token", "  Test@Example.com  ", { home, keyringAvailable: false, keyringState: state });
+  assert.equal(result, "legacy-token");
+});
+
+t("secrets: saveTrustedToken escribe al keyring cuando está disponible (no al legacy)", () => {
+  const home = makeHome({});
+  const state = join(secretsTmp, "state-7.json");
+  runProbe("save-token", SECRETS_EMAIL, {
+    home, keyringAvailable: true, keyringState: state,
+    extraEnv: { PROBE_TOKEN_VALUE: "nuevo-token" },
+  });
+  const stored = JSON.parse(readFileSync(state, "utf8"));
+  assert.equal(stored["gavriel-mcp:trusted_device_token"], "nuevo-token");
+  const legacyPath = join(home, ".local/share/gavriel-mcp/trusted-device.json");
+  assert.throws(() => readFileSync(legacyPath, "utf8"), "no debería haber tocado el archivo legacy");
+});
+
+t("secrets: saveTrustedToken cae al archivo legacy sin keyring, y clearTrustedToken lo borra", () => {
+  const home = makeHome({});
+  const state = join(secretsTmp, "state-8.json");
+  runProbe("save-token", SECRETS_EMAIL, {
+    home, keyringAvailable: false, keyringState: state,
+    extraEnv: { PROBE_TOKEN_VALUE: "nuevo-token" },
+  });
+  const afterSave = runProbe("token", SECRETS_EMAIL, { home, keyringAvailable: false, keyringState: state });
+  assert.equal(afterSave, "nuevo-token");
+  runProbe("clear-token", SECRETS_EMAIL, { home, keyringAvailable: false, keyringState: state });
+  const afterClear = runProbe("token", SECRETS_EMAIL, { home, keyringAvailable: false, keyringState: state });
+  assert.equal(afterClear, null);
+});
+
+rmSync(secretsTmp, { recursive: true, force: true });
 rmSync(logDir, { recursive: true, force: true });
 console.log(`\n== selfcheck: ${passed} checks ==`);
