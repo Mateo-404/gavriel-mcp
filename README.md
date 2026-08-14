@@ -5,15 +5,15 @@ monitoreo de alarmas — como herramientas para agentes de IA (OpenCode, Claude 
 
 ## Requisitos
 
-- Node.js 18+ (probado con Node 22)
+- Node.js 20+ (probado con Node 22/24)
 - Credenciales de usuario de Gavriel (`app.gavriel.com.ar`)
 
 ## Instalación
 
 ```bash
 cd ~/proyectos/gavriel-mcp
-npm install
-npm run build
+pnpm install          # package manager: pnpm (ver packageManager en package.json)
+pnpm build
 cp .env.example .env   # completar GAVRIEL_EMAIL y GAVRIEL_PASSWORD
 ```
 
