@@ -1,8 +1,9 @@
 import type { GavrielClient } from "../gavrielClient.js";
-import { ok, err, paginationSchema } from "./shared.js";
+import { ok, err, paginationSchema, okStructured } from "./shared.js";
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { requireConfirm, confirmSchema } from "./writeHelpers.js";
+import { registerTool, type Role } from "./roles.js";
 
 const EVENT_STATUSES = [
   "pending",
@@ -13,13 +14,13 @@ const EVENT_STATUSES = [
   "hidden",
 ] as const;
 
-export function registerEventTools(server: McpServer, client: GavrielClient): void {
+export function registerEventTools(server: McpServer, client: GavrielClient, role: Role): void {
   server.registerTool(
     "list_events",
     {
       title: "Listar eventos",
       description:
-        "Lista eventos (alarmas) con filtros. Parámetros y paginación duros (máx 200). Los estados de evento son: pending, attending, processed, self-processed, cancelled, hidden. IMPORTANTE: el backend es lento — siempre filtrar por accountId y/o rango de fechas acotado, nunca llamar sin filtros (puede tardar 60s+ o dar 500).",
+        "Lista eventos (alarmas) con filtros. Estados: pending, attending, processed, self-processed, cancelled, hidden. IMPORTANTE: backend lento — filtrar siempre por accountId y/o rango de fechas acotado (sin filtros: 60s+ o 500).",
       inputSchema: {
         ...paginationSchema,
         accountId: z.string().optional(),
@@ -36,6 +37,8 @@ export function registerEventTools(server: McpServer, client: GavrielClient): vo
         dateFrom: z.string().optional().describe("ISO datetime, ej 2026-08-01T00:00:00.000Z"),
         dateTo: z.string().optional().describe("ISO datetime"),
       },
+      outputSchema: z.object({}).passthrough(),
+      annotations: { readOnlyHint: true },
     },
     async (args) => {
       try {
@@ -54,19 +57,19 @@ export function registerEventTools(server: McpServer, client: GavrielClient): vo
           if (v !== undefined) params[k] = v;
         }
         const res = await client.get("/events", params);
-        return ok(res.data);
+        return okStructured(res.data);
       } catch (e) {
         return err((e as Error).message);
       }
     },
   );
 
-  server.registerTool(
-    "mark_events_processed",
+  registerTool(
+    server, role, "full", "mark_events_processed",
     {
       title: "Marcar eventos como procesados (ESCRITURA)",
       description:
-        "Marca uno o más eventos como procesados (PATCH /events/{id} con status=processed). Requiere confirm: true para ejecutarse; sin confirm devuelve un preview de lo que haría.",
+        "Marca eventos como procesados (PATCH /events/{id}; status=processed). Requiere confirm: true; sin confirm devuelve preview.",
       inputSchema: {
         eventIds: z.array(z.string()).min(1).describe("IDs de los eventos a marcar"),
         status: z
@@ -75,6 +78,7 @@ export function registerEventTools(server: McpServer, client: GavrielClient): vo
           .describe("Estado a asignar (por defecto processed)"),
         confirm: confirmSchema,
       },
+      annotations: { idempotentHint: true },
     },
     async (args) => {
       const exec = {
@@ -84,6 +88,9 @@ export function registerEventTools(server: McpServer, client: GavrielClient): vo
         params: { eventIds: args.eventIds, status: args.status },
       };
       return requireConfirm(args.confirm, exec, client, async () => {
+        // ponytail: N eventos = N PATCH seriales (la cola del cliente ya
+        // serializa). No se confirmó endpoint bulk contra el bundle (ver
+        // TIER3_PENDIENTE.md); si aparece uno, reemplazar el loop.
         const results = [];
         for (const id of args.eventIds) {
           const r = await client.patch(`/events/${id}`, { status: args.status });

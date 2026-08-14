@@ -20,6 +20,8 @@ const envSchema = z.object({
     .url("GAVRIEL_API_BASE debe ser una URL válida")
     .default("https://app.gavriel.com.ar/api"),
   GAVRIEL_MCP_LOG_DIR: z.string().optional(),
+  // readonly: solo tools de lectura. full (default): todas + escritura.
+  GAVRIEL_MCP_ROLE: z.enum(["readonly", "full"]).default("full"),
 });
 
 export type Config = Omit<z.infer<typeof envSchema>, "GAVRIEL_PASSWORD"> & {

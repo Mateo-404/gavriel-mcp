@@ -1,6 +1,6 @@
 {
   "name": "gavriel-mcp",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "MCP server local que expone la API de Gavriel (alarmas) como herramientas para agentes de IA",
   "private": true,
   "type": "module",

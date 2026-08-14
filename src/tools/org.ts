@@ -3,8 +3,9 @@ import { ok, err, paginationSchema } from "./shared.js";
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { requireConfirm, confirmSchema } from "./writeHelpers.js";
+import { registerTool, type Role } from "./roles.js";
 
-export function registerOrgTools(server: McpServer, client: GavrielClient): void {
+export function registerOrgTools(server: McpServer, client: GavrielClient, role: Role): void {
   server.registerTool(
     "list_companies",
     {
@@ -14,6 +15,7 @@ export function registerOrgTools(server: McpServer, client: GavrielClient): void
         ...paginationSchema,
         search: z.string().optional().describe("Búsqueda libre (nombre/código)"),
       },
+      annotations: { readOnlyHint: true },
     },
     async (args) => {
       try {
@@ -33,6 +35,7 @@ export function registerOrgTools(server: McpServer, client: GavrielClient): void
       title: "Listar técnicos de empresa",
       description: "Técnicos de la empresa para asignar servicios.",
       inputSchema: { id: z.string() },
+      annotations: { readOnlyHint: true },
     },
     async (args) => {
       try {
@@ -53,6 +56,7 @@ export function registerOrgTools(server: McpServer, client: GavrielClient): void
         ...paginationSchema,
         search: z.string().optional().describe("Búsqueda libre (nombre/email)"),
       },
+      annotations: { readOnlyHint: true },
     },
     async (args) => {
       try {
@@ -72,6 +76,7 @@ export function registerOrgTools(server: McpServer, client: GavrielClient): void
       title: "Listar roles",
       description: "Lista de roles del sistema.",
       inputSchema: {},
+      annotations: { readOnlyHint: true },
     },
     async (_args) => {
       try {
@@ -89,6 +94,7 @@ export function registerOrgTools(server: McpServer, client: GavrielClient): void
       title: "Obtener perfil propio",
       description: "Perfil del usuario logueado.",
       inputSchema: {},
+      annotations: { readOnlyHint: true },
     },
     async (_args) => {
       try {
@@ -100,8 +106,8 @@ export function registerOrgTools(server: McpServer, client: GavrielClient): void
     },
   );
 
-  server.registerTool(
-    "add_technician_non_working_days",
+  registerTool(
+    server, role, "full", "add_technician_non_working_days",
     {
       title: "Agregar días no laborales a técnico (ESCRITURA)",
       description:
@@ -127,8 +133,8 @@ export function registerOrgTools(server: McpServer, client: GavrielClient): void
     },
   );
 
-  server.registerTool(
-    "add_company_non_working_day",
+  registerTool(
+    server, role, "full", "add_company_non_working_day",
     {
       title: "Agregar día no laboral a empresa (ESCRITURA)",
       description:

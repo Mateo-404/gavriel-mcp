@@ -139,7 +139,8 @@ archivos) están en `TIER3_PENDIENTE.md`: **documentados pero no implementados**
 
 - `npm run selfcheck`: suite rápida offline (preview sin ejecutar,
   `applied_response_unparseable`, re-lectura a padre, 4xx genuinos,
-  serialización de la cola, whitelist de `get`, orden de resolución de
+  serialización de la cola, whitelist de `get`, gate de roles
+  readonly/full, orden de resolución de
   secretos keyring/env/legacy, reintentos/backoff de gavrielClient en
   401/429/5xx y errores de red). Todo en verde = invariantes core OK (el
   conteo de checks crece con el tiempo; no hardcodear el número acá).
@@ -166,6 +167,10 @@ archivos) están en `TIER3_PENDIENTE.md`: **documentados pero no implementados**
    usa stdout para JSON-RPC).
 4. No inventar campos de payload: si un endpoint de escritura no está
    confirmado contra el bundle, marcarlo como pendiente en vez de adivinar.
-5. El gate `confirm` es el único control técnico de escrituras (además del
-   log local). No agregar restricciones de roles/permisos en el código: el
-   control de cuándo se usan las tools de escritura es del usuario/prompt.
+5. El gate `confirm` es el control técnico de escrituras (además del log
+   local): ninguna tool de escritura se ejecuta sin `confirm: true`.
+6. Roles (`GAVRIEL_MCP_ROLE`): `readonly` expone solo lectura (+ `get` y
+   `audit_logs`); `full` (default) expone todas, con `confirm` vigente.
+   Rol y `confirm` son capas distintas: rol = disponibilidad de tools,
+   confirm = aprobación. Roles no sustituye al usuario/permission del
+   backend de Gavriel (defensa en profundidad).

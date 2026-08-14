@@ -1,4 +1,5 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { readFileSync } from "node:fs";
 import type { GavrielClient } from "./gavrielClient.js";
 import { registerTicketTools } from "./tools/tickets.js";
 import { registerEventTools } from "./tools/events.js";
@@ -13,23 +14,37 @@ import { registerOrgTools } from "./tools/org.js";
 import { registerActivityTools } from "./tools/activities.js";
 import { registerRawGetTool } from "./tools/rawGet.js";
 import { registerCatalogResources } from "./resources/catalogs.js";
+import type { Role } from "./tools/roles.js";
 
-export function buildServer(client: GavrielClient): McpServer {
-  const server = new McpServer({ name: "gavriel-mcp", version: "1.0.0" });
+// Versión tomada de package.json (fuente única, evita desincronización).
+const VERSION = (() => {
+  try {
+    return (
+      JSON.parse(
+        readFileSync(new URL("../package.json", import.meta.url), "utf8"),
+      ).version ?? "dev"
+    );
+  } catch {
+    return "dev";
+  }
+})();
 
-  registerTicketTools(server, client);
-  registerEventTools(server, client);
-  registerAccountTools(server, client);
-  registerInterventionTools(server, client);
-  registerAuditTools(server, client);
-  registerHealthTools(server, client);
-  registerConversationTools(server, client);
-  registerMonitoringTools(server, client);
-  registerServiceTools(server, client);
-  registerOrgTools(server, client);
-  registerActivityTools(server, client);
-  registerRawGetTool(server, client);
-  registerCatalogResources(server, client);
+export function buildServer(client: GavrielClient, role: Role = "full"): McpServer {
+  const server = new McpServer({ name: "gavriel-mcp", version: VERSION });
+
+  registerTicketTools(server, client, role);
+  registerEventTools(server, client, role);
+  registerAccountTools(server, client, role);
+  registerInterventionTools(server, client, role);
+  registerAuditTools(server, client, role);
+  registerHealthTools(server, client, role);
+  registerConversationTools(server, client, role);
+  registerMonitoringTools(server, client, role);
+  registerServiceTools(server, client, role);
+  registerOrgTools(server, client, role);
+  registerActivityTools(server, client, role);
+  registerRawGetTool(server, client, role);
+  registerCatalogResources(server, client, role);
 
   return server;
 }

@@ -2,8 +2,9 @@ import type { GavrielClient } from "../gavrielClient.js";
 import { ok, err } from "./shared.js";
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { Role } from "./roles.js";
 
-export function registerHealthTools(server: McpServer, client: GavrielClient): void {
+export function registerHealthTools(server: McpServer, client: GavrielClient, _role: Role): void {
   server.registerTool(
     "health",
     {
@@ -15,6 +16,7 @@ export function registerHealthTools(server: McpServer, client: GavrielClient): v
         connectionId: z.string().optional(),
         limit: z.number().int().min(1).max(200).default(25),
       },
+      annotations: { readOnlyHint: true },
     },
     async (args) => {
       try {

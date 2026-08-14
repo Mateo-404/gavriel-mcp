@@ -1,5 +1,6 @@
 import type { Config } from "./config.js";
 import { readTrustedToken, saveTrustedToken, clearTrustedToken } from "./secrets.js";
+import { logPerf } from "./auditLog.js";
 
 // ponytail: el backend de Gavriel es lento en consultas sin filtrar (events llegó
 // a 60s+). Timeout global 90s; si una tool puntual necesita más, se filtra mejor
@@ -172,7 +173,7 @@ export class GavrielClient {
     }
   }
 
-  private async request(
+  private async requestInner(
     method: "GET" | "POST" | "PATCH" | "PUT" | "DELETE",
     path: string,
     body?: unknown,
@@ -205,7 +206,7 @@ export class GavrielClient {
       console.error("[gavrielClient] 401, reintento con re-login");
       this.jwt.token = null;
       await this.login();
-      return this.request(method, path, body, _attempt + 1);
+      return this.requestInner(method, path, body, _attempt + 1);
     }
 
     if ((res.status === 429 || res.status >= 500) && _attempt < 2) {
@@ -214,7 +215,7 @@ export class GavrielClient {
       const delay = Math.min(retryAfter || 500 * 2 ** _attempt, MAX_BACKOFF_MS);
       console.error(`[gavrielClient] ${res.status}, backoff ${delay}ms`);
       await new Promise((r) => setTimeout(r, delay));
-      return this.request(method, path, body, _attempt + 1);
+      return this.requestInner(method, path, body, _attempt + 1);
     }
 
     this.handleNewToken(res);
@@ -237,6 +238,25 @@ export class GavrielClient {
       data = text;
     }
     return { status: res.status, data, headers: res.headers };
+  }
+
+  // Envuelve requestInner con medición de latencia (perf.log): separa la
+  // señal de cuánto tarda el backend del "sentimiento" del agente.
+  private async request(
+    method: "GET" | "POST" | "PATCH" | "PUT" | "DELETE",
+    path: string,
+    body?: unknown,
+    _attempt = 0,
+  ): Promise<{ status: number; data: unknown; headers: Headers }> {
+    const start = Date.now();
+    try {
+      const res = await this.requestInner(method, path, body, _attempt);
+      logPerf({ method, path: path.split("?")[0], status: res.status, ms: Date.now() - start });
+      return res;
+    } catch (e) {
+      logPerf({ method, path: path.split("?")[0], ms: Date.now() - start });
+      throw e;
+    }
   }
 
   async get<T = unknown>(path: string, params?: Record<string, unknown>): Promise<{ status: number; data: T }> {
