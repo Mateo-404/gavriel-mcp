@@ -28,6 +28,17 @@ cp .env.example .env   # completar GAVRIEL_EMAIL y GAVRIEL_PASSWORD
 | `GAVRIEL_TRUSTED_DEVICE_TOKEN` | no | — (fallback dev; normalmente en keyring) |
 | `GAVRIEL_API_BASE` | no | `https://app.gavriel.com.ar/api` |
 | `GAVRIEL_MCP_LOG_DIR` | no | `~/.local/share/gavriel-mcp` |
+| `GAVRIEL_MCP_ROLE` | no | `full` |
+
+### Roles del server (`GAVRIEL_MCP_ROLE`)
+
+- `full` (default): todas las tools, incluidas las de escritura (con `confirm`).
+- `readonly`: solo lectura; las tools de escritura **no se registran** (no
+  existen para el agente). Incluye `get` y `audit_logs`, que son GET.
+
+Sin variable → `full` (comportamiento actual). `confirm` sigue vigente en
+todos los roles: rol = disponibilidad, confirm = aprobación. El rol real de
+seguridad es el usuario de Gavriel con el que se loguea el server.
 
 ### Configuración del rol de servicio
 

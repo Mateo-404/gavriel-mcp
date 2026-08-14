@@ -1,7 +1,8 @@
 import type { GavrielClient } from "../gavrielClient.js";
-import { ok, err } from "./shared.js";
+import { ok, err, okTruncated } from "./shared.js";
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { Role } from "./roles.js";
 
 // Exportado para poder recorrerlo desde tests (ver isAllowed más abajo).
 export const READ_PREFIXES = [
@@ -61,17 +62,24 @@ export function isAllowed(path: string): boolean {
   return READ_PREFIXES.some((p) => path === p || path.startsWith(`${p}/`));
 }
 
-export function registerRawGetTool(server: McpServer, client: GavrielClient): void {
+export function registerRawGetTool(server: McpServer, client: GavrielClient, _role: Role): void {
   server.registerTool(
     "get",
     {
       title: "GET libre sobre la API (solo lectura)",
       description:
-        "GET a cualquier path permitido (whitelist de prefijos de lectura) con query opcional. Útil para endpoints no cubiertos por tools específicas. NO ejecuta escrituras.",
+        "GET a cualquier path permitido (whitelist de prefijos de lectura) con query opcional. Útil para endpoints sin tool específica. NO ejecuta escrituras.",
       inputSchema: {
         path: z.string().describe("Ruta de la API, ej /tickets/{id} o /connections"),
         query: z.record(z.unknown()).optional().describe("Query params (ej { page: 1, limit: 25 })"),
+        truncate: z
+          .number()
+          .int()
+          .min(1000)
+          .optional()
+          .describe("Máx chars del JSON compacto (default: completo)"),
       },
+      annotations: { readOnlyHint: true },
     },
     async (args) => {
       const path = args.path.startsWith("/") ? args.path : `/${args.path}`;
@@ -83,7 +91,7 @@ export function registerRawGetTool(server: McpServer, client: GavrielClient): vo
       }
       try {
         const res = await client.get(path, args.query as Record<string, unknown> | undefined);
-        return ok(res.data);
+        return okTruncated(res.data, args.truncate);
       } catch (e) {
         return err((e as Error).message);
       }

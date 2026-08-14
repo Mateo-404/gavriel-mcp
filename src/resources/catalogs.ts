@@ -1,5 +1,6 @@
 import type { GavrielClient } from "../gavrielClient.js";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { Role } from "../tools/roles.js";
 
 const TTL_MS = 60 * 60 * 1000; // 1h
 
@@ -31,7 +32,7 @@ const CATALOGS = [
 // se agrega un Map de versiones o se baja el TTL — hoy alcanza para catálogos semi-estáticos.
 const cache = new Map<string, { expiresAt: number; data: unknown }>();
 
-export function registerCatalogResources(server: McpServer, client: GavrielClient): void {
+export function registerCatalogResources(server: McpServer, client: GavrielClient, _role: Role): void {
   for (const { path, name } of CATALOGS) {
     const uri = `gavriel://catalog${path}`;
     server.registerResource(

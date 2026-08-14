@@ -112,3 +112,12 @@ Nada de esta tabla se implementa sin instrucción explícita posterior.
 |---|---|---|
 | POST | `/accounts/{id}/contact` | Registra click de llamada/WhatsApp a un contacto |
 | POST | `/accounts/{id}/contact-email` | Registra click de email a un contacto |
+
+## Bulk de eventos — NO confirmado
+
+`mark_events_processed` marca N eventos con N `PATCH /events/{id}` seriales
+(la cola del cliente ya serializa). No se encontró un endpoint bulk de
+eventos (`/events/bulk`, `/events/process`, etc.) en el inventario del bundle
+ni en la documentación disponible en este entorno. **No se implementa por
+adivinación** (regla AGENTS 4). Si al acceder al bundle del frontend aparece
+el endpoint, reemplazar el loop serial por una sola llamada.

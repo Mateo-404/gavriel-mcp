@@ -3,14 +3,16 @@ import { ok, err } from "./shared.js";
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { requireConfirm, confirmSchema } from "./writeHelpers.js";
+import { registerTool, type Role } from "./roles.js";
 
-export function registerServiceTools(server: McpServer, client: GavrielClient): void {
+export function registerServiceTools(server: McpServer, client: GavrielClient, role: Role): void {
   server.registerTool(
     "get_service_panel",
     {
       title: "Obtener panel de servicios",
       description: "GET /services/panel.",
       inputSchema: {},
+      annotations: { readOnlyHint: true },
     },
     async () => {
       try {
@@ -28,6 +30,7 @@ export function registerServiceTools(server: McpServer, client: GavrielClient): 
       title: "Obtener resumen del panel de servicios",
       description: "GET /services/panel/summary.",
       inputSchema: {},
+      annotations: { readOnlyHint: true },
     },
     async () => {
       try {
@@ -48,6 +51,7 @@ export function registerServiceTools(server: McpServer, client: GavrielClient): 
         userId: z.string(),
         date: z.string().describe("Fecha (ISO 8601)"),
       },
+      annotations: { readOnlyHint: true },
     },
     async (args) => {
       try {
@@ -68,6 +72,7 @@ export function registerServiceTools(server: McpServer, client: GavrielClient): 
       title: "Obtener servicio",
       description: "GET /services/{id}.",
       inputSchema: { id: z.string() },
+      annotations: { readOnlyHint: true },
     },
     async (args) => {
       try {
@@ -85,6 +90,7 @@ export function registerServiceTools(server: McpServer, client: GavrielClient): 
       title: "Obtener ubicaciones de técnicos",
       description: "GET /technician-locations/latest.",
       inputSchema: {},
+      annotations: { readOnlyHint: true },
     },
     async () => {
       try {
@@ -96,8 +102,8 @@ export function registerServiceTools(server: McpServer, client: GavrielClient): 
     },
   );
 
-  server.registerTool(
-    "schedule_service",
+  registerTool(
+    server, role, "full", "schedule_service",
     {
       title: "Agendar servicio (ESCRITURA)",
       description: "PATCH /services/{id}/schedule con fecha de agendado. Requiere confirm: true.",
@@ -122,8 +128,8 @@ export function registerServiceTools(server: McpServer, client: GavrielClient): 
     },
   );
 
-  server.registerTool(
-    "update_service",
+  registerTool(
+    server, role, "full", "update_service",
     {
       title: "Actualizar servicio (ESCRITURA)",
       description:

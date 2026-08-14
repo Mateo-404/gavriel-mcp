@@ -1,8 +1,9 @@
 import type { GavrielClient } from "../gavrielClient.js";
-import { ok, err, paginationSchema } from "./shared.js";
+import { ok, err, paginationSchema, okStructured, okTruncated } from "./shared.js";
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { requireConfirm, confirmSchema } from "./writeHelpers.js";
+import { registerTool, type Role } from "./roles.js";
 
 const ACCOUNT_FIELDS = [
   "accountNumber", "name", "description", "note", "address", "city", "state",
@@ -10,13 +11,15 @@ const ACCOUNT_FIELDS = [
   "companyTechnicalId", "companyMonitoringId", "jurisdictionId",
 ] as const;
 
-export function registerAccountTools(server: McpServer, client: GavrielClient): void {
+export function registerAccountTools(server: McpServer, client: GavrielClient, role: Role): void {
   server.registerTool(
     "get_account",
     {
       title: "Obtener cuenta",
       description: "Devuelve una cuenta con sus zonas, contactos, usuarios e intervenciones.",
       inputSchema: { id: z.string() },
+      outputSchema: z.object({}).passthrough(),
+      annotations: { readOnlyHint: true },
     },
     async (args) => {
       const looksLikeAccountNumber = /^\d{1,10}$/.test(args.id);
@@ -47,7 +50,7 @@ export function registerAccountTools(server: McpServer, client: GavrielClient): 
           }
           return err(`GET /accounts/${id} -> ${res.status}: ${String(detail).slice(0, 200)}`);
         }
-        return ok(res.data);
+        return okStructured(res.data);
       } catch (e) {
         if (looksLikeAccountNumber) {
           return err(
@@ -71,7 +74,14 @@ export function registerAccountTools(server: McpServer, client: GavrielClient): 
         search: z.string().optional().describe("Búsqueda libre (nombre/código)"),
         name: z.string().optional(),
         code: z.string().optional(),
+        truncate: z
+          .number()
+          .int()
+          .min(1000)
+          .optional()
+          .describe("Máx chars del JSON compacto (default: completo)"),
       },
+      annotations: { readOnlyHint: true },
     },
     async (args) => {
       try {
@@ -81,19 +91,19 @@ export function registerAccountTools(server: McpServer, client: GavrielClient): 
           if (v !== undefined) params[k] = v;
         }
         const res = await client.get("/accounts", params);
-        return ok(res.data);
+        return okTruncated(res.data, args.truncate);
       } catch (e) {
         return err((e as Error).message);
       }
     },
   );
 
-  server.registerTool(
-    "update_account",
+  registerTool(
+    server, role, "full", "update_account",
     {
       title: "Actualizar cuenta (ESCRITURA)",
       description:
-        "PATCH /accounts/{id} con los campos a modificar (solo envía los provistos). Campos de cuenta confirmados en el bundle. Requiere confirm: true.",
+        "PATCH /accounts/{id} (solo envía los provistos). Campos confirmados en el bundle. Requiere confirm: true.",
       inputSchema: {
         id: z.string(),
         ...Object.fromEntries(
@@ -117,8 +127,8 @@ export function registerAccountTools(server: McpServer, client: GavrielClient): 
     },
   );
 
-  server.registerTool(
-    "add_account_note",
+  registerTool(
+    server, role, "full", "add_account_note",
     {
       title: "Agregar nota a cuenta (ESCRITURA)",
       description:
@@ -145,8 +155,8 @@ export function registerAccountTools(server: McpServer, client: GavrielClient): 
     },
   );
 
-  server.registerTool(
-    "update_account_note",
+  registerTool(
+    server, role, "full", "update_account_note",
     {
       title: "Actualizar nota de cuenta (ESCRITURA)",
       description: "PATCH /accounts/{id}/notes/{noteId}. Requiere confirm: true.",
@@ -174,8 +184,8 @@ export function registerAccountTools(server: McpServer, client: GavrielClient): 
     },
   );
 
-  server.registerTool(
-    "delete_account_note",
+  registerTool(
+    server, role, "full", "delete_account_note",
     {
       title: "Eliminar nota de cuenta (ESCRITURA)",
       description: "DELETE /accounts/{id}/notes/{noteId}. Requiere confirm: true.",
@@ -184,6 +194,7 @@ export function registerAccountTools(server: McpServer, client: GavrielClient): 
         noteId: z.string(),
         confirm: confirmSchema,
       },
+      annotations: { destructiveHint: true },
     },
     async (args) => {
       return requireConfirm(
@@ -201,6 +212,7 @@ export function registerAccountTools(server: McpServer, client: GavrielClient): 
       title: "Listar dispositivos de cuenta",
       description: "GET /accounts/{id}/devices.",
       inputSchema: { id: z.string() },
+      annotations: { readOnlyHint: true },
     },
     async (args) => {
       try {
@@ -218,6 +230,7 @@ export function registerAccountTools(server: McpServer, client: GavrielClient): 
       title: "Listar particiones de cuenta",
       description: "GET /accounts/{id}/partitions.",
       inputSchema: { id: z.string() },
+      annotations: { readOnlyHint: true },
     },
     async (args) => {
       try {
@@ -235,6 +248,7 @@ export function registerAccountTools(server: McpServer, client: GavrielClient): 
       title: "Listar usuarios de cuenta",
       description: "GET /account-users/account/{id}.",
       inputSchema: { id: z.string() },
+      annotations: { readOnlyHint: true },
     },
     async (args) => {
       try {
@@ -252,6 +266,7 @@ export function registerAccountTools(server: McpServer, client: GavrielClient): 
       title: "Listar contactos de cuenta",
       description: "GET /account-contacts con query { accountId }.",
       inputSchema: { accountId: z.string() },
+      annotations: { readOnlyHint: true },
     },
     async (args) => {
       try {
@@ -272,6 +287,7 @@ export function registerAccountTools(server: McpServer, client: GavrielClient): 
       inputSchema: {
         jurisdictionId: z.string().optional().describe("Filtra por jurisdicción si viene"),
       },
+      annotations: { readOnlyHint: true },
     },
     async (args) => {
       try {
@@ -292,6 +308,7 @@ export function registerAccountTools(server: McpServer, client: GavrielClient): 
       title: "Listar zonas de cuenta",
       description: "GET /zones/account/{id}.",
       inputSchema: { id: z.string() },
+      annotations: { readOnlyHint: true },
     },
     async (args) => {
       try {
@@ -303,8 +320,8 @@ export function registerAccountTools(server: McpServer, client: GavrielClient): 
     },
   );
 
-  server.registerTool(
-    "add_account_contact",
+  registerTool(
+    server, role, "full", "add_account_contact",
     {
       title: "Agregar contacto a cuenta (ESCRITURA)",
       description: "POST /account-contacts. Requiere confirm: true.",
@@ -333,8 +350,8 @@ export function registerAccountTools(server: McpServer, client: GavrielClient): 
     },
   );
 
-  server.registerTool(
-    "update_account_contact",
+  registerTool(
+    server, role, "full", "update_account_contact",
     {
       title: "Actualizar contacto de cuenta (ESCRITURA)",
       description: "PATCH /account-contacts/{id}. Requiere confirm: true.",

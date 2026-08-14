@@ -3,6 +3,7 @@ import { ok, err } from "./shared.js";
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { requireConfirm, confirmSchema } from "./writeHelpers.js";
+import { registerTool, type Role } from "./roles.js";
 
 const INTERVENTION_STATUSES = [
   "in_progress",
@@ -12,17 +13,18 @@ const INTERVENTION_STATUSES = [
   "observation",
 ] as const;
 
-export function registerInterventionTools(server: McpServer, client: GavrielClient): void {
+export function registerInterventionTools(server: McpServer, client: GavrielClient, role: Role): void {
   server.registerTool(
     "list_interventions",
     {
       title: "Listar intervenciones de una cuenta",
       description:
-        "Lista las intervenciones de una cuenta (GET /interventions/account/{id}). Con openOnly=true usa el endpoint de abiertas.",
+        "Lista intervenciones de una cuenta (GET /interventions/account/{id}); openOnly=true usa el endpoint de abiertas.",
       inputSchema: {
         id: z.string().describe("ID de la cuenta"),
         openOnly: z.boolean().default(false).describe("Solo intervenciones abiertas"),
       },
+      annotations: { readOnlyHint: true },
     },
     async (args) => {
       try {
@@ -37,12 +39,12 @@ export function registerInterventionTools(server: McpServer, client: GavrielClie
     },
   );
 
-  server.registerTool(
-    "create_intervention",
+  registerTool(
+    server, role, "full", "create_intervention",
     {
       title: "Crear intervención (ESCRITURA)",
       description:
-        "Crea una intervención en progreso sobre una cuenta (POST /interventions). Requiere confirm: true. NOTA: según el bundle, el create simple no lleva motivo — el motivo solo se usa en el cierre (resolution) o en el create masivo (reason).",
+        "Crea una intervención en progreso (POST /interventions). Requiere confirm: true. NOTA: el create simple no lleva motivo — el motivo es solo del cierre (resolution) o del masivo (reason).",
       inputSchema: {
         accountId: z.string().describe("ID de la cuenta a intervenir"),
         assignedUserId: z.string().optional().describe(
@@ -70,12 +72,12 @@ export function registerInterventionTools(server: McpServer, client: GavrielClie
     },
   );
 
-  server.registerTool(
-    "create_bulk_interventions",
+  registerTool(
+    server, role, "full", "create_bulk_interventions",
     {
       title: "Procesar eventos pendientes en masa (ESCRITURA)",
       description:
-        "POST /interventions/bulk: crea intervenciones para varias cuentas con motivo y opcionalmente un tipo de evento. Es el flujo usado para procesar eventos pendientes en masa. Requiere confirm: true.",
+        "POST /interventions/bulk: intervenciones masivas para varias cuentas con motivo y opcionalmente un tipo de evento. Flujo para procesar eventos pendientes en masa. Requiere confirm: true.",
       inputSchema: {
         accountIds: z.array(z.string()).min(1).describe("IDs de cuentas"),
         assignedUserId: z.string().describe("Usuario asignado"),
@@ -100,18 +102,19 @@ export function registerInterventionTools(server: McpServer, client: GavrielClie
     },
   );
 
-  server.registerTool(
-    "close_intervention",
+  registerTool(
+    server, role, "full", "close_intervention",
     {
       title: "Cerrar intervención (ESCRITURA)",
       description:
-        "Cierra una intervención con categoría de cierre y resolución (PATCH /interventions/{id}). Al cerrar, el backend crea/cierra un ticket asociado y marca los eventos pendientes de la cuenta como procesados. Requiere confirm: true.",
+        "Cierra intervención con categoría y resolución (PATCH /interventions/{id}); el backend crea/cierra el ticket asociado y marca eventos pendientes como procesados. Requiere confirm: true.",
       inputSchema: {
         interventionId: z.string(),
         categoryId: z.string().optional().describe("Categoría de cierre"),
         resolution: z.string().optional().describe("Resolución / motivo del cierre"),
         confirm: confirmSchema,
       },
+      annotations: { destructiveHint: true },
     },
     async (args) => {
       const body: Record<string, unknown> = { currentStatus: "closed" };
@@ -126,8 +129,8 @@ export function registerInterventionTools(server: McpServer, client: GavrielClie
     },
   );
 
-  server.registerTool(
-    "set_intervention_observation",
+  registerTool(
+    server, role, "full", "set_intervention_observation",
     {
       title: "Poner intervención en observación (ESCRITURA)",
       description:

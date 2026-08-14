@@ -3,6 +3,7 @@ import { ok, err } from "./shared.js";
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { requireConfirm, confirmSchema } from "./writeHelpers.js";
+import { registerTool, type Role } from "./roles.js";
 
 const ACTIVITY_TYPES = [
   "MESSAGE",
@@ -13,13 +14,14 @@ const ACTIVITY_TYPES = [
   "UPDATE",
 ] as const;
 
-export function registerActivityTools(server: McpServer, client: GavrielClient): void {
+export function registerActivityTools(server: McpServer, client: GavrielClient, role: Role): void {
   server.registerTool(
     "list_activities_by_ticket",
     {
       title: "Listar actividades de ticket",
       description: "Actividades/comentarios de un ticket.",
       inputSchema: { id: z.string() },
+      annotations: { readOnlyHint: true },
     },
     async (args) => {
       try {
@@ -37,6 +39,7 @@ export function registerActivityTools(server: McpServer, client: GavrielClient):
       title: "Estadísticas de actividades",
       description: "Estadísticas globales de actividades.",
       inputSchema: {},
+      annotations: { readOnlyHint: true },
     },
     async (_args) => {
       try {
@@ -48,8 +51,8 @@ export function registerActivityTools(server: McpServer, client: GavrielClient):
     },
   );
 
-  server.registerTool(
-    "mark_activity_read",
+  registerTool(
+    server, role, "full", "mark_activity_read",
     {
       title: "Marcar actividad como leída (ESCRITURA)",
       description:
@@ -62,6 +65,7 @@ export function registerActivityTools(server: McpServer, client: GavrielClient):
           .describe("ISO datetime de lectura (si no viene, usa la fecha actual)"),
         confirm: confirmSchema,
       },
+      annotations: { idempotentHint: true },
     },
     async (args) => {
       const body = { readAt: args.readAt ?? new Date().toISOString() };
@@ -75,8 +79,8 @@ export function registerActivityTools(server: McpServer, client: GavrielClient):
     },
   );
 
-  server.registerTool(
-    "mark_activity_unread",
+  registerTool(
+    server, role, "full", "mark_activity_unread",
     {
       title: "Marcar actividad como no leída (ESCRITURA)",
       description:
@@ -85,6 +89,7 @@ export function registerActivityTools(server: McpServer, client: GavrielClient):
         activityId: z.string(),
         confirm: confirmSchema,
       },
+      annotations: { idempotentHint: true },
     },
     async (args) => {
       const path = `/activities/${args.activityId}/mark-as-unread`;
@@ -97,8 +102,8 @@ export function registerActivityTools(server: McpServer, client: GavrielClient):
     },
   );
 
-  server.registerTool(
-    "update_activity",
+  registerTool(
+    server, role, "full", "update_activity",
     {
       title: "Actualizar actividad (ESCRITURA)",
       description:

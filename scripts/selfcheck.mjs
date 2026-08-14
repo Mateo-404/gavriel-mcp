@@ -13,6 +13,7 @@ import { setLogDir } from "../dist/auditLog.js";
 import { requireConfirm } from "../dist/tools/writeHelpers.js";
 import { buildQueryString, GavrielClient } from "../dist/gavrielClient.js";
 import { isAllowed, READ_PREFIXES } from "../dist/tools/rawGet.js";
+import { hasRole, registerTool } from "../dist/tools/roles.js";
 
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
 
@@ -69,6 +70,72 @@ t("whitelist de `get`: match parcial de nombre no cuenta como prefijo", () => {
 });
 t("whitelist de `get`: path sin barra inicial se rechaza", () => {
   assert.equal(isAllowed("tickets"), false);
+});
+
+// --- roles: GAVRIEL_MCP_ROLE (readonly/full) ---
+function fakeServer() {
+  const names = [];
+  return { names, registerTool: (name) => { names.push(name); } };
+}
+
+t("roles: full registra las tools de escritura", () => {
+  const s = fakeServer();
+  registerTool(s, "full", "full", "create_ticket", {}, () => {});
+  assert.deepEqual(s.names, ["create_ticket"]);
+});
+
+t("roles: readonly NO registra las tools de escritura", () => {
+  const s = fakeServer();
+  registerTool(s, "readonly", "full", "create_ticket", {}, () => {});
+  assert.deepEqual(s.names, []);
+});
+
+t("roles: hasRole respeta el ranking (readonly < full)", () => {
+  assert.equal(hasRole("full", "full"), true);
+  assert.equal(hasRole("full", "readonly"), true);
+  assert.equal(hasRole("readonly", "readonly"), true);
+  assert.equal(hasRole("readonly", "full"), false);
+});
+
+// --- roles e2e: buildServer(listTools) via transport in-memory ---
+const WRITE_TOOLS = [
+  "create_intervention", "create_bulk_interventions", "close_intervention",
+  "set_intervention_observation", "create_ticket", "update_ticket",
+  "close_ticket", "add_ticket_activity", "mark_events_processed",
+  "update_account", "add_account_note", "update_account_note",
+  "delete_account_note", "send_conversation_message", "conversation_claim",
+  "conversation_release", "conversation_set_status", "conversation_mark_read",
+  "mark_activity_read", "mark_activity_unread", "update_activity",
+  "add_account_contact", "update_account_contact", "schedule_service",
+  "update_service", "add_technician_non_working_days",
+  "add_company_non_working_day",
+];
+
+const tListTools = async (server) => {
+  const { InMemoryTransport } = await import("@modelcontextprotocol/sdk/inMemory.js");
+  const { Client } = await import("@modelcontextprotocol/sdk/client/index.js");
+  const [c2s, s2c] = InMemoryTransport.createLinkedPair();
+  const client = new Client({ name: "selfcheck", version: "0.0.0" });
+  await server.connect(c2s);
+  await client.connect(s2c);
+  const tools = await client.listTools();
+  await client.close();
+  return tools.tools.map((x) => x.name);
+};
+
+tAsync("roles e2e: full lista TODAS las tools (lectura + escritura)", async () => {
+  const { buildServer } = await import("../dist/server.js");
+  const names = await tListTools(buildServer(mockClient, "full"));
+  for (const w of WRITE_TOOLS) assert.ok(names.includes(w), `full debería incluir ${w}`);
+});
+
+tAsync("roles e2e: readonly lista SOLO lectura (sin las 27 de escritura)", async () => {
+  const { buildServer } = await import("../dist/server.js");
+  const names = await tListTools(buildServer(mockClient, "readonly"));
+  for (const w of WRITE_TOOLS) assert.ok(!names.includes(w), `readonly no debería incluir ${w}`);
+  for (const r of ["list_tickets", "get_ticket", "list_events", "get_account", "list_accounts", "get", "audit_logs", "health"]) {
+    assert.ok(names.includes(r), `readonly debería incluir ${r}`);
+  }
 });
 
 // --- gavrielClient: reintentos, backoff y errores de red en request() ---

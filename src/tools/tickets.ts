@@ -1,8 +1,9 @@
 import type { GavrielClient } from "../gavrielClient.js";
-import { ok, err, paginationSchema } from "./shared.js";
+import { ok, err, paginationSchema, okStructured } from "./shared.js";
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { requireConfirm, confirmSchema } from "./writeHelpers.js";
+import { registerTool, type Role } from "./roles.js";
 
 const singleOrArray = z.union([z.string(), z.array(z.string())]).optional();
 
@@ -10,13 +11,13 @@ const ACTIVITY_TYPES = [
   "MESSAGE", "TASK", "NOTIFICATION", "REMINDER", "ALERT", "UPDATE",
 ] as const;
 
-function addWriteTicketTools(server: McpServer, client: GavrielClient): void {
-  server.registerTool(
-    "create_ticket",
+function addWriteTicketTools(server: McpServer, client: GavrielClient, role: Role): void {
+  registerTool(
+    server, role, "full", "create_ticket",
     {
       title: "Crear ticket (ESCRITURA)",
       description:
-        "POST /tickets. Los valores de status y priority se validan contra los catálogos (ver gavriel://catalog/tickets/status-options y priority-options). La descripción se envía como texto/HTML. Requiere confirm: true.",
+        "POST /tickets. status y priority se validan contra catálogos (gavriel://catalog/tickets/*). La descripción se envía como texto/HTML. Requiere confirm: true.",
       inputSchema: {
         title: z.string().min(1),
         description: z.string().optional(),
@@ -47,8 +48,8 @@ function addWriteTicketTools(server: McpServer, client: GavrielClient): void {
     },
   );
 
-  server.registerTool(
-    "update_ticket",
+  registerTool(
+    server, role, "full", "update_ticket",
     {
       title: "Actualizar ticket (ESCRITURA)",
       description:
@@ -81,8 +82,8 @@ function addWriteTicketTools(server: McpServer, client: GavrielClient): void {
     },
   );
 
-  server.registerTool(
-    "close_ticket",
+  registerTool(
+    server, role, "full", "close_ticket",
     {
       title: "Cerrar ticket (ESCRITURA)",
       description:
@@ -92,6 +93,7 @@ function addWriteTicketTools(server: McpServer, client: GavrielClient): void {
         resolution: z.string().describe("Resolución / comentario de cierre"),
         confirm: confirmSchema,
       },
+      annotations: { destructiveHint: true },
     },
     async (args) => {
       const body = { resolution: args.resolution };
@@ -104,12 +106,12 @@ function addWriteTicketTools(server: McpServer, client: GavrielClient): void {
     },
   );
 
-  server.registerTool(
-    "add_ticket_activity",
+  registerTool(
+    server, role, "full", "add_ticket_activity",
     {
       title: "Agregar actividad a ticket (ESCRITURA)",
       description:
-        "POST /activities: agrega un comentario/actividad a un ticket. type: MESSAGE, TASK, NOTIFICATION, REMINDER, ALERT, UPDATE (default MESSAGE). Requiere confirm: true.",
+        "POST /activities: comentario/actividad en un ticket. type: MESSAGE|TASK|NOTIFICATION|REMINDER|ALERT|UPDATE (default MESSAGE). Requiere confirm: true.",
       inputSchema: {
         ticketId: z.string(),
         title: z.string().describe("Título de la actividad (requerido por la API)"),
@@ -137,8 +139,8 @@ function addWriteTicketTools(server: McpServer, client: GavrielClient): void {
   );
 }
 
-export function registerTicketTools(server: McpServer, client: GavrielClient): void {
-  addWriteTicketTools(server, client);
+export function registerTicketTools(server: McpServer, client: GavrielClient, role: Role): void {
+  addWriteTicketTools(server, client, role);
 
   server.registerTool(
     "list_tickets",
@@ -160,6 +162,8 @@ export function registerTicketTools(server: McpServer, client: GavrielClient): v
         categoryId: z.string().optional(),
         assignedUserId: z.string().optional(),
       },
+      outputSchema: z.object({}).passthrough(),
+      annotations: { readOnlyHint: true },
     },
     async (args) => {
       try {
@@ -174,7 +178,7 @@ export function registerTicketTools(server: McpServer, client: GavrielClient): v
           if (v !== undefined) params[k] = v;
         }
         const res = await client.get("/tickets", params);
-        return ok(res.data);
+        return okStructured(res.data);
       } catch (e) {
         return err((e as Error).message);
       }
@@ -187,6 +191,8 @@ export function registerTicketTools(server: McpServer, client: GavrielClient): v
       title: "Obtener ticket por ID",
       description: "Devuelve el ticket y sus actividades (comentarios) asociadas.",
       inputSchema: { id: z.string().describe("ID del ticket") },
+      outputSchema: z.object({}).passthrough(),
+      annotations: { readOnlyHint: true },
     },
     async (args) => {
       try {
@@ -194,7 +200,7 @@ export function registerTicketTools(server: McpServer, client: GavrielClient): v
           client.get(`/tickets/${args.id}`),
           client.get(`/activities/ticket/${args.id}`),
         ]);
-        return ok({ ticket: ticket.data, activities: activities.data });
+        return okStructured({ ticket: ticket.data, activities: activities.data });
       } catch (e) {
         return err((e as Error).message);
       }
@@ -207,6 +213,7 @@ export function registerTicketTools(server: McpServer, client: GavrielClient): v
       title: "Estadísticas de tickets",
       description: "Estadísticas globales de tickets (GET /tickets/stats).",
       inputSchema: {},
+      annotations: { readOnlyHint: true },
     },
     async () => {
       try {
@@ -225,6 +232,7 @@ export function registerTicketTools(server: McpServer, client: GavrielClient): v
       description:
         "GET /tickets/open-technical-count. Con accountId filtra por cuenta.",
       inputSchema: { accountId: z.string().optional() },
+      annotations: { readOnlyHint: true },
     },
     async (args) => {
       try {
