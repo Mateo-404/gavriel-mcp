@@ -137,20 +137,23 @@ archivos) están en `TIER3_PENDIENTE.md`: **documentados pero no implementados**
 
 ## Verificación
 
-- `npm run selfcheck`: suite rápida offline (preview sin ejecutar,
+- `pnpm run selfcheck`: suite rápida offline (preview sin ejecutar,
   `applied_response_unparseable`, re-lectura a padre, 4xx genuinos,
   serialización de la cola, whitelist de `get`, gate de roles
   readonly/full, orden de resolución de
   secretos keyring/env/legacy, reintentos/backoff de gavrielClient en
   401/429/5xx y errores de red). Todo en verde = invariantes core OK (el
   conteo de checks crece con el tiempo; no hardcodear el número acá).
-- `npm run regression`: comparación tool vs endpoint crudo contra el backend
+- `pnpm run regression`: comparación tool vs endpoint crudo contra el backend
   real (muestra fija de datos). Compara estructura estable (ignora orden de
   arrays, `updatedAt` y celdas horarias de drift), no el JSON exacto. Necesita
   el `.env` y conexión a `app.gavriel.com.ar`.
 - CI (`.github/workflows/ci.yml`): typecheck + build + selfcheck en cada push
   y PR. No corre `regression` (necesita credenciales y red) ni pega contra
   `app.gavriel.com.ar` de ninguna forma.
+- Package manager: **pnpm** (campo `packageManager` en `package.json` fija la
+  versión). Instalar con `pnpm install --frozen-lockfile`; no regenerar
+  `pnpm-lock.yaml` a mano.
 
 ## Reglas de proyecto
 
