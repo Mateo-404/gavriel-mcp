@@ -1,5 +1,9 @@
 # Gavriel MCP
 
+<p align="center">
+  <img src="assets/gavriel-logo.svg" alt="Gavriel MCP" width="440">
+</p>
+
 Servidor MCP local (TypeScript) que expone la API de **Gavriel** — sistema de
 monitoreo de alarmas — como herramientas para agentes de IA (OpenCode, Claude Desktop).
 
