@@ -1,5 +1,5 @@
 import type { GavrielClient } from "../gavrielClient.js";
-import { ok, err, paginationSchema, okStructured, okTruncated, buildBody, wrapReadOnly, forwardParams } from "./shared.js";
+import { ok, err, paginationSchema, okStructured, okTruncated, truncateSchema, selectFields, normalizeAccountNumber, buildBody, wrapReadOnly, forwardParams } from "./shared.js";
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { requireConfirm, confirmSchema } from "./writeHelpers.js";
@@ -16,12 +16,13 @@ export function registerAccountTools(server: McpServer, client: GavrielClient, r
     "get_account",
     {
       title: "Obtener cuenta",
-      description: "Devuelve una cuenta con sus zonas, contactos, usuarios e intervenciones. Usar `include` para seleccionar secciones y ahorrar tokens.",
+      description: "Devuelve una cuenta con sus zonas, contactos, usuarios e intervenciones.",
       inputSchema: {
         id: z.string(),
         include: z.array(z.enum(["zones", "contacts", "users", "interventions", "devices"]))
           .optional()
           .describe("Secciones a incluir (default: todas)"),
+        fields: z.array(z.string()).optional().describe("Campos a retornar (default: todos)"),
       },
       outputSchema: z.object({}).passthrough(),
       annotations: { readOnlyHint: true },
@@ -52,6 +53,7 @@ export function registerAccountTools(server: McpServer, client: GavrielClient, r
         }
         // Filtrar secciones si se pidió `include`
         const include = args.include as string[] | undefined;
+        let data: unknown;
         if (include && Array.isArray(include) && include.length > 0) {
           const d = res.data as Record<string, unknown>;
           const SECTION_KEYS: Record<string, string[]> = {
@@ -67,9 +69,12 @@ export function registerAccountTools(server: McpServer, client: GavrielClient, r
               for (const k of keys) delete filtered[k];
             }
           }
-          return okStructured(filtered);
+          data = filtered;
+        } else {
+          data = res.data;
         }
-        return okStructured(res.data);
+        if (args.fields) data = selectFields(data as Record<string, unknown>, args.fields as string[]);
+        return okStructured(data);
       } catch (e) {
         if (looksLikeAccountNumber) {
           return err(
@@ -93,19 +98,19 @@ export function registerAccountTools(server: McpServer, client: GavrielClient, r
         search: z.string().optional().describe("Búsqueda libre (nombre/código)"),
         name: z.string().optional(),
         code: z.string().optional(),
-        truncate: z
-          .number()
-          .int()
-          .min(1000)
-          .optional()
-          .describe("Máx chars del JSON compacto (default: completo)"),
+        truncate: truncateSchema,
+        fields: z.array(z.string()).optional().describe("Campos a retornar por objeto"),
       },
       annotations: { readOnlyHint: true },
     },
     async (args) => {
       const params: Record<string, unknown> = { page: args.page, limit: args.limit, ...forwardParams(args as Record<string, unknown>, ["search", "name", "code"]) };
       const res = await client.get("/accounts", params);
-      return okTruncated(res.data, args.truncate);
+      let data = res.data;
+      if (args.fields && Array.isArray(data)) {
+        data = data.map((item) => selectFields(item as Record<string, unknown>, args.fields as string[]));
+      }
+      return okTruncated(data, args.truncate);
     },
   );
 
@@ -214,12 +219,14 @@ export function registerAccountTools(server: McpServer, client: GavrielClient, r
     "list_account_devices",
     {
       title: "Listar dispositivos de cuenta",
-      description: "GET /accounts/{id}/devices.",
+      description: "Dispositivos de una cuenta.",
       inputSchema: {
         id: z.string(),
         brandId: z.string().optional().describe("Filtrar por marca"),
         modelId: z.string().optional().describe("Filtrar por modelo"),
         status: z.string().optional().describe("Filtrar por estado"),
+        truncate: truncateSchema,
+        fields: z.array(z.string()).optional().describe("Campos a retornar por objeto"),
       },
       annotations: { readOnlyHint: true },
     },
@@ -229,7 +236,11 @@ export function registerAccountTools(server: McpServer, client: GavrielClient, r
       if (args.modelId) params.modelId = args.modelId;
       if (args.status) params.status = args.status;
       const res = await client.get(`/accounts/${args.id}/devices`, Object.keys(params).length ? params : undefined);
-      return ok(res.data);
+      let data = res.data;
+      if (args.fields && Array.isArray(data)) {
+        data = data.map((item) => selectFields(item as Record<string, unknown>, args.fields as string[]));
+      }
+      return okTruncated(data, args.truncate);
     }),
   );
 
@@ -237,13 +248,21 @@ export function registerAccountTools(server: McpServer, client: GavrielClient, r
     "list_account_partitions",
     {
       title: "Listar particiones de cuenta",
-      description: "GET /accounts/{id}/partitions.",
-      inputSchema: { id: z.string() },
+      description: "Particiones de una cuenta.",
+      inputSchema: {
+        id: z.string(),
+        truncate: truncateSchema,
+        fields: z.array(z.string()).optional().describe("Campos a retornar por objeto"),
+      },
       annotations: { readOnlyHint: true },
     },
     wrapReadOnly(async (args) => {
       const res = await client.get(`/accounts/${args.id}/partitions`);
-      return ok(res.data);
+      let data = res.data;
+      if (args.fields && Array.isArray(data)) {
+        data = data.map((item) => selectFields(item as Record<string, unknown>, args.fields as string[]));
+      }
+      return okTruncated(data, args.truncate);
     }),
   );
 
@@ -251,13 +270,21 @@ export function registerAccountTools(server: McpServer, client: GavrielClient, r
     "list_account_users",
     {
       title: "Listar usuarios de cuenta",
-      description: "GET /account-users/account/{id}.",
-      inputSchema: { id: z.string() },
+      description: "Usuarios de una cuenta.",
+      inputSchema: {
+        id: z.string(),
+        truncate: truncateSchema,
+        fields: z.array(z.string()).optional().describe("Campos a retornar por objeto"),
+      },
       annotations: { readOnlyHint: true },
     },
     wrapReadOnly(async (args) => {
       const res = await client.get(`/account-users/account/${args.id}`);
-      return ok(res.data);
+      let data = res.data;
+      if (args.fields && Array.isArray(data)) {
+        data = data.map((item) => selectFields(item as Record<string, unknown>, args.fields as string[]));
+      }
+      return okTruncated(data, args.truncate);
     }),
   );
 
@@ -265,13 +292,22 @@ export function registerAccountTools(server: McpServer, client: GavrielClient, r
     "list_account_contacts",
     {
       title: "Listar contactos de cuenta",
-      description: "GET /account-contacts con query { accountId }.",
-      inputSchema: { accountId: z.string() },
+      description: "Contactos de una cuenta.",
+      inputSchema: {
+        accountId: z.string(),
+        truncate: truncateSchema,
+        fields: z.array(z.string()).optional().describe("Campos a retornar por objeto"),
+      },
       annotations: { readOnlyHint: true },
     },
     wrapReadOnly(async (args) => {
-      const res = await client.get("/account-contacts", { accountId: args.accountId });
-      return ok(res.data);
+      const accountId = normalizeAccountNumber(args.accountId);
+      const res = await client.get("/account-contacts", { accountId });
+      let data = res.data;
+      if (args.fields && Array.isArray(data)) {
+        data = data.map((item) => selectFields(item as Record<string, unknown>, args.fields as string[]));
+      }
+      return okTruncated(data, args.truncate);
     }),
   );
 
@@ -279,10 +315,11 @@ export function registerAccountTools(server: McpServer, client: GavrielClient, r
     "list_useful_contacts",
     {
       title: "Listar contactos útiles",
-      description:
-        "GET /useful-contacts, o /useful-contacts/jurisdiction/{jurisdictionId} si se pasa jurisdictionId.",
+      description: "Contactos útiles (por jurisdicción opcional).",
       inputSchema: {
         jurisdictionId: z.string().optional().describe("Filtra por jurisdicción si viene"),
+        truncate: truncateSchema,
+        fields: z.array(z.string()).optional().describe("Campos a retornar por objeto"),
       },
       annotations: { readOnlyHint: true },
     },
@@ -291,7 +328,11 @@ export function registerAccountTools(server: McpServer, client: GavrielClient, r
         ? `/useful-contacts/jurisdiction/${args.jurisdictionId}`
         : "/useful-contacts";
       const res = await client.get(path);
-      return ok(res.data);
+      let data = res.data;
+      if (args.fields && Array.isArray(data)) {
+        data = data.map((item) => selectFields(item as Record<string, unknown>, args.fields as string[]));
+      }
+      return okTruncated(data, args.truncate);
     }),
   );
 
@@ -299,13 +340,21 @@ export function registerAccountTools(server: McpServer, client: GavrielClient, r
     "list_account_zones",
     {
       title: "Listar zonas de cuenta",
-      description: "GET /zones/account/{id}.",
-      inputSchema: { id: z.string() },
+      description: "Zonas de una cuenta.",
+      inputSchema: {
+        id: z.string(),
+        truncate: truncateSchema,
+        fields: z.array(z.string()).optional().describe("Campos a retornar por objeto"),
+      },
       annotations: { readOnlyHint: true },
     },
     wrapReadOnly(async (args) => {
       const res = await client.get(`/zones/account/${args.id}`);
-      return ok(res.data);
+      let data = res.data;
+      if (args.fields && Array.isArray(data)) {
+        data = data.map((item) => selectFields(item as Record<string, unknown>, args.fields as string[]));
+      }
+      return okTruncated(data, args.truncate);
     }),
   );
 
@@ -325,7 +374,8 @@ export function registerAccountTools(server: McpServer, client: GavrielClient, r
       },
     },
     async (args) => {
-      const body = buildBody(args as Record<string, unknown>, {
+      const accountId = normalizeAccountNumber(args.accountId);
+      const body = buildBody({ ...args, accountId } as Record<string, unknown>, {
         required: ["accountId", "name"],
         optional: ["phone", "email", "description", "order"],
       });

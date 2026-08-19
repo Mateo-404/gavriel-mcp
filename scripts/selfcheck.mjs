@@ -144,6 +144,20 @@ tAsync("roles e2e: readonly lista SOLO lectura (sin las 27 de escritura)", async
   }
 });
 
+tAsync("roles e2e: lite incluye lectura + core writes (create_ticket, update_ticket)", async () => {
+  const { buildServer } = await import("../dist/server.js");
+  const names = await tListTools(buildServer(mockClient, "lite"));
+  for (const r of ["list_tickets", "get_ticket", "get_account", "list_accounts"]) {
+    assert.ok(names.includes(r), `lite debería incluir ${r}`);
+  }
+  assert.ok(names.includes("create_ticket"), "lite debería incluir create_ticket");
+  assert.ok(names.includes("update_ticket"), "lite debería incluir update_ticket");
+  // Admin/catalog tools should NOT be in lite
+  for (const w of ["create_device_brand", "delete_event_type", "bulk_create_event_codes"]) {
+    assert.ok(!names.includes(w), `lite NO debería incluir ${w}`);
+  }
+});
+
 // --- gavrielClient: reintentos, backoff y errores de red en request() ---
 // Corre ANTES del test de la cola de escrituras (más abajo), que reemplaza
 // GavrielClient.prototype.request por un stub permanente para el resto del

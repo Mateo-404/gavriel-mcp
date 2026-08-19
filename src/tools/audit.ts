@@ -1,5 +1,5 @@
 import type { GavrielClient } from "../gavrielClient.js";
-import { ok, err, paginationSchema, okTruncated, wrapReadOnly, forwardParams } from "./shared.js";
+import { ok, err, paginationSchema, okTruncated, wrapReadOnly, forwardParams, truncateSchema, requireFilters } from "./shared.js";
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { Role } from "./roles.js";
@@ -15,10 +15,10 @@ export function registerAuditTools(server: McpServer, client: GavrielClient, _ro
     {
       title: "Logs de auditoría",
       description:
-        "GET /audit/logs con filtros (acciones sobre cuentas, tickets, intervenciones, eventos, usuarios). IMPORTANTE: backend lento — filtrar siempre por entityType y/o accountId/entityId/rango de fechas (sin filtros: ~3 min y 500).",
+        "Audit log. Requiere entityType. Catálogos: gavriel://catalog/tickets/status-options",
       inputSchema: {
         ...paginationSchema,
-        entityType: z.enum(AUDIT_ENTITY_TYPES).optional(),
+        entityType: z.enum(AUDIT_ENTITY_TYPES),
         action: z.string().optional(),
         userId: z.string().optional(),
         accountId: z.string().optional(),
@@ -26,18 +26,16 @@ export function registerAuditTools(server: McpServer, client: GavrielClient, _ro
         search: z.string().optional(),
         startDate: z.string().optional().describe("ISO datetime"),
         endDate: z.string().optional().describe("ISO datetime"),
-        truncate: z
-          .number()
-          .int()
-          .min(1000)
-          .optional()
-          .describe("Máx chars del JSON compacto (default: completo)"),
+        truncate: truncateSchema,
       },
       annotations: { readOnlyHint: true },
     },
     wrapReadOnly(async (args) => {
+      const filtered = requireFilters(args, ["entityType"], "audit_logs");
+      if (filtered) return filtered;
       const params: Record<string, unknown> = { page: args.page, limit: args.limit, ...forwardParams(args as Record<string, unknown>, ["entityType", "action", "userId", "accountId", "entityId", "search", "startDate", "endDate"]) };
       const res = await client.get("/audit/logs", params);
+      if (res.status === 403) return err("403: sin permiso audit:read. Pedile al admin que active ese permiso en Gavriel.");
       return okTruncated(res.data, args.truncate);
     }),
   );

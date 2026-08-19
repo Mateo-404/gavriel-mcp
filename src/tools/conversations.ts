@@ -1,5 +1,5 @@
 import type { GavrielClient } from "../gavrielClient.js";
-import { ok, err, paginationSchema, okStructured, wrapReadOnly } from "./shared.js";
+import { ok, err, paginationSchema, okTruncated, truncateSchema, selectFields, wrapReadOnly } from "./shared.js";
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { requireConfirm, confirmSchema } from "./writeHelpers.js";
@@ -9,24 +9,32 @@ export function registerConversationTools(server: McpServer, client: GavrielClie
   server.registerTool(
     "list_conversations",
     {
-      title: "Listar conversaciones (helpdesk)",
-      description: "GET /me/conversations del usuario logueado.",
-      inputSchema: { ...paginationSchema },
-      outputSchema: z.object({}).passthrough(),
+      title: "Conversaciones del usuario",
+      description: "Conversaciones del usuario.",
+      inputSchema: {
+        ...paginationSchema,
+        truncate: truncateSchema,
+        fields: z.array(z.string()).optional().describe("Campos a retornar"),
+      },
       annotations: { readOnlyHint: true },
     },
     wrapReadOnly(async (args) => {
       const res = await client.get("/me/conversations", { page: args.page, limit: args.limit });
-      return okStructured(res.data);
+      return okTruncated(selectFields(res.data as Record<string, unknown>, args.fields as string[] | undefined), args.truncate);
     }),
   );
 
   server.registerTool(
     "list_conversation_messages",
     {
-      title: "Listar mensajes de una conversación",
-      description: "GET /conversations/{id}/messages.",
-      inputSchema: { id: z.string(), ...paginationSchema },
+      title: "Mensajes de conversación",
+      description: "Mensajes de conversación.",
+      inputSchema: {
+        id: z.string(),
+        ...paginationSchema,
+        truncate: truncateSchema,
+        fields: z.array(z.string()).optional().describe("Campos a retornar"),
+      },
       annotations: { readOnlyHint: true },
     },
     wrapReadOnly(async (args) => {
@@ -34,16 +42,15 @@ export function registerConversationTools(server: McpServer, client: GavrielClie
         page: args.page,
         limit: args.limit,
       });
-      return ok(res.data);
+      return okTruncated(selectFields(res.data as Record<string, unknown>, args.fields as string[] | undefined), args.truncate);
     }),
   );
 
   registerTool(
     server, role, "full", "send_conversation_message",
     {
-      title: "Enviar mensaje en conversación (ESCRITURA)",
-      description:
-        "POST /conversations/{id}/messages con { body, messageType: \"text\" }. Requiere confirm: true.",
+      title: "Enviar mensaje (ESCRITURA)",
+      description: "POST /conversations/{id}/messages. Requiere confirm: true.",
       inputSchema: {
         conversationId: z.string(),
         body: z.string().min(1).describe("Contenido del mensaje"),
@@ -100,11 +107,11 @@ export function registerConversationTools(server: McpServer, client: GavrielClie
   registerTool(
     server, role, "full", "conversation_set_status",
     {
-      title: "Cambiar estado de conversación (ESCRITURA)",
-      description: "PATCH /conversations/{id} con { status }. Requiere confirm: true.",
+      title: "Estado de conversación (ESCRITURA)",
+      description: "PATCH /conversations/{id}. Requiere confirm: true.",
       inputSchema: {
         conversationId: z.string(),
-        status: z.string().describe("Nuevo estado (consultar catálogo de conversaciones si aplica)"),
+        status: z.string().describe("Nuevo estado (consultar catálogo si aplica)"),
         confirm: confirmSchema,
       },
     },
@@ -122,21 +129,23 @@ export function registerConversationTools(server: McpServer, client: GavrielClie
   server.registerTool(
     "get_conversation_stats",
     {
-      title: "Estadísticas de conversaciones",
-      description: "GET /me/conversations/stats del usuario logueado.",
-      inputSchema: {},
+      title: "Stats de conversaciones",
+      description: "Stats de conversaciones.",
+      inputSchema: {
+        truncate: truncateSchema,
+      },
       annotations: { readOnlyHint: true },
     },
-    wrapReadOnly(async () => {
+    wrapReadOnly(async (args) => {
       const res = await client.get("/me/conversations/stats");
-      return ok(res.data);
+      return okTruncated(res.data, args.truncate);
     }),
   );
 
   registerTool(
     server, role, "full", "conversation_mark_read",
     {
-      title: "Marcar conversación como leída (ESCRITURA)",
+      title: "Marcar leída (ESCRITURA)",
       description: "POST /conversations/{id}/read. Requiere confirm: true.",
       inputSchema: { conversationId: z.string(), confirm: confirmSchema },
       annotations: { idempotentHint: true },

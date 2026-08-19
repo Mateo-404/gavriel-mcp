@@ -2,13 +2,13 @@ import type { McpServer, ToolCallback } from "@modelcontextprotocol/sdk/server/m
 import type { ToolAnnotations } from "@modelcontextprotocol/sdk/types.js";
 import type { AnySchema, ZodRawShapeCompat } from "@modelcontextprotocol/sdk/server/zod-compat.js";
 
-// Rol del server completo (GAVRIEL_MCP_ROLE), decidido por configuración.
-// readonly: solo tools de lectura (+ `get` y `audit_logs`, que son GET).
-// full: todas las tools (lectura + escritura). El gate `confirm` sigue
-// vigente en todos los roles: rol = disponibilidad, confirm = aprobación.
-export type Role = "readonly" | "full";
+// Rol del server (GAVRIEL_MCP_ROLE).
+// readonly: solo lectura (+ get y audit_logs).
+// lite: lectura + tools core de escritura (tickets, interventions, conversations).
+// full: todas las tools.
+export type Role = "readonly" | "lite" | "full";
 
-const ROLE_RANK: Record<Role, number> = { readonly: 0, full: 1 };
+const ROLE_RANK: Record<Role, number> = { readonly: 0, lite: 1, full: 2 };
 
 export function hasRole(current: Role, min: Role): boolean {
   return ROLE_RANK[current] >= ROLE_RANK[min];

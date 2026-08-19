@@ -11,8 +11,7 @@ const ACTION_SEGMENTS = new Set([
 
 export const confirmSchema = z
   .boolean({
-    description:
-      "Debe ser `true` para ejecutar la escritura real. Si falta o es `false`, la tool NO ejecuta nada y devuelve un preview.",
+    description: "true = ejecutar. false/omitido = preview.",
   })
   .default(false);
 

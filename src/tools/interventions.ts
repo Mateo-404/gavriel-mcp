@@ -1,5 +1,5 @@
 import type { GavrielClient } from "../gavrielClient.js";
-import { ok, err, wrapReadOnly } from "./shared.js";
+import { ok, err, wrapReadOnly, okTruncated, truncateSchema, selectFields } from "./shared.js";
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { requireConfirm, confirmSchema } from "./writeHelpers.js";
@@ -17,12 +17,13 @@ export function registerInterventionTools(server: McpServer, client: GavrielClie
   server.registerTool(
     "list_interventions",
     {
-      title: "Listar intervenciones de una cuenta",
-      description:
-        "Lista intervenciones de una cuenta (GET /interventions/account/{id}); openOnly=true usa el endpoint de abiertas.",
+      title: "Intervenciones de cuenta",
+      description: "Intervenciones de una cuenta.",
       inputSchema: {
         id: z.string().describe("ID de la cuenta"),
         openOnly: z.boolean().default(false).describe("Solo intervenciones abiertas"),
+        truncate: truncateSchema,
+        fields: z.array(z.string()).optional().describe("Campos a retornar"),
       },
       annotations: { readOnlyHint: true },
     },
@@ -31,7 +32,7 @@ export function registerInterventionTools(server: McpServer, client: GavrielClie
         ? `/interventions/account/${args.id}/open`
         : `/interventions/account/${args.id}`;
       const res = await client.get(path);
-      return ok(res.data);
+      return okTruncated(selectFields(Array.isArray(res.data) ? res.data : [], args.fields as string[] | undefined), args.truncate);
     }),
   );
 
@@ -39,8 +40,7 @@ export function registerInterventionTools(server: McpServer, client: GavrielClie
     server, role, "full", "create_intervention",
     {
       title: "Crear intervención (ESCRITURA)",
-      description:
-        "Crea una intervención en progreso (POST /interventions). Requiere confirm: true. NOTA: el create simple no lleva motivo — el motivo es solo del cierre (resolution) o del masivo (reason).",
+      description: "POST /interventions. Requiere confirm: true.",
       inputSchema: {
         accountId: z.string().describe("ID de la cuenta a intervenir"),
         assignedUserId: z.string().optional().describe(
@@ -71,9 +71,8 @@ export function registerInterventionTools(server: McpServer, client: GavrielClie
   registerTool(
     server, role, "full", "create_bulk_interventions",
     {
-      title: "Procesar eventos pendientes en masa (ESCRITURA)",
-      description:
-        "POST /interventions/bulk: intervenciones masivas para varias cuentas con motivo y opcionalmente un tipo de evento. Flujo para procesar eventos pendientes en masa. Requiere confirm: true.",
+      title: "Intervenciones masivas (ESCRITURA)",
+      description: "POST /interventions/bulk. Requiere confirm: true.",
       inputSchema: {
         accountIds: z.array(z.string()).min(1).describe("IDs de cuentas"),
         assignedUserId: z.string().describe("Usuario asignado"),
@@ -102,8 +101,7 @@ export function registerInterventionTools(server: McpServer, client: GavrielClie
     server, role, "full", "close_intervention",
     {
       title: "Cerrar intervención (ESCRITURA)",
-      description:
-        "Cierra intervención con categoría y resolución (PATCH /interventions/{id}); el backend crea/cierra el ticket asociado y marca eventos pendientes como procesados. Requiere confirm: true.",
+      description: "PATCH /interventions/{id}. Requiere confirm: true.",
       inputSchema: {
         interventionId: z.string(),
         categoryId: z.string().optional().describe("Categoría de cierre"),
@@ -128,9 +126,8 @@ export function registerInterventionTools(server: McpServer, client: GavrielClie
   registerTool(
     server, role, "full", "set_intervention_observation",
     {
-      title: "Poner intervención en observación (ESCRITURA)",
-      description:
-        "Pone una intervención en estado observation con comentario (PATCH /interventions/{id}). Requiere confirm: true.",
+      title: "Observación (ESCRITURA)",
+      description: "PATCH /interventions/{id}. Requiere confirm: true.",
       inputSchema: {
         interventionId: z.string(),
         observationComment: z.string().optional(),
