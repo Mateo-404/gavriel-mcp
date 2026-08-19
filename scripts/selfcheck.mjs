@@ -109,6 +109,12 @@ const WRITE_TOOLS = [
   "add_account_contact", "update_account_contact", "schedule_service",
   "update_service", "add_technician_non_working_days",
   "add_company_non_working_day",
+  "create_event_type", "update_event_type", "delete_event_type",
+  "create_event_code", "update_event_code", "delete_event_code",
+  "bulk_create_event_codes",
+  "create_device_brand", "update_device_brand", "delete_device_brand",
+  "create_device_model", "update_device_model", "delete_device_model",
+  "create_device", "update_device", "delete_device",
 ];
 
 const tListTools = async (server) => {

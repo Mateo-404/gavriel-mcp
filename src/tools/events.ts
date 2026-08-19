@@ -1,5 +1,5 @@
 import type { GavrielClient } from "../gavrielClient.js";
-import { ok, err, paginationSchema, okStructured } from "./shared.js";
+import { ok, err, paginationSchema, okStructured, wrapReadOnly, forwardParams, okTruncated } from "./shared.js";
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { requireConfirm, confirmSchema } from "./writeHelpers.js";
@@ -15,6 +15,23 @@ const EVENT_STATUSES = [
 ] as const;
 
 export function registerEventTools(server: McpServer, client: GavrielClient, role: Role): void {
+  server.registerTool(
+    "get_event",
+    {
+      title: "Obtener evento por ID",
+      description: "Devuelve el evento completo con relaciones (account, connection, eventsCode, eventsType).",
+      inputSchema: {
+        id: z.string().describe("ID del evento"),
+        truncate: z.number().int().min(1000).optional().describe("Máx chars del JSON compacto (default: completo)"),
+      },
+      annotations: { readOnlyHint: true },
+    },
+    wrapReadOnly(async (args) => {
+      const res = await client.get(`/events/${args.id}`);
+      return args.truncate ? okTruncated(res.data, args.truncate) : ok(res.data);
+    }),
+  );
+
   server.registerTool(
     "list_events",
     {
@@ -40,28 +57,21 @@ export function registerEventTools(server: McpServer, client: GavrielClient, rol
       outputSchema: z.object({}).passthrough(),
       annotations: { readOnlyHint: true },
     },
-    async (args) => {
-      try {
-        const params: Record<string, unknown> = {
-          page: args.page,
-          limit: args.limit,
-          sortBy: "createdAt",
-          sortDirection: "desc",
-        };
-        for (const k of [
+    wrapReadOnly(async (args) => {
+      const params: Record<string, unknown> = {
+        page: args.page,
+        limit: args.limit,
+        sortBy: "createdAt",
+        sortDirection: "desc",
+        ...forwardParams(args as Record<string, unknown>, [
           "accountId", "accountNumber", "port", "eventCode", "eventTypeName",
           "search", "requiresIntervention", "pending", "inProgress",
           "bridgeId", "connectionId", "dateFrom", "dateTo",
-        ] as const) {
-          const v = (args as Record<string, unknown>)[k];
-          if (v !== undefined) params[k] = v;
-        }
-        const res = await client.get("/events", params);
-        return okStructured(res.data);
-      } catch (e) {
-        return err((e as Error).message);
-      }
-    },
+        ]),
+      };
+      const res = await client.get("/events", params);
+      return okStructured(res.data);
+    }),
   );
 
   registerTool(

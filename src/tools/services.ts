@@ -1,5 +1,5 @@
 import type { GavrielClient } from "../gavrielClient.js";
-import { ok, err } from "./shared.js";
+import { ok, err, wrapReadOnly, buildBody } from "./shared.js";
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { requireConfirm, confirmSchema } from "./writeHelpers.js";
@@ -14,14 +14,10 @@ export function registerServiceTools(server: McpServer, client: GavrielClient, r
       inputSchema: {},
       annotations: { readOnlyHint: true },
     },
-    async () => {
-      try {
-        const res = await client.get("/services/panel");
-        return ok(res.data);
-      } catch (e) {
-        return err((e as Error).message);
-      }
-    },
+    wrapReadOnly(async () => {
+      const res = await client.get("/services/panel");
+      return ok(res.data);
+    }),
   );
 
   server.registerTool(
@@ -32,14 +28,10 @@ export function registerServiceTools(server: McpServer, client: GavrielClient, r
       inputSchema: {},
       annotations: { readOnlyHint: true },
     },
-    async () => {
-      try {
-        const res = await client.get("/services/panel/summary");
-        return ok(res.data);
-      } catch (e) {
-        return err((e as Error).message);
-      }
-    },
+    wrapReadOnly(async () => {
+      const res = await client.get("/services/panel/summary");
+      return ok(res.data);
+    }),
   );
 
   server.registerTool(
@@ -53,17 +45,13 @@ export function registerServiceTools(server: McpServer, client: GavrielClient, r
       },
       annotations: { readOnlyHint: true },
     },
-    async (args) => {
-      try {
-        const res = await client.get("/services/technician-agenda", {
-          userId: args.userId,
-          date: args.date,
-        });
-        return ok(res.data);
-      } catch (e) {
-        return err((e as Error).message);
-      }
-    },
+    wrapReadOnly(async (args) => {
+      const res = await client.get("/services/technician-agenda", {
+        userId: args.userId,
+        date: args.date,
+      });
+      return ok(res.data);
+    }),
   );
 
   server.registerTool(
@@ -74,14 +62,10 @@ export function registerServiceTools(server: McpServer, client: GavrielClient, r
       inputSchema: { id: z.string() },
       annotations: { readOnlyHint: true },
     },
-    async (args) => {
-      try {
-        const res = await client.get(`/services/${args.id}`);
-        return ok(res.data);
-      } catch (e) {
-        return err((e as Error).message);
-      }
-    },
+    wrapReadOnly(async (args) => {
+      const res = await client.get(`/services/${args.id}`);
+      return ok(res.data);
+    }),
   );
 
   server.registerTool(
@@ -92,14 +76,10 @@ export function registerServiceTools(server: McpServer, client: GavrielClient, r
       inputSchema: {},
       annotations: { readOnlyHint: true },
     },
-    async () => {
-      try {
-        const res = await client.get("/technician-locations/latest");
-        return ok(res.data);
-      } catch (e) {
-        return err((e as Error).message);
-      }
-    },
+    wrapReadOnly(async () => {
+      const res = await client.get("/technician-locations/latest");
+      return ok(res.data);
+    }),
   );
 
   registerTool(
@@ -116,9 +96,7 @@ export function registerServiceTools(server: McpServer, client: GavrielClient, r
       },
     },
     async (args) => {
-      const body: Record<string, unknown> = { scheduledDate: args.scheduledDate };
-      if (args.slotCount !== undefined) body.slotCount = args.slotCount;
-      if (args.assignedUserId !== undefined) body.assignedUserId = args.assignedUserId;
+      const body = buildBody(args as Record<string, unknown>, { required: ["scheduledDate"], optional: ["slotCount", "assignedUserId"] });
       return requireConfirm(
         args.confirm,
         { tool: "schedule_service", method: "PATCH", path: `/services/${args.serviceId}/schedule`, params: body },
@@ -147,11 +125,9 @@ export function registerServiceTools(server: McpServer, client: GavrielClient, r
       },
     },
     async (args) => {
-      const body: Record<string, unknown> = {};
-      for (const f of ["accountId", "type", "title", "description", "priority", "assignedUserId", "categoryId"] as const) {
-        const v = (args as Record<string, unknown>)[f];
-        if (v !== undefined) body[f] = v;
-      }
+      const body = buildBody(args as Record<string, unknown>, {
+        optional: ["accountId", "type", "title", "description", "priority", "assignedUserId", "categoryId"],
+      });
       return requireConfirm(
         args.confirm,
         { tool: "update_service", method: "PATCH", path: `/services/${args.serviceId}`, params: body },

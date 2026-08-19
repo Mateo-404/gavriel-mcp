@@ -1,5 +1,5 @@
 import type { GavrielClient } from "../gavrielClient.js";
-import { ok, err } from "./shared.js";
+import { ok, err, wrapReadOnly } from "./shared.js";
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { requireConfirm, confirmSchema } from "./writeHelpers.js";
@@ -26,17 +26,13 @@ export function registerInterventionTools(server: McpServer, client: GavrielClie
       },
       annotations: { readOnlyHint: true },
     },
-    async (args) => {
-      try {
-        const path = args.openOnly
-          ? `/interventions/account/${args.id}/open`
-          : `/interventions/account/${args.id}`;
-        const res = await client.get(path);
-        return ok(res.data);
-      } catch (e) {
-        return err((e as Error).message);
-      }
-    },
+    wrapReadOnly(async (args) => {
+      const path = args.openOnly
+        ? `/interventions/account/${args.id}/open`
+        : `/interventions/account/${args.id}`;
+      const res = await client.get(path);
+      return ok(res.data);
+    }),
   );
 
   registerTool(

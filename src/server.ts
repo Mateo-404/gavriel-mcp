@@ -13,6 +13,8 @@ import { registerServiceTools } from "./tools/services.js";
 import { registerOrgTools } from "./tools/org.js";
 import { registerActivityTools } from "./tools/activities.js";
 import { registerRawGetTool } from "./tools/rawGet.js";
+import { registerEventCatalogTools } from "./tools/eventCatalogs.js";
+import { registerDeviceTools } from "./tools/devices.js";
 import { registerCatalogResources } from "./resources/catalogs.js";
 import type { Role } from "./tools/roles.js";
 
@@ -44,6 +46,8 @@ export function buildServer(client: GavrielClient, role: Role = "full"): McpServ
   registerOrgTools(server, client, role);
   registerActivityTools(server, client, role);
   registerRawGetTool(server, client, role);
+  registerEventCatalogTools(server, client, role);
+  registerDeviceTools(server, client, role);
   registerCatalogResources(server, client, role);
 
   return server;

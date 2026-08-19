@@ -1,5 +1,5 @@
 import type { GavrielClient } from "../gavrielClient.js";
-import { ok, err, paginationSchema } from "./shared.js";
+import { ok, err, paginationSchema, wrapReadOnly, forwardParams } from "./shared.js";
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { requireConfirm, confirmSchema } from "./writeHelpers.js";
@@ -17,16 +17,11 @@ export function registerOrgTools(server: McpServer, client: GavrielClient, role:
       },
       annotations: { readOnlyHint: true },
     },
-    async (args) => {
-      try {
-        const params: Record<string, unknown> = { page: args.page, limit: args.limit };
-        if (args.search !== undefined) params.search = args.search;
-        const res = await client.get("/companies", params);
-        return ok(res.data);
-      } catch (e) {
-        return err((e as Error).message);
-      }
-    },
+    wrapReadOnly(async (args) => {
+      const params: Record<string, unknown> = { page: args.page, limit: args.limit, ...forwardParams(args as Record<string, unknown>, ["search"]) };
+      const res = await client.get("/companies", params);
+      return ok(res.data);
+    }),
   );
 
   server.registerTool(
@@ -37,14 +32,10 @@ export function registerOrgTools(server: McpServer, client: GavrielClient, role:
       inputSchema: { id: z.string() },
       annotations: { readOnlyHint: true },
     },
-    async (args) => {
-      try {
-        const res = await client.get(`/companies/${args.id}/technicians`);
-        return ok(res.data);
-      } catch (e) {
-        return err((e as Error).message);
-      }
-    },
+    wrapReadOnly(async (args) => {
+      const res = await client.get(`/companies/${args.id}/technicians`);
+      return ok(res.data);
+    }),
   );
 
   server.registerTool(
@@ -58,16 +49,11 @@ export function registerOrgTools(server: McpServer, client: GavrielClient, role:
       },
       annotations: { readOnlyHint: true },
     },
-    async (args) => {
-      try {
-        const params: Record<string, unknown> = { page: args.page, limit: args.limit };
-        if (args.search !== undefined) params.search = args.search;
-        const res = await client.get("/users", params);
-        return ok(res.data);
-      } catch (e) {
-        return err((e as Error).message);
-      }
-    },
+    wrapReadOnly(async (args) => {
+      const params: Record<string, unknown> = { page: args.page, limit: args.limit, ...forwardParams(args as Record<string, unknown>, ["search"]) };
+      const res = await client.get("/users", params);
+      return ok(res.data);
+    }),
   );
 
   server.registerTool(
@@ -78,14 +64,10 @@ export function registerOrgTools(server: McpServer, client: GavrielClient, role:
       inputSchema: {},
       annotations: { readOnlyHint: true },
     },
-    async (_args) => {
-      try {
-        const res = await client.get("/roles");
-        return ok(res.data);
-      } catch (e) {
-        return err((e as Error).message);
-      }
-    },
+    wrapReadOnly(async (_args) => {
+      const res = await client.get("/roles");
+      return ok(res.data);
+    }),
   );
 
   server.registerTool(
@@ -96,14 +78,10 @@ export function registerOrgTools(server: McpServer, client: GavrielClient, role:
       inputSchema: {},
       annotations: { readOnlyHint: true },
     },
-    async (_args) => {
-      try {
-        const res = await client.get("/auth/profile");
-        return ok(res.data);
-      } catch (e) {
-        return err((e as Error).message);
-      }
-    },
+    wrapReadOnly(async (_args) => {
+      const res = await client.get("/auth/profile");
+      return ok(res.data);
+    }),
   );
 
   registerTool(

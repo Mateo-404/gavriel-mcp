@@ -1,5 +1,5 @@
 import type { GavrielClient } from "../gavrielClient.js";
-import { ok, err, paginationSchema, okTruncated } from "./shared.js";
+import { ok, err, paginationSchema, okTruncated, wrapReadOnly, forwardParams } from "./shared.js";
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { Role } from "./roles.js";
@@ -35,18 +35,10 @@ export function registerAuditTools(server: McpServer, client: GavrielClient, _ro
       },
       annotations: { readOnlyHint: true },
     },
-    async (args) => {
-      try {
-        const params: Record<string, unknown> = { page: args.page, limit: args.limit };
-        for (const k of ["entityType", "action", "userId", "accountId", "entityId", "search", "startDate", "endDate"] as const) {
-          const v = (args as Record<string, unknown>)[k];
-          if (v !== undefined) params[k] = v;
-        }
-        const res = await client.get("/audit/logs", params);
-        return okTruncated(res.data, args.truncate);
-      } catch (e) {
-        return err((e as Error).message);
-      }
-    },
+    wrapReadOnly(async (args) => {
+      const params: Record<string, unknown> = { page: args.page, limit: args.limit, ...forwardParams(args as Record<string, unknown>, ["entityType", "action", "userId", "accountId", "entityId", "search", "startDate", "endDate"]) };
+      const res = await client.get("/audit/logs", params);
+      return okTruncated(res.data, args.truncate);
+    }),
   );
 }

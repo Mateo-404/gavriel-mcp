@@ -32,14 +32,28 @@ const CATALOGS = [
 // se agrega un Map de versiones o se baja el TTL — hoy alcanza para catálogos semi-estáticos.
 const cache = new Map<string, { expiresAt: number; data: unknown }>();
 
+function compactEventsTypes(data: unknown): unknown {
+  const items = Array.isArray(data) ? data : (data as { data?: unknown[] })?.data ?? [];
+  return items.map((t: Record<string, unknown>) => ({
+    id: t.id,
+    name: t.name,
+    title: t.title,
+    eventCount: Array.isArray(t.eventsCodes) ? t.eventsCodes.length : 0,
+  }));
+}
+
 export function registerCatalogResources(server: McpServer, client: GavrielClient, _role: Role): void {
   for (const { path, name } of CATALOGS) {
     const uri = `gavriel://catalog${path}`;
+    const isEventsTypes = path === "/events-types";
+
     server.registerResource(
       name,
       uri,
       {
-        description: `Catálogo ${name} de Gavriel (GET ${path}). Cacheado 1 hora.`,
+        description: isEventsTypes
+          ? `Catálogo ${name} de Gavriel (compacto: id/name/title/eventCount). Cacheado 1 hora.`
+          : `Catálogo ${name} de Gavriel (GET ${path}). Cacheado 1 hora.`,
         mimeType: "application/json",
       },
       async () => {
@@ -48,9 +62,15 @@ export function registerCatalogResources(server: McpServer, client: GavrielClien
         if (hit && hit.expiresAt > now) {
           return { contents: [{ uri, mimeType: "application/json", text: JSON.stringify(hit.data) }] };
         }
-        const { data } = await client.get(path, { limit: 200 });
-        cache.set(path, { expiresAt: now + TTL_MS, data });
-        return { contents: [{ uri, mimeType: "application/json", text: JSON.stringify(data) }] };
+        try {
+          const { data } = await client.get(path, { limit: 200 });
+          const compacted = isEventsTypes ? compactEventsTypes(data) : data;
+          cache.set(path, { expiresAt: now + TTL_MS, data: compacted });
+          return { contents: [{ uri, mimeType: "application/json", text: JSON.stringify(compacted) }] };
+        } catch (e) {
+          const errorData = { error: (e as Error).message, path };
+          return { contents: [{ uri, mimeType: "application/json", text: JSON.stringify(errorData) }] };
+        }
       },
     );
   }

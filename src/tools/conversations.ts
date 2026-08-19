@@ -1,5 +1,5 @@
 import type { GavrielClient } from "../gavrielClient.js";
-import { ok, err, paginationSchema, okStructured } from "./shared.js";
+import { ok, err, paginationSchema, okStructured, wrapReadOnly } from "./shared.js";
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { requireConfirm, confirmSchema } from "./writeHelpers.js";
@@ -15,14 +15,10 @@ export function registerConversationTools(server: McpServer, client: GavrielClie
       outputSchema: z.object({}).passthrough(),
       annotations: { readOnlyHint: true },
     },
-    async (args) => {
-      try {
-        const res = await client.get("/me/conversations", { page: args.page, limit: args.limit });
-        return okStructured(res.data);
-      } catch (e) {
-        return err((e as Error).message);
-      }
-    },
+    wrapReadOnly(async (args) => {
+      const res = await client.get("/me/conversations", { page: args.page, limit: args.limit });
+      return okStructured(res.data);
+    }),
   );
 
   server.registerTool(
@@ -33,17 +29,13 @@ export function registerConversationTools(server: McpServer, client: GavrielClie
       inputSchema: { id: z.string(), ...paginationSchema },
       annotations: { readOnlyHint: true },
     },
-    async (args) => {
-      try {
-        const res = await client.get(`/conversations/${args.id}/messages`, {
-          page: args.page,
-          limit: args.limit,
-        });
-        return ok(res.data);
-      } catch (e) {
-        return err((e as Error).message);
-      }
-    },
+    wrapReadOnly(async (args) => {
+      const res = await client.get(`/conversations/${args.id}/messages`, {
+        page: args.page,
+        limit: args.limit,
+      });
+      return ok(res.data);
+    }),
   );
 
   registerTool(
@@ -135,14 +127,10 @@ export function registerConversationTools(server: McpServer, client: GavrielClie
       inputSchema: {},
       annotations: { readOnlyHint: true },
     },
-    async () => {
-      try {
-        const res = await client.get("/me/conversations/stats");
-        return ok(res.data);
-      } catch (e) {
-        return err((e as Error).message);
-      }
-    },
+    wrapReadOnly(async () => {
+      const res = await client.get("/me/conversations/stats");
+      return ok(res.data);
+    }),
   );
 
   registerTool(

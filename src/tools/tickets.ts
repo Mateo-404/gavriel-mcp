@@ -1,5 +1,5 @@
 import type { GavrielClient } from "../gavrielClient.js";
-import { ok, err, paginationSchema, okStructured } from "./shared.js";
+import { ok, err, paginationSchema, okStructured, buildBody, wrapReadOnly, forwardParams } from "./shared.js";
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { requireConfirm, confirmSchema } from "./writeHelpers.js";
@@ -30,15 +30,10 @@ function addWriteTicketTools(server: McpServer, client: GavrielClient, role: Rol
       },
     },
     async (args) => {
-      const body: Record<string, unknown> = {
-        title: args.title,
-        priority: args.priority,
-        status: args.status,
-      };
-      for (const f of ["description", "accountId", "categoryId", "assignedUserId"] as const) {
-        const v = (args as Record<string, unknown>)[f];
-        if (v !== undefined && v !== null) body[f] = v;
-      }
+      const body = buildBody(args as Record<string, unknown>, {
+        required: ["title", "priority", "status"],
+        optional: ["description", "accountId", "categoryId", "assignedUserId"],
+      });
       return requireConfirm(
         args.confirm,
         { tool: "create_ticket", method: "POST", path: "/tickets", params: body },
@@ -68,11 +63,9 @@ function addWriteTicketTools(server: McpServer, client: GavrielClient, role: Rol
       },
     },
     async (args) => {
-      const body: Record<string, unknown> = {};
-      for (const f of ["title", "description", "priority", "status", "accountId", "categoryId", "assignedUserId", "resolution"] as const) {
-        const v = (args as Record<string, unknown>)[f];
-        if (v !== undefined && v !== null) body[f] = v;
-      }
+      const body = buildBody(args as Record<string, unknown>, {
+        optional: ["title", "description", "priority", "status", "accountId", "categoryId", "assignedUserId", "resolution"],
+      });
       return requireConfirm(
         args.confirm,
         { tool: "update_ticket", method: "PATCH", path: `/tickets/${args.ticketId}`, params: body },
@@ -122,13 +115,10 @@ function addWriteTicketTools(server: McpServer, client: GavrielClient, role: Rol
       },
     },
     async (args) => {
-      const body: Record<string, unknown> = {
-        ticketId: args.ticketId,
-        title: args.title,
-        type: args.type,
-      };
-      if (args.description) body.description = args.description;
-      if (args.assignedUserId) body.assignedUserId = args.assignedUserId;
+      const body = buildBody(args as Record<string, unknown>, {
+        required: ["ticketId", "title", "type"],
+        optional: ["description", "assignedUserId"],
+      });
       return requireConfirm(
         args.confirm,
         { tool: "add_ticket_activity", method: "POST", path: "/activities", params: body },
@@ -165,24 +155,17 @@ export function registerTicketTools(server: McpServer, client: GavrielClient, ro
       outputSchema: z.object({}).passthrough(),
       annotations: { readOnlyHint: true },
     },
-    async (args) => {
-      try {
-        const params: Record<string, unknown> = {
-          page: args.page,
-          limit: args.limit,
-          sortBy: "createdAt",
-          sortDirection: "desc",
-        };
-        for (const k of ["search", "status", "priority", "accountSearch", "accountId", "categoryId", "assignedUserId"] as const) {
-          const v = (args as Record<string, unknown>)[k];
-          if (v !== undefined) params[k] = v;
-        }
-        const res = await client.get("/tickets", params);
-        return okStructured(res.data);
-      } catch (e) {
-        return err((e as Error).message);
-      }
-    },
+    wrapReadOnly(async (args) => {
+      const params: Record<string, unknown> = {
+        page: args.page,
+        limit: args.limit,
+        sortBy: "createdAt",
+        sortDirection: "desc",
+        ...forwardParams(args as Record<string, unknown>, ["search", "status", "priority", "accountSearch", "accountId", "categoryId", "assignedUserId"]),
+      };
+      const res = await client.get("/tickets", params);
+      return okStructured(res.data);
+    }),
   );
 
   server.registerTool(
@@ -194,17 +177,13 @@ export function registerTicketTools(server: McpServer, client: GavrielClient, ro
       outputSchema: z.object({}).passthrough(),
       annotations: { readOnlyHint: true },
     },
-    async (args) => {
-      try {
-        const [ticket, activities] = await Promise.all([
-          client.get(`/tickets/${args.id}`),
-          client.get(`/activities/ticket/${args.id}`),
-        ]);
-        return okStructured({ ticket: ticket.data, activities: activities.data });
-      } catch (e) {
-        return err((e as Error).message);
-      }
-    },
+    wrapReadOnly(async (args) => {
+      const [ticket, activities] = await Promise.all([
+        client.get(`/tickets/${args.id}`),
+        client.get(`/activities/ticket/${args.id}`),
+      ]);
+      return okStructured({ ticket: ticket.data, activities: activities.data });
+    }),
   );
 
   server.registerTool(
@@ -215,14 +194,10 @@ export function registerTicketTools(server: McpServer, client: GavrielClient, ro
       inputSchema: {},
       annotations: { readOnlyHint: true },
     },
-    async () => {
-      try {
-        const res = await client.get("/tickets/stats");
-        return ok(res.data);
-      } catch (e) {
-        return err((e as Error).message);
-      }
-    },
+    wrapReadOnly(async () => {
+      const res = await client.get("/tickets/stats");
+      return ok(res.data);
+    }),
   );
 
   server.registerTool(
@@ -234,15 +209,11 @@ export function registerTicketTools(server: McpServer, client: GavrielClient, ro
       inputSchema: { accountId: z.string().optional() },
       annotations: { readOnlyHint: true },
     },
-    async (args) => {
-      try {
-        const params: Record<string, unknown> = {};
-        if (args.accountId) params.accountId = args.accountId;
-        const res = await client.get("/tickets/open-technical-count", params);
-        return ok(res.data);
-      } catch (e) {
-        return err((e as Error).message);
-      }
-    },
+    wrapReadOnly(async (args) => {
+      const params: Record<string, unknown> = {};
+      if (args.accountId) params.accountId = args.accountId;
+      const res = await client.get("/tickets/open-technical-count", params);
+      return ok(res.data);
+    }),
   );
 }

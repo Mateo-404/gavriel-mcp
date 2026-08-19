@@ -1,5 +1,5 @@
 import type { GavrielClient } from "../gavrielClient.js";
-import { ok, err, paginationSchema, okStructured, okTruncated } from "./shared.js";
+import { ok, err, paginationSchema, okStructured, okTruncated, buildBody, wrapReadOnly, forwardParams } from "./shared.js";
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { requireConfirm, confirmSchema } from "./writeHelpers.js";
@@ -16,8 +16,13 @@ export function registerAccountTools(server: McpServer, client: GavrielClient, r
     "get_account",
     {
       title: "Obtener cuenta",
-      description: "Devuelve una cuenta con sus zonas, contactos, usuarios e intervenciones.",
-      inputSchema: { id: z.string() },
+      description: "Devuelve una cuenta con sus zonas, contactos, usuarios e intervenciones. Usar `include` para seleccionar secciones y ahorrar tokens.",
+      inputSchema: {
+        id: z.string(),
+        include: z.array(z.enum(["zones", "contacts", "users", "interventions", "devices"]))
+          .optional()
+          .describe("Secciones a incluir (default: todas)"),
+      },
       outputSchema: z.object({}).passthrough(),
       annotations: { readOnlyHint: true },
     },
@@ -26,16 +31,11 @@ export function registerAccountTools(server: McpServer, client: GavrielClient, r
       let id = args.id;
       if (looksLikeAccountNumber) {
         try {
-          // El ID interno es del estilo "xxxxxxxxxxxxxxx"; un número corto
-          // es un número de cuenta. Resolverlo por búsqueda antes de fallar.
           const res = await client.get("/accounts", { search: id, limit: 5 });
           const list = Array.isArray(res.data) ? res.data : (res.data as { data?: unknown[] } | null)?.data ?? [];
           const exact = list.find((a) => String((a as { accountNumber?: unknown }).accountNumber) === args.id);
           if (exact) id = (exact as { id: string }).id;
-        } catch {
-          // búsqueda falla o es lenta: seguir con el id numérico, el error de
-          // abajo lo explica.
-        }
+        } catch { /* fallthrough */ }
       }
       try {
         const res = await client.get(`/accounts/${id}`);
@@ -49,6 +49,25 @@ export function registerAccountTools(server: McpServer, client: GavrielClient, r
             );
           }
           return err(`GET /accounts/${id} -> ${res.status}: ${String(detail).slice(0, 200)}`);
+        }
+        // Filtrar secciones si se pidió `include`
+        const include = args.include as string[] | undefined;
+        if (include && Array.isArray(include) && include.length > 0) {
+          const d = res.data as Record<string, unknown>;
+          const SECTION_KEYS: Record<string, string[]> = {
+            zones: ["accountZones", "zones"],
+            contacts: ["accountContacts", "contacts"],
+            users: ["accountUsers", "users"],
+            interventions: ["interventions"],
+            devices: ["devices"],
+          };
+          const filtered = { ...d };
+          for (const [section, keys] of Object.entries(SECTION_KEYS)) {
+            if (!include.includes(section)) {
+              for (const k of keys) delete filtered[k];
+            }
+          }
+          return okStructured(filtered);
         }
         return okStructured(res.data);
       } catch (e) {
@@ -84,17 +103,9 @@ export function registerAccountTools(server: McpServer, client: GavrielClient, r
       annotations: { readOnlyHint: true },
     },
     async (args) => {
-      try {
-        const params: Record<string, unknown> = { page: args.page, limit: args.limit };
-        for (const k of ["search", "name", "code"] as const) {
-          const v = (args as Record<string, unknown>)[k];
-          if (v !== undefined) params[k] = v;
-        }
-        const res = await client.get("/accounts", params);
-        return okTruncated(res.data, args.truncate);
-      } catch (e) {
-        return err((e as Error).message);
-      }
+      const params: Record<string, unknown> = { page: args.page, limit: args.limit, ...forwardParams(args as Record<string, unknown>, ["search", "name", "code"]) };
+      const res = await client.get("/accounts", params);
+      return okTruncated(res.data, args.truncate);
     },
   );
 
@@ -113,11 +124,7 @@ export function registerAccountTools(server: McpServer, client: GavrielClient, r
       },
     },
     async (args) => {
-      const body: Record<string, unknown> = {};
-      for (const f of ACCOUNT_FIELDS) {
-        const v = (args as Record<string, unknown>)[f];
-        if (v !== undefined && v !== null) body[f] = v;
-      }
+      const body = buildBody(args as Record<string, unknown>, { optional: ACCOUNT_FIELDS });
       return requireConfirm(
         args.confirm,
         { tool: "update_account", method: "PATCH", path: `/accounts/${args.id}`, params: body },
@@ -143,9 +150,10 @@ export function registerAccountTools(server: McpServer, client: GavrielClient, r
       },
     },
     async (args) => {
-      const body: Record<string, unknown> = { type: args.type, content: args.content };
-      if (args.validFrom) body.validFrom = args.validFrom;
-      if (args.validUntil) body.validUntil = args.validUntil;
+      const body = buildBody(args as Record<string, unknown>, {
+        required: ["type", "content"],
+        optional: ["validFrom", "validUntil"],
+      });
       return requireConfirm(
         args.confirm,
         { tool: "add_account_note", method: "POST", path: `/accounts/${args.accountId}/notes`, params: body },
@@ -170,11 +178,7 @@ export function registerAccountTools(server: McpServer, client: GavrielClient, r
       },
     },
     async (args) => {
-      const body: Record<string, unknown> = {};
-      for (const f of ["content", "validFrom", "validUntil"] as const) {
-        const v = (args as Record<string, unknown>)[f];
-        if (v !== undefined) body[f] = v;
-      }
+      const body = buildBody(args as Record<string, unknown>, { optional: ["content", "validFrom", "validUntil"] });
       return requireConfirm(
         args.confirm,
         { tool: "update_account_note", method: "PATCH", path: `/accounts/${args.accountId}/notes/${args.noteId}`, params: body },
@@ -211,17 +215,22 @@ export function registerAccountTools(server: McpServer, client: GavrielClient, r
     {
       title: "Listar dispositivos de cuenta",
       description: "GET /accounts/{id}/devices.",
-      inputSchema: { id: z.string() },
+      inputSchema: {
+        id: z.string(),
+        brandId: z.string().optional().describe("Filtrar por marca"),
+        modelId: z.string().optional().describe("Filtrar por modelo"),
+        status: z.string().optional().describe("Filtrar por estado"),
+      },
       annotations: { readOnlyHint: true },
     },
-    async (args) => {
-      try {
-        const res = await client.get(`/accounts/${args.id}/devices`);
-        return ok(res.data);
-      } catch (e) {
-        return err((e as Error).message);
-      }
-    },
+    wrapReadOnly(async (args) => {
+      const params: Record<string, unknown> = {};
+      if (args.brandId) params.brandId = args.brandId;
+      if (args.modelId) params.modelId = args.modelId;
+      if (args.status) params.status = args.status;
+      const res = await client.get(`/accounts/${args.id}/devices`, Object.keys(params).length ? params : undefined);
+      return ok(res.data);
+    }),
   );
 
   server.registerTool(
@@ -232,14 +241,10 @@ export function registerAccountTools(server: McpServer, client: GavrielClient, r
       inputSchema: { id: z.string() },
       annotations: { readOnlyHint: true },
     },
-    async (args) => {
-      try {
-        const res = await client.get(`/accounts/${args.id}/partitions`);
-        return ok(res.data);
-      } catch (e) {
-        return err((e as Error).message);
-      }
-    },
+    wrapReadOnly(async (args) => {
+      const res = await client.get(`/accounts/${args.id}/partitions`);
+      return ok(res.data);
+    }),
   );
 
   server.registerTool(
@@ -250,14 +255,10 @@ export function registerAccountTools(server: McpServer, client: GavrielClient, r
       inputSchema: { id: z.string() },
       annotations: { readOnlyHint: true },
     },
-    async (args) => {
-      try {
-        const res = await client.get(`/account-users/account/${args.id}`);
-        return ok(res.data);
-      } catch (e) {
-        return err((e as Error).message);
-      }
-    },
+    wrapReadOnly(async (args) => {
+      const res = await client.get(`/account-users/account/${args.id}`);
+      return ok(res.data);
+    }),
   );
 
   server.registerTool(
@@ -268,14 +269,10 @@ export function registerAccountTools(server: McpServer, client: GavrielClient, r
       inputSchema: { accountId: z.string() },
       annotations: { readOnlyHint: true },
     },
-    async (args) => {
-      try {
-        const res = await client.get("/account-contacts", { accountId: args.accountId });
-        return ok(res.data);
-      } catch (e) {
-        return err((e as Error).message);
-      }
-    },
+    wrapReadOnly(async (args) => {
+      const res = await client.get("/account-contacts", { accountId: args.accountId });
+      return ok(res.data);
+    }),
   );
 
   server.registerTool(
@@ -289,17 +286,13 @@ export function registerAccountTools(server: McpServer, client: GavrielClient, r
       },
       annotations: { readOnlyHint: true },
     },
-    async (args) => {
-      try {
-        const path = args.jurisdictionId
-          ? `/useful-contacts/jurisdiction/${args.jurisdictionId}`
-          : "/useful-contacts";
-        const res = await client.get(path);
-        return ok(res.data);
-      } catch (e) {
-        return err((e as Error).message);
-      }
-    },
+    wrapReadOnly(async (args) => {
+      const path = args.jurisdictionId
+        ? `/useful-contacts/jurisdiction/${args.jurisdictionId}`
+        : "/useful-contacts";
+      const res = await client.get(path);
+      return ok(res.data);
+    }),
   );
 
   server.registerTool(
@@ -310,14 +303,10 @@ export function registerAccountTools(server: McpServer, client: GavrielClient, r
       inputSchema: { id: z.string() },
       annotations: { readOnlyHint: true },
     },
-    async (args) => {
-      try {
-        const res = await client.get(`/zones/account/${args.id}`);
-        return ok(res.data);
-      } catch (e) {
-        return err((e as Error).message);
-      }
-    },
+    wrapReadOnly(async (args) => {
+      const res = await client.get(`/zones/account/${args.id}`);
+      return ok(res.data);
+    }),
   );
 
   registerTool(
@@ -336,11 +325,10 @@ export function registerAccountTools(server: McpServer, client: GavrielClient, r
       },
     },
     async (args) => {
-      const body: Record<string, unknown> = { accountId: args.accountId, name: args.name };
-      for (const f of ["phone", "email", "description", "order"] as const) {
-        const v = (args as Record<string, unknown>)[f];
-        if (v !== undefined) body[f] = v;
-      }
+      const body = buildBody(args as Record<string, unknown>, {
+        required: ["accountId", "name"],
+        optional: ["phone", "email", "description", "order"],
+      });
       return requireConfirm(
         args.confirm,
         { tool: "add_account_contact", method: "POST", path: "/account-contacts", params: body },
@@ -366,11 +354,7 @@ export function registerAccountTools(server: McpServer, client: GavrielClient, r
       },
     },
     async (args) => {
-      const body: Record<string, unknown> = {};
-      for (const f of ["name", "phone", "email", "description", "order"] as const) {
-        const v = (args as Record<string, unknown>)[f];
-        if (v !== undefined) body[f] = v;
-      }
+      const body = buildBody(args as Record<string, unknown>, { optional: ["name", "phone", "email", "description", "order"] });
       return requireConfirm(
         args.confirm,
         { tool: "update_account_contact", method: "PATCH", path: `/account-contacts/${args.contactId}`, params: body },

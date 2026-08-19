@@ -53,6 +53,7 @@ export const READ_PREFIXES = [
   "/files",
   "/files/stats",
   "/partitions",
+  "/devices",
 ] as const;
 
 // Exportada solo para poder testear la whitelist directamente desde
