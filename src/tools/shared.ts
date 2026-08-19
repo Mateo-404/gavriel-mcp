@@ -20,6 +20,45 @@ export const paginationSchema = {
     .describe(`Cantidad por página (default ${DEFAULT_LIMIT}, máximo ${MAX_LIMIT})`),
 };
 
+// Construye el body de una escritura a partir de los args de la tool.
+// required: campos que siempre van. optional: campos que van solo si no son undefined/null.
+export function buildBody(
+  args: Record<string, unknown>,
+  opts: { required?: readonly string[]; optional?: readonly string[] },
+): Record<string, unknown> {
+  const body: Record<string, unknown> = {};
+  for (const f of opts.required ?? []) body[f] = args[f];
+  for (const f of opts.optional ?? []) {
+    if (args[f] !== undefined && args[f] !== null) body[f] = args[f];
+  }
+  return body;
+}
+
+// Envuelve un handler de solo lectura con try/catch estandarizado.
+export function wrapReadOnly<T>(
+  fn: (args: T) => Promise<CallToolResult>,
+): (args: T) => Promise<CallToolResult> {
+  return async (args) => {
+    try {
+      return await fn(args);
+    } catch (e) {
+      return err((e as Error).message);
+    }
+  };
+}
+
+// Extrae parámetros de query de args, saltando los undefined.
+export function forwardParams(
+  args: Record<string, unknown>,
+  keys: readonly string[],
+): Record<string, unknown> {
+  const params: Record<string, unknown> = {};
+  for (const k of keys) {
+    if (args[k] !== undefined) params[k] = args[k];
+  }
+  return params;
+}
+
 // JSON compacto (sin indentación): ahorra ~30-40% de tokens vs pretty-print.
 // Los logs (writes.log/perf.log) usan su propio formato legible.
 export function ok(value: unknown): CallToolResult {

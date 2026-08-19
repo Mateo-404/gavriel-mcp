@@ -1,5 +1,5 @@
 import type { GavrielClient } from "../gavrielClient.js";
-import { ok, err, paginationSchema, MAX_LIMIT, okTruncated } from "./shared.js";
+import { ok, err, paginationSchema, MAX_LIMIT, okTruncated, wrapReadOnly, forwardParams } from "./shared.js";
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { Role } from "./roles.js";
@@ -19,19 +19,11 @@ export function registerMonitoringTools(server: McpServer, client: GavrielClient
       },
       annotations: { readOnlyHint: true },
     },
-    async (args) => {
-      try {
-        const params: Record<string, unknown> = { page: args.page, limit: args.limit };
-        for (const k of ["bridgeId", "type", "activated", "search"] as const) {
-          const v = (args as Record<string, unknown>)[k];
-          if (v !== undefined) params[k] = v;
-        }
-        const res = await client.get("/connections", params);
-        return ok(res.data);
-      } catch (e) {
-        return err((e as Error).message);
-      }
-    },
+    wrapReadOnly(async (args) => {
+      const params: Record<string, unknown> = { page: args.page, limit: args.limit, ...forwardParams(args as Record<string, unknown>, ["bridgeId", "type", "activated", "search"]) };
+      const res = await client.get("/connections", params);
+      return ok(res.data);
+    }),
   );
 
   server.registerTool(
@@ -42,14 +34,10 @@ export function registerMonitoringTools(server: McpServer, client: GavrielClient
       inputSchema: { id: z.string() },
       annotations: { readOnlyHint: true },
     },
-    async (args) => {
-      try {
-        const res = await client.get(`/connections/report/${args.id}`);
-        return ok(res.data);
-      } catch (e) {
-        return err((e as Error).message);
-      }
-    },
+    wrapReadOnly(async (args) => {
+      const res = await client.get(`/connections/report/${args.id}`);
+      return ok(res.data);
+    }),
   );
 
   server.registerTool(
@@ -77,17 +65,13 @@ export function registerMonitoringTools(server: McpServer, client: GavrielClient
       },
       annotations: { readOnlyHint: true },
     },
-    async (args) => {
-      try {
-        const params: Record<string, unknown> = { port: args.port };
-        if (args.nextToken !== undefined) params.nextToken = args.nextToken;
-        if (args.limit !== undefined) params.limit = args.limit;
-        const res = await client.get(`/bridges/${args.id}/logs`, params);
-        return okTruncated(res.data, args.truncate);
-      } catch (e) {
-        return err((e as Error).message);
-      }
-    },
+    wrapReadOnly(async (args) => {
+      const params: Record<string, unknown> = { port: args.port };
+      if (args.nextToken !== undefined) params.nextToken = args.nextToken;
+      if (args.limit !== undefined) params.limit = args.limit;
+      const res = await client.get(`/bridges/${args.id}/logs`, params);
+      return okTruncated(res.data, args.truncate);
+    }),
   );
 
   server.registerTool(
@@ -98,14 +82,10 @@ export function registerMonitoringTools(server: McpServer, client: GavrielClient
       inputSchema: { id: z.string() },
       annotations: { readOnlyHint: true },
     },
-    async (args) => {
-      try {
-        const res = await client.get(`/bridges/${args.id}/disk-space`);
-        return ok(res.data);
-      } catch (e) {
-        return err((e as Error).message);
-      }
-    },
+    wrapReadOnly(async (args) => {
+      const res = await client.get(`/bridges/${args.id}/disk-space`);
+      return ok(res.data);
+    }),
   );
 
   server.registerTool(
@@ -116,14 +96,10 @@ export function registerMonitoringTools(server: McpServer, client: GavrielClient
       inputSchema: {},
       annotations: { readOnlyHint: true },
     },
-    async () => {
-      try {
-        const res = await client.get("/events/accounts-with-pending-events");
-        return ok(res.data);
-      } catch (e) {
-        return err((e as Error).message);
-      }
-    },
+    wrapReadOnly(async () => {
+      const res = await client.get("/events/accounts-with-pending-events");
+      return ok(res.data);
+    }),
   );
 
   server.registerTool(
@@ -136,15 +112,11 @@ export function registerMonitoringTools(server: McpServer, client: GavrielClient
       annotations: { readOnlyHint: true },
     },
     async (args) => {
-      try {
-        const path = args.connectionId
-          ? "/monitoring/events-chart"
-          : "/monitoring/all-connections-events-chart";
-        const res = await client.get(path, args.connectionId ? { connectionId: args.connectionId } : undefined);
-        return ok(res.data);
-      } catch (e) {
-        return err((e as Error).message);
-      }
+      const path = args.connectionId
+        ? "/monitoring/events-chart"
+        : "/monitoring/all-connections-events-chart";
+      const res = await client.get(path, args.connectionId ? { connectionId: args.connectionId } : undefined);
+      return ok(res.data);
     },
   );
 }

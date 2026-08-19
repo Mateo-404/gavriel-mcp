@@ -1,5 +1,5 @@
 import type { GavrielClient } from "../gavrielClient.js";
-import { ok, err } from "./shared.js";
+import { ok, err, wrapReadOnly, buildBody } from "./shared.js";
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { requireConfirm, confirmSchema } from "./writeHelpers.js";
@@ -23,14 +23,10 @@ export function registerActivityTools(server: McpServer, client: GavrielClient, 
       inputSchema: { id: z.string() },
       annotations: { readOnlyHint: true },
     },
-    async (args) => {
-      try {
-        const res = await client.get(`/activities/ticket/${args.id}`);
-        return ok(res.data);
-      } catch (e) {
-        return err((e as Error).message);
-      }
-    },
+    wrapReadOnly(async (args) => {
+      const res = await client.get(`/activities/ticket/${args.id}`);
+      return ok(res.data);
+    }),
   );
 
   server.registerTool(
@@ -41,14 +37,10 @@ export function registerActivityTools(server: McpServer, client: GavrielClient, 
       inputSchema: {},
       annotations: { readOnlyHint: true },
     },
-    async (_args) => {
-      try {
-        const res = await client.get("/activities/stats");
-        return ok(res.data);
-      } catch (e) {
-        return err((e as Error).message);
-      }
-    },
+    wrapReadOnly(async (_args) => {
+      const res = await client.get("/activities/stats");
+      return ok(res.data);
+    }),
   );
 
   registerTool(
@@ -119,16 +111,9 @@ export function registerActivityTools(server: McpServer, client: GavrielClient, 
       },
     },
     async (args) => {
-      const body: Record<string, unknown> = {};
-      const fields = ["title", "description", "type"] as const;
-      for (const f of fields) {
-        const v = (args as Record<string, unknown>)[f];
-        if (v !== undefined) body[f] = v;
-      }
-      for (const f of ["assignedUserId", "ticketId"] as const) {
-        const v = (args as Record<string, unknown>)[f];
-        if (v !== undefined && v !== null) body[f] = v;
-      }
+      const body = buildBody(args as Record<string, unknown>, {
+        optional: ["title", "description", "type", "assignedUserId", "ticketId"],
+      });
       const path = `/activities/${args.activityId}`;
       return requireConfirm(
         args.confirm,

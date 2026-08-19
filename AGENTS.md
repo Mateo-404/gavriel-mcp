@@ -155,6 +155,22 @@ archivos) están en `TIER3_PENDIENTE.md`: **documentados pero no implementados**
   versión). Instalar con `pnpm install --frozen-lockfile`; no regenerar
   `pnpm-lock.yaml` a mano.
 
+## Bridge transformation rules (QuecLink GL320MG)
+
+Los bridges transforman los códigos del protocolo antes de almacenarlos. Conocer
+las reglas es necesario para crear event codes correctos:
+
+| Sección protocolo | Bridge transforma | Ejemplo | Almacenado |
+|-------------------|-------------------|---------|------------|
+| 3.3.4 event reports | GT → E | GTSTT → ESTT | `Exxx` |
+| 3.3.4 restores | GT → R | GTEPF → REPF | `Rxxx` |
+| 3.3.1-3.3.3, 3.4 | Sin transform | GTFRI → GTFRI | `GTxxx` |
+
+**Regla:** eventos de la sección 3.3.4 usan prefijo **E**, restauraciones
+usan **R**, el resto mantiene **GT**. La regla es del bridge, no del backend.
+Otros formatos pueden tener reglas diferentes — verificar con eventos reales
+antes de crear codes para un formato nuevo.
+
 ## Reglas de proyecto
 
 1. No hardcodear credenciales/JWT en código, tests, README ni este archivo.
