@@ -1,5 +1,5 @@
 import type { GavrielClient } from "../gavrielClient.js";
-import { ok, err, wrapReadOnly, buildBody } from "./shared.js";
+import { ok, err, okTruncated, truncateSchema, selectFields, wrapReadOnly, buildBody } from "./shared.js";
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { requireConfirm, confirmSchema } from "./writeHelpers.js";
@@ -10,13 +10,15 @@ export function registerServiceTools(server: McpServer, client: GavrielClient, r
     "get_service_panel",
     {
       title: "Obtener panel de servicios",
-      description: "GET /services/panel.",
-      inputSchema: {},
+      description: "Panel de servicios.",
+      inputSchema: {
+        truncate: truncateSchema,
+      },
       annotations: { readOnlyHint: true },
     },
-    wrapReadOnly(async () => {
+    wrapReadOnly(async (args) => {
       const res = await client.get("/services/panel");
-      return ok(res.data);
+      return okTruncated(res.data, args.truncate);
     }),
   );
 
@@ -24,13 +26,15 @@ export function registerServiceTools(server: McpServer, client: GavrielClient, r
     "get_service_panel_summary",
     {
       title: "Obtener resumen del panel de servicios",
-      description: "GET /services/panel/summary.",
-      inputSchema: {},
+      description: "Resumen del panel.",
+      inputSchema: {
+        truncate: truncateSchema,
+      },
       annotations: { readOnlyHint: true },
     },
-    wrapReadOnly(async () => {
+    wrapReadOnly(async (args) => {
       const res = await client.get("/services/panel/summary");
-      return ok(res.data);
+      return okTruncated(res.data, args.truncate);
     }),
   );
 
@@ -38,10 +42,12 @@ export function registerServiceTools(server: McpServer, client: GavrielClient, r
     "list_technician_agenda",
     {
       title: "Listar agenda de técnicos",
-      description: "GET /services/technician-agenda con userId y fecha.",
+      description: "Agenda del técnico.",
       inputSchema: {
         userId: z.string(),
         date: z.string().describe("Fecha (ISO 8601)"),
+        truncate: truncateSchema,
+        fields: z.array(z.string()).optional(),
       },
       annotations: { readOnlyHint: true },
     },
@@ -50,7 +56,7 @@ export function registerServiceTools(server: McpServer, client: GavrielClient, r
         userId: args.userId,
         date: args.date,
       });
-      return ok(res.data);
+      return okTruncated(selectFields(res.data as Record<string, unknown>, args.fields), args.truncate);
     }),
   );
 
@@ -58,27 +64,16 @@ export function registerServiceTools(server: McpServer, client: GavrielClient, r
     "get_service",
     {
       title: "Obtener servicio",
-      description: "GET /services/{id}.",
-      inputSchema: { id: z.string() },
+      description: "Servicio por ID.",
+      inputSchema: {
+        id: z.string(),
+        fields: z.array(z.string()).optional(),
+      },
       annotations: { readOnlyHint: true },
     },
     wrapReadOnly(async (args) => {
       const res = await client.get(`/services/${args.id}`);
-      return ok(res.data);
-    }),
-  );
-
-  server.registerTool(
-    "get_technician_locations",
-    {
-      title: "Obtener ubicaciones de técnicos",
-      description: "GET /technician-locations/latest.",
-      inputSchema: {},
-      annotations: { readOnlyHint: true },
-    },
-    wrapReadOnly(async () => {
-      const res = await client.get("/technician-locations/latest");
-      return ok(res.data);
+      return ok(selectFields(res.data as Record<string, unknown>, args.fields));
     }),
   );
 

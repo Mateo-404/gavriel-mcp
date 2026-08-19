@@ -1,5 +1,5 @@
 import type { GavrielClient } from "../gavrielClient.js";
-import { ok, err, paginationSchema, wrapReadOnly, forwardParams } from "./shared.js";
+import { ok, err, paginationSchema, okTruncated, truncateSchema, selectFields, wrapReadOnly, forwardParams } from "./shared.js";
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { requireConfirm, confirmSchema } from "./writeHelpers.js";
@@ -10,17 +10,19 @@ export function registerOrgTools(server: McpServer, client: GavrielClient, role:
     "list_companies",
     {
       title: "Listar empresas",
-      description: "Lista empresas del sistema con búsqueda opcional.",
+      description: "Lista empresas.",
       inputSchema: {
         ...paginationSchema,
         search: z.string().optional().describe("Búsqueda libre (nombre/código)"),
+        truncate: truncateSchema,
+        fields: z.array(z.string()).optional(),
       },
       annotations: { readOnlyHint: true },
     },
     wrapReadOnly(async (args) => {
       const params: Record<string, unknown> = { page: args.page, limit: args.limit, ...forwardParams(args as Record<string, unknown>, ["search"]) };
       const res = await client.get("/companies", params);
-      return ok(res.data);
+      return okTruncated(selectFields(res.data as Record<string, unknown>, args.fields), args.truncate);
     }),
   );
 
@@ -28,13 +30,17 @@ export function registerOrgTools(server: McpServer, client: GavrielClient, role:
     "list_company_technicians",
     {
       title: "Listar técnicos de empresa",
-      description: "Técnicos de la empresa para asignar servicios.",
-      inputSchema: { id: z.string() },
+      description: "Técnicos de una empresa.",
+      inputSchema: {
+        id: z.string(),
+        truncate: truncateSchema,
+        fields: z.array(z.string()).optional(),
+      },
       annotations: { readOnlyHint: true },
     },
     wrapReadOnly(async (args) => {
       const res = await client.get(`/companies/${args.id}/technicians`);
-      return ok(res.data);
+      return okTruncated(selectFields(res.data as Record<string, unknown>, args.fields), args.truncate);
     }),
   );
 
@@ -42,17 +48,19 @@ export function registerOrgTools(server: McpServer, client: GavrielClient, role:
     "list_users",
     {
       title: "Listar usuarios",
-      description: "Lista usuarios del sistema con búsqueda opcional.",
+      description: "Lista usuarios.",
       inputSchema: {
         ...paginationSchema,
         search: z.string().optional().describe("Búsqueda libre (nombre/email)"),
+        truncate: truncateSchema,
+        fields: z.array(z.string()).optional(),
       },
       annotations: { readOnlyHint: true },
     },
     wrapReadOnly(async (args) => {
       const params: Record<string, unknown> = { page: args.page, limit: args.limit, ...forwardParams(args as Record<string, unknown>, ["search"]) };
       const res = await client.get("/users", params);
-      return ok(res.data);
+      return okTruncated(selectFields(res.data as Record<string, unknown>, args.fields), args.truncate);
     }),
   );
 
@@ -60,13 +68,15 @@ export function registerOrgTools(server: McpServer, client: GavrielClient, role:
     "list_roles",
     {
       title: "Listar roles",
-      description: "Lista de roles del sistema.",
-      inputSchema: {},
+      description: "Roles del sistema.",
+      inputSchema: {
+        truncate: truncateSchema,
+      },
       annotations: { readOnlyHint: true },
     },
-    wrapReadOnly(async (_args) => {
+    wrapReadOnly(async (args) => {
       const res = await client.get("/roles");
-      return ok(res.data);
+      return okTruncated(res.data, args.truncate);
     }),
   );
 

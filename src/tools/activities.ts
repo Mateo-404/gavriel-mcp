@@ -1,5 +1,5 @@
 import type { GavrielClient } from "../gavrielClient.js";
-import { ok, err, wrapReadOnly, buildBody } from "./shared.js";
+import { ok, err, wrapReadOnly, buildBody, okTruncated, truncateSchema, selectFields } from "./shared.js";
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { requireConfirm, confirmSchema } from "./writeHelpers.js";
@@ -18,37 +18,42 @@ export function registerActivityTools(server: McpServer, client: GavrielClient, 
   server.registerTool(
     "list_activities_by_ticket",
     {
-      title: "Listar actividades de ticket",
-      description: "Actividades/comentarios de un ticket.",
-      inputSchema: { id: z.string() },
+      title: "Actividades de ticket",
+      description: "Actividades de un ticket.",
+      inputSchema: {
+        id: z.string(),
+        truncate: truncateSchema,
+        fields: z.array(z.string()).optional().describe("Campos a retornar"),
+      },
       annotations: { readOnlyHint: true },
     },
     wrapReadOnly(async (args) => {
       const res = await client.get(`/activities/ticket/${args.id}`);
-      return ok(res.data);
+      return okTruncated(selectFields(res.data as Record<string, unknown>, args.fields as string[] | undefined), args.truncate);
     }),
   );
 
   server.registerTool(
     "get_activity_stats",
     {
-      title: "Estadísticas de actividades",
-      description: "Estadísticas globales de actividades.",
-      inputSchema: {},
+      title: "Stats de actividades",
+      description: "Stats de actividades.",
+      inputSchema: {
+        truncate: truncateSchema,
+      },
       annotations: { readOnlyHint: true },
     },
-    wrapReadOnly(async (_args) => {
+    wrapReadOnly(async (args) => {
       const res = await client.get("/activities/stats");
-      return ok(res.data);
+      return okTruncated(res.data, args.truncate);
     }),
   );
 
   registerTool(
     server, role, "full", "mark_activity_read",
     {
-      title: "Marcar actividad como leída (ESCRITURA)",
-      description:
-        "PATCH /activities/{id}/mark-as-read. Marca una actividad como leída. Requiere confirm: true.",
+      title: "Marcar leída (ESCRITURA)",
+      description: "PATCH /activities/{id}/mark-as-read. Requiere confirm: true.",
       inputSchema: {
         activityId: z.string(),
         readAt: z
@@ -74,9 +79,8 @@ export function registerActivityTools(server: McpServer, client: GavrielClient, 
   registerTool(
     server, role, "full", "mark_activity_unread",
     {
-      title: "Marcar actividad como no leída (ESCRITURA)",
-      description:
-        "PATCH /activities/{id}/mark-as-unread. Marca una actividad como no leída. Requiere confirm: true.",
+      title: "Marcar no leída (ESCRITURA)",
+      description: "PATCH /activities/{id}/mark-as-unread. Requiere confirm: true.",
       inputSchema: {
         activityId: z.string(),
         confirm: confirmSchema,
@@ -98,8 +102,7 @@ export function registerActivityTools(server: McpServer, client: GavrielClient, 
     server, role, "full", "update_activity",
     {
       title: "Actualizar actividad (ESCRITURA)",
-      description:
-        "PATCH /activities/{id}. Actualiza campos de una actividad (solo envía los provistos). Requiere confirm: true.",
+      description: "PATCH /activities/{id}. Requiere confirm: true.",
       inputSchema: {
         activityId: z.string(),
         title: z.string().optional(),

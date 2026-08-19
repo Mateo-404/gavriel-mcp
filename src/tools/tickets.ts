@@ -1,5 +1,5 @@
 import type { GavrielClient } from "../gavrielClient.js";
-import { ok, err, paginationSchema, okStructured, buildBody, wrapReadOnly, forwardParams } from "./shared.js";
+import { ok, err, paginationSchema, okStructured, okTruncated, buildBody, wrapReadOnly, forwardParams, truncateSchema, selectFields } from "./shared.js";
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { requireConfirm, confirmSchema } from "./writeHelpers.js";
@@ -13,11 +13,11 @@ const ACTIVITY_TYPES = [
 
 function addWriteTicketTools(server: McpServer, client: GavrielClient, role: Role): void {
   registerTool(
-    server, role, "full", "create_ticket",
+    server, role, "lite", "create_ticket",
     {
       title: "Crear ticket (ESCRITURA)",
       description:
-        "POST /tickets. status y priority se validan contra catálogos (gavriel://catalog/tickets/*). La descripción se envía como texto/HTML. Requiere confirm: true.",
+        "POST /tickets. status y priority se validan contra catálogos (gavriel://catalog/tickets/*). La descripción se envía como texto/HTML.",
       inputSchema: {
         title: z.string().min(1),
         description: z.string().optional(),
@@ -44,11 +44,11 @@ function addWriteTicketTools(server: McpServer, client: GavrielClient, role: Rol
   );
 
   registerTool(
-    server, role, "full", "update_ticket",
+    server, role, "lite", "update_ticket",
     {
       title: "Actualizar ticket (ESCRITURA)",
       description:
-        "PATCH /tickets/{id}. Solo envía los campos provistos. Para cerrar con resolución usar close_ticket. Requiere confirm: true.",
+        "PATCH /tickets/{id}. Solo envía los campos provistos. Para cerrar con resolución usar close_ticket.",
       inputSchema: {
         ticketId: z.string(),
         title: z.string().optional(),
@@ -80,7 +80,7 @@ function addWriteTicketTools(server: McpServer, client: GavrielClient, role: Rol
     {
       title: "Cerrar ticket (ESCRITURA)",
       description:
-        "PATCH /tickets/{id}/close con resolución. Requiere confirm: true.",
+        "PATCH /tickets/{id}/close con resolución.",
       inputSchema: {
         ticketId: z.string(),
         resolution: z.string().describe("Resolución / comentario de cierre"),
@@ -137,7 +137,7 @@ export function registerTicketTools(server: McpServer, client: GavrielClient, ro
     {
       title: "Listar tickets",
       description:
-        "Lista tickets de Gavriel con filtros. El sistema tiene +170.000 tickets: siempre acotar con filtros o paginación chica. Respuesta: { data, meta.pagination }.",
+        "Lista tickets con filtros.",
       inputSchema: {
         ...paginationSchema,
         search: z.string().optional().describe("Búsqueda libre (título/descripción)"),
@@ -151,6 +151,8 @@ export function registerTicketTools(server: McpServer, client: GavrielClient, ro
         accountId: z.string().optional(),
         categoryId: z.string().optional(),
         assignedUserId: z.string().optional(),
+        truncate: truncateSchema,
+        fields: z.array(z.string()).optional().describe("Campos a retornar por ticket"),
       },
       outputSchema: z.object({}).passthrough(),
       annotations: { readOnlyHint: true },
@@ -164,7 +166,8 @@ export function registerTicketTools(server: McpServer, client: GavrielClient, ro
         ...forwardParams(args as Record<string, unknown>, ["search", "status", "priority", "accountSearch", "accountId", "categoryId", "assignedUserId"]),
       };
       const res = await client.get("/tickets", params);
-      return okStructured(res.data);
+      const data = args.fields ? selectFields(res.data as Record<string, unknown>[], args.fields) : res.data;
+      return args.truncate ? okTruncated(data, args.truncate) : ok(data);
     }),
   );
 
@@ -172,17 +175,27 @@ export function registerTicketTools(server: McpServer, client: GavrielClient, ro
     "get_ticket",
     {
       title: "Obtener ticket por ID",
-      description: "Devuelve el ticket y sus actividades (comentarios) asociadas.",
-      inputSchema: { id: z.string().describe("ID del ticket") },
+      description: "Ticket y sus actividades.",
+      inputSchema: {
+        id: z.string().describe("ID del ticket"),
+        include: z.array(z.enum(["activities"])).optional().describe("Secciones extra (default: activities)"),
+        truncate: truncateSchema,
+        fields: z.array(z.string()).optional().describe("Campos a retornar"),
+      },
       outputSchema: z.object({}).passthrough(),
       annotations: { readOnlyHint: true },
     },
     wrapReadOnly(async (args) => {
-      const [ticket, activities] = await Promise.all([
-        client.get(`/tickets/${args.id}`),
-        client.get(`/activities/ticket/${args.id}`),
-      ]);
-      return okStructured({ ticket: ticket.data, activities: activities.data });
+      const ticket = await client.get(`/tickets/${args.id}`);
+      const shouldFetchActivities = !args.include || args.include.includes("activities");
+      if (shouldFetchActivities) {
+        const activities = await client.get(`/activities/ticket/${args.id}`);
+        const result = { ticket: ticket.data, activities: activities.data };
+        const filtered = args.fields ? selectFields(result as Record<string, unknown>, args.fields) : result;
+        return args.truncate ? okTruncated(filtered, args.truncate) : ok(filtered);
+      }
+      const filtered = args.fields ? selectFields(ticket.data as Record<string, unknown>, args.fields) : ticket.data;
+      return args.truncate ? okTruncated(filtered, args.truncate) : ok(filtered);
     }),
   );
 

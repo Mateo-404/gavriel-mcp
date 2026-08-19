@@ -1,5 +1,5 @@
 import type { GavrielClient } from "../gavrielClient.js";
-import { ok, err, paginationSchema, okStructured, wrapReadOnly, forwardParams, okTruncated } from "./shared.js";
+import { ok, err, paginationSchema, okStructured, wrapReadOnly, forwardParams, okTruncated, truncateSchema, selectFields, requireFilters } from "./shared.js";
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { requireConfirm, confirmSchema } from "./writeHelpers.js";
@@ -19,16 +19,18 @@ export function registerEventTools(server: McpServer, client: GavrielClient, rol
     "get_event",
     {
       title: "Obtener evento por ID",
-      description: "Devuelve el evento completo con relaciones (account, connection, eventsCode, eventsType).",
+      description: "Evento por ID con relaciones.",
       inputSchema: {
         id: z.string().describe("ID del evento"),
-        truncate: z.number().int().min(1000).optional().describe("Máx chars del JSON compacto (default: completo)"),
+        truncate: truncateSchema,
+        fields: z.array(z.string()).optional(),
       },
       annotations: { readOnlyHint: true },
     },
     wrapReadOnly(async (args) => {
       const res = await client.get(`/events/${args.id}`);
-      return args.truncate ? okTruncated(res.data, args.truncate) : ok(res.data);
+      const data = selectFields(res.data as Record<string, unknown>, args.fields);
+      return args.truncate ? okTruncated(data, args.truncate) : ok(data);
     }),
   );
 
@@ -37,10 +39,10 @@ export function registerEventTools(server: McpServer, client: GavrielClient, rol
     {
       title: "Listar eventos",
       description:
-        "Lista eventos (alarmas) con filtros. Estados: pending, attending, processed, self-processed, cancelled, hidden. IMPORTANTE: backend lento — filtrar siempre por accountId y/o rango de fechas acotado (sin filtros: 60s+ o 500).",
+        "Lista eventos (alarmas). Requiere accountId. Catálogos: gavriel://catalog/events-types",
       inputSchema: {
         ...paginationSchema,
-        accountId: z.string().optional(),
+        accountId: z.string(),
         accountNumber: z.string().optional(),
         port: z.string().optional(),
         eventCode: z.string().optional(),
@@ -53,11 +55,14 @@ export function registerEventTools(server: McpServer, client: GavrielClient, rol
         connectionId: z.string().optional(),
         dateFrom: z.string().optional().describe("ISO datetime, ej 2026-08-01T00:00:00.000Z"),
         dateTo: z.string().optional().describe("ISO datetime"),
+        fields: z.array(z.string()).optional().describe("Campos a retornar por evento"),
       },
       outputSchema: z.object({}).passthrough(),
       annotations: { readOnlyHint: true },
     },
     wrapReadOnly(async (args) => {
+      const filtered = requireFilters(args, ["accountId"], "list_events");
+      if (filtered) return filtered;
       const params: Record<string, unknown> = {
         page: args.page,
         limit: args.limit,
@@ -70,7 +75,8 @@ export function registerEventTools(server: McpServer, client: GavrielClient, rol
         ]),
       };
       const res = await client.get("/events", params);
-      return okStructured(res.data);
+      const data = selectFields(res.data as Record<string, unknown>, args.fields);
+      return okStructured(data);
     }),
   );
 
@@ -79,7 +85,7 @@ export function registerEventTools(server: McpServer, client: GavrielClient, rol
     {
       title: "Marcar eventos como procesados (ESCRITURA)",
       description:
-        "Marca eventos como procesados (PATCH /events/{id}; status=processed). Requiere confirm: true; sin confirm devuelve preview.",
+        "Marca eventos como procesados. Requiere confirm.",
       inputSchema: {
         eventIds: z.array(z.string()).min(1).describe("IDs de los eventos a marcar"),
         status: z
