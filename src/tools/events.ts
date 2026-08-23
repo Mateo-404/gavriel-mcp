@@ -1,5 +1,5 @@
 import type { GavrielClient } from "../gavrielClient.js";
-import { ok, err, paginationSchema, okStructured, wrapReadOnly, forwardParams, okTruncated, truncateSchema, selectFields, requireFilters } from "./shared.js";
+import { ok, err, paginationSchema, okStructured, wrapReadOnly, forwardParams, okTruncated, truncateSchema, selectFields, requireFilters, fieldsSchema } from "./shared.js";
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/server";
 import { requireConfirm, confirmSchema, runBatch, destructiveGuard } from "./writeHelpers.js";
@@ -23,7 +23,7 @@ export function registerEventTools(server: McpServer, client: GavrielClient, rol
       inputSchema: z.object({
               id: z.string().describe("ID del evento"),
               truncate: truncateSchema,
-              fields: z.array(z.string()).optional(),
+              fields: fieldsSchema,
             }),
       annotations: { readOnlyHint: true },
     },
@@ -55,7 +55,7 @@ export function registerEventTools(server: McpServer, client: GavrielClient, rol
               connectionId: z.string().optional(),
               dateFrom: z.iso.datetime({ offset: true }).optional().describe("ISO datetime, ej 2026-08-01T00:00:00.000Z"),
               dateTo: z.iso.datetime({ offset: true }).optional().describe("ISO datetime"),
-              fields: z.array(z.string()).optional().describe("Campos a retornar por evento"),
+              fields: fieldsSchema,
             }),
       outputSchema: z.object({}).passthrough(),
       annotations: { readOnlyHint: true },

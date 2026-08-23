@@ -1,5 +1,5 @@
 import type { GavrielClient } from "../gavrielClient.js";
-import { ok, err, paginationSchema, okTruncated, truncateSchema, selectFields, wrapReadOnly } from "./shared.js";
+import { ok, err, paginationSchema, okTruncated, truncateSchema, selectFields, wrapReadOnly, fieldsSchema } from "./shared.js";
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/server";
 import { requireConfirm, confirmSchema } from "./writeHelpers.js";
@@ -14,7 +14,7 @@ export function registerConversationTools(server: McpServer, client: GavrielClie
       inputSchema: z.object({
               ...paginationSchema,
               truncate: truncateSchema,
-              fields: z.array(z.string()).optional().describe("Campos a retornar"),
+              fields: fieldsSchema,
             }),
       annotations: { readOnlyHint: true },
     },
@@ -33,7 +33,7 @@ export function registerConversationTools(server: McpServer, client: GavrielClie
               id: z.string(),
               ...paginationSchema,
               truncate: truncateSchema,
-              fields: z.array(z.string()).optional().describe("Campos a retornar"),
+              fields: fieldsSchema,
             }),
       annotations: { readOnlyHint: true },
     },
