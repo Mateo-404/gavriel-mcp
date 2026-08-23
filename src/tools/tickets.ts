@@ -1,5 +1,5 @@
 import type { GavrielClient } from "../gavrielClient.js";
-import { ok, err, paginationSchema, okStructured, okTruncated, buildBody, wrapReadOnly, forwardParams, truncateSchema, selectFields } from "./shared.js";
+import { ok, err, paginationSchema, okStructured, okTruncated, buildBody, wrapReadOnly, forwardParams, truncateSchema, selectFields, fieldsSchema } from "./shared.js";
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/server";
 import { requireConfirm, confirmSchema } from "./writeHelpers.js";
@@ -152,7 +152,7 @@ export function registerTicketTools(server: McpServer, client: GavrielClient, ro
               categoryId: z.string().optional(),
               assignedUserId: z.string().optional(),
               truncate: truncateSchema,
-              fields: z.array(z.string()).optional().describe("Campos a retornar por ticket"),
+              fields: fieldsSchema,
             }),
       annotations: { readOnlyHint: true },
     },
@@ -179,7 +179,7 @@ export function registerTicketTools(server: McpServer, client: GavrielClient, ro
               id: z.string().describe("ID del ticket"),
               include: z.array(z.enum(["activities"])).optional().describe("Secciones extra (default: activities)"),
               truncate: truncateSchema,
-              fields: z.array(z.string()).optional().describe("Campos a retornar"),
+              fields: fieldsSchema,
             }),
       annotations: { readOnlyHint: true },
     },

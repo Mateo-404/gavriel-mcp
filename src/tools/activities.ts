@@ -1,5 +1,5 @@
 import type { GavrielClient } from "../gavrielClient.js";
-import { ok, err, wrapReadOnly, buildBody, okTruncated, truncateSchema, selectFields } from "./shared.js";
+import { ok, err, wrapReadOnly, buildBody, okTruncated, truncateSchema, selectFields, fieldsSchema } from "./shared.js";
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/server";
 import { requireConfirm, confirmSchema } from "./writeHelpers.js";
@@ -23,7 +23,7 @@ export function registerActivityTools(server: McpServer, client: GavrielClient, 
       inputSchema: z.object({
               id: z.string(),
               truncate: truncateSchema,
-              fields: z.array(z.string()).optional().describe("Campos a retornar"),
+              fields: fieldsSchema,
             }),
       annotations: { readOnlyHint: true },
     },

@@ -1,5 +1,5 @@
 import type { GavrielClient } from "../gavrielClient.js";
-import { ok, err, paginationSchema, okStructured, okTruncated, truncateSchema, selectFields, normalizeAccountNumber, buildBody, wrapReadOnly, forwardParams } from "./shared.js";
+import { ok, err, paginationSchema, okStructured, okTruncated, truncateSchema, selectFields, normalizeAccountNumber, buildBody, wrapReadOnly, forwardParams, fieldsSchema } from "./shared.js";
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/server";
 import { requireConfirm, confirmSchema, runBatch, destructiveGuard } from "./writeHelpers.js";
@@ -22,7 +22,7 @@ export function registerAccountTools(server: McpServer, client: GavrielClient, r
               include: z.array(z.enum(["zones", "contacts", "users", "interventions", "devices"]))
                 .optional()
                 .describe("Secciones a incluir (default: todas)"),
-              fields: z.array(z.string()).optional().describe("Campos a retornar (default: todos)"),
+              fields: fieldsSchema,
             }),
       outputSchema: z.object({}).passthrough(),
       annotations: { readOnlyHint: true },
@@ -99,7 +99,7 @@ export function registerAccountTools(server: McpServer, client: GavrielClient, r
               name: z.string().optional(),
               code: z.string().optional(),
               truncate: truncateSchema,
-              fields: z.array(z.string()).optional().describe("Campos a retornar por objeto"),
+              fields: fieldsSchema,
             }),
       annotations: { readOnlyHint: true },
     },
@@ -265,7 +265,7 @@ export function registerAccountTools(server: McpServer, client: GavrielClient, r
               modelId: z.string().optional().describe("Filtrar por modelo"),
               status: z.string().optional().describe("Filtrar por estado"),
               truncate: truncateSchema,
-              fields: z.array(z.string()).optional().describe("Campos a retornar por objeto"),
+              fields: fieldsSchema,
             }),
       annotations: { readOnlyHint: true },
     },
@@ -291,7 +291,7 @@ export function registerAccountTools(server: McpServer, client: GavrielClient, r
       inputSchema: z.object({
               id: z.string(),
               truncate: truncateSchema,
-              fields: z.array(z.string()).optional().describe("Campos a retornar por objeto"),
+              fields: fieldsSchema,
             }),
       annotations: { readOnlyHint: true },
     },
@@ -313,7 +313,7 @@ export function registerAccountTools(server: McpServer, client: GavrielClient, r
       inputSchema: z.object({
               id: z.string(),
               truncate: truncateSchema,
-              fields: z.array(z.string()).optional().describe("Campos a retornar por objeto"),
+              fields: fieldsSchema,
             }),
       annotations: { readOnlyHint: true },
     },
@@ -335,7 +335,7 @@ export function registerAccountTools(server: McpServer, client: GavrielClient, r
       inputSchema: z.object({
               accountId: z.string(),
               truncate: truncateSchema,
-              fields: z.array(z.string()).optional().describe("Campos a retornar por objeto"),
+              fields: fieldsSchema,
             }),
       annotations: { readOnlyHint: true },
     },
@@ -358,7 +358,7 @@ export function registerAccountTools(server: McpServer, client: GavrielClient, r
       inputSchema: z.object({
               jurisdictionId: z.string().optional().describe("Filtra por jurisdicción si viene"),
               truncate: truncateSchema,
-              fields: z.array(z.string()).optional().describe("Campos a retornar por objeto"),
+              fields: fieldsSchema,
             }),
       annotations: { readOnlyHint: true },
     },
@@ -383,7 +383,7 @@ export function registerAccountTools(server: McpServer, client: GavrielClient, r
       inputSchema: z.object({
               id: z.string(),
               truncate: truncateSchema,
-              fields: z.array(z.string()).optional().describe("Campos a retornar por objeto"),
+              fields: fieldsSchema,
             }),
       annotations: { readOnlyHint: true },
     },

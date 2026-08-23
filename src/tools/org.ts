@@ -1,5 +1,5 @@
 import type { GavrielClient } from "../gavrielClient.js";
-import { ok, err, paginationSchema, okTruncated, truncateSchema, selectFields, wrapReadOnly, forwardParams } from "./shared.js";
+import { ok, err, paginationSchema, okTruncated, truncateSchema, selectFields, wrapReadOnly, forwardParams, fieldsSchema } from "./shared.js";
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/server";
 import { requireConfirm, confirmSchema } from "./writeHelpers.js";
@@ -15,7 +15,7 @@ export function registerOrgTools(server: McpServer, client: GavrielClient, role:
               ...paginationSchema,
               search: z.string().optional().describe("Búsqueda libre (nombre/código)"),
               truncate: truncateSchema,
-              fields: z.array(z.string()).optional(),
+              fields: fieldsSchema,
             }),
       annotations: { readOnlyHint: true },
     },
@@ -34,7 +34,7 @@ export function registerOrgTools(server: McpServer, client: GavrielClient, role:
       inputSchema: z.object({
               id: z.string(),
               truncate: truncateSchema,
-              fields: z.array(z.string()).optional(),
+              fields: fieldsSchema,
             }),
       annotations: { readOnlyHint: true },
     },
@@ -53,7 +53,7 @@ export function registerOrgTools(server: McpServer, client: GavrielClient, role:
               ...paginationSchema,
               search: z.string().optional().describe("Búsqueda libre (nombre/email)"),
               truncate: truncateSchema,
-              fields: z.array(z.string()).optional(),
+              fields: fieldsSchema,
             }),
       annotations: { readOnlyHint: true },
     },

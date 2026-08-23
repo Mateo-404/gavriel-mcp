@@ -1,5 +1,5 @@
 import type { GavrielClient } from "../gavrielClient.js";
-import { ok, err, okTruncated, truncateSchema, selectFields, wrapReadOnly, buildBody } from "./shared.js";
+import { ok, err, okTruncated, truncateSchema, selectFields, wrapReadOnly, buildBody, fieldsSchema } from "./shared.js";
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/server";
 import { requireConfirm, confirmSchema } from "./writeHelpers.js";
@@ -47,7 +47,7 @@ export function registerServiceTools(server: McpServer, client: GavrielClient, r
               userId: z.string(),
               date: z.iso.date().describe("Fecha (YYYY-MM-DD)"),
               truncate: truncateSchema,
-              fields: z.array(z.string()).optional(),
+              fields: fieldsSchema,
             }),
       annotations: { readOnlyHint: true },
     },
@@ -67,7 +67,7 @@ export function registerServiceTools(server: McpServer, client: GavrielClient, r
       description: "Servicio por ID.",
       inputSchema: z.object({
               id: z.string(),
-              fields: z.array(z.string()).optional(),
+              fields: fieldsSchema,
             }),
       annotations: { readOnlyHint: true },
     },

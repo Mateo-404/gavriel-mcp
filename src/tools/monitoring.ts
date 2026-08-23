@@ -1,5 +1,5 @@
 import type { GavrielClient } from "../gavrielClient.js";
-import { ok, err, paginationSchema, MAX_LIMIT, okTruncated, truncateSchema, selectFields, wrapReadOnly, forwardParams } from "./shared.js";
+import { ok, err, paginationSchema, MAX_LIMIT, okTruncated, truncateSchema, selectFields, wrapReadOnly, forwardParams, fieldsSchema } from "./shared.js";
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/server";
 import type { Role } from "./roles.js";
@@ -17,7 +17,7 @@ export function registerMonitoringTools(server: McpServer, client: GavrielClient
               activated: z.boolean().optional().describe("Solo conexiones activadas"),
               search: z.string().optional().describe("Búsqueda libre"),
               truncate: truncateSchema,
-              fields: z.array(z.string()).optional().describe("Campos a retornar"),
+              fields: fieldsSchema,
             }),
       annotations: { readOnlyHint: true },
     },
@@ -36,7 +36,7 @@ export function registerMonitoringTools(server: McpServer, client: GavrielClient
       inputSchema: z.object({
               id: z.string(),
               truncate: truncateSchema,
-              fields: z.array(z.string()).optional().describe("Campos a retornar"),
+              fields: fieldsSchema,
             }),
       annotations: { readOnlyHint: true },
     },
@@ -63,7 +63,7 @@ export function registerMonitoringTools(server: McpServer, client: GavrielClient
                 .optional()
                 .describe(`Cantidad por página (máximo ${MAX_LIMIT})`),
               truncate: truncateSchema,
-              fields: z.array(z.string()).optional().describe("Campos a retornar"),
+              fields: fieldsSchema,
             }),
       annotations: { readOnlyHint: true },
     },

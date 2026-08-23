@@ -10,22 +10,24 @@ export function capLimit(limit: number | undefined): number {
 }
 
 export const paginationSchema = {
-  page: z.number().int().min(1).default(1).describe("Número de página (1-based)"),
+  page: z.number().int().min(1).default(1).describe("Página (1-based)"),
   limit: z
     .number()
     .int()
     .min(1)
     .max(MAX_LIMIT)
     .default(DEFAULT_LIMIT)
-    .describe(`Cantidad por página (default ${DEFAULT_LIMIT}, máximo ${MAX_LIMIT})`),
+    .describe(`Por página (default ${DEFAULT_LIMIT}, máx ${MAX_LIMIT})`),
 };
+
+export const fieldsSchema = z.array(z.string()).optional().describe("Campos a devolver");
 
 export const truncateSchema = z
   .number()
   .int()
   .min(1000)
   .optional()
-  .describe("Máx chars del JSON (default: completo)");
+  .describe("Trunca la respuesta a N chars");
 
 // ── Field selection ──────────────────────────────────────────────────
 // Selecciona solo los campos pedidos de un objeto/array. Si fields está
