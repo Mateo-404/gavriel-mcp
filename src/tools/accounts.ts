@@ -2,7 +2,7 @@ import type { GavrielClient } from "../gavrielClient.js";
 import { ok, err, paginationSchema, okStructured, okTruncated, truncateSchema, selectFields, normalizeAccountNumber, buildBody, wrapReadOnly, forwardParams } from "./shared.js";
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/server";
-import { requireConfirm, confirmSchema, runBatch } from "./writeHelpers.js";
+import { requireConfirm, confirmSchema, runBatch, destructiveGuard } from "./writeHelpers.js";
 import { registerTool, type Role } from "./roles.js";
 
 const ACCOUNT_FIELDS = [
@@ -184,7 +184,7 @@ export function registerAccountTools(server: McpServer, client: GavrielClient, r
         confirm: confirmSchema,
       },
     },
-    async (args) => {
+    async (args, ctx) => {
       const body = buildBody(args as Record<string, unknown>, {
         required: ["type", "content"],
         optional: ["validFrom", "validUntil"],
@@ -201,7 +201,7 @@ export function registerAccountTools(server: McpServer, client: GavrielClient, r
           ids.map((id) => ({ id, run: () => client.post(`/accounts/${id}/notes`, body) })),
         );
         return { status: 200, data: report };
-      }).then(ok);
+      }, destructiveGuard("bulk_add_account_note", exec, ctx.mcpReq.elicitInput)).then(ok);
     },
   );
 
@@ -242,12 +242,14 @@ export function registerAccountTools(server: McpServer, client: GavrielClient, r
       },
       annotations: { destructiveHint: true },
     },
-    async (args) => {
+    async (args, ctx) => {
+      const exec = { tool: "delete_account_note", method: "DELETE", path: `/accounts/${args.accountId}/notes/${args.noteId}`, params: {} };
       return requireConfirm(
         args.confirm,
-        { tool: "delete_account_note", method: "DELETE", path: `/accounts/${args.accountId}/notes/${args.noteId}`, params: {} },
+        exec,
         client,
         () => client.delete(`/accounts/${args.accountId}/notes/${args.noteId}`),
+        destructiveGuard("delete_account_note", exec, ctx.mcpReq.elicitInput),
       ).then(ok);
     },
   );
