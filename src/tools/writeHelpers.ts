@@ -145,5 +145,7 @@ function summarize(data: unknown, maxLen = 1000): unknown {
   if (data === null || data === undefined) return data;
   const json = JSON.stringify(data);
   if (json.length <= maxLen) return data;
-  return JSON.parse(json.slice(0, maxLen) + '..."}');
+  // ponytail: preview truncado sin parsear — JSON.parse sobre un slice
+  // truncado lanza (bug C-2); el log solo necesita una muestra legible.
+  return { _truncatedPreview: json.slice(0, maxLen), totalLength: json.length };
 }

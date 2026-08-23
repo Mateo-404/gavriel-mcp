@@ -154,7 +154,6 @@ export function registerTicketTools(server: McpServer, client: GavrielClient, ro
               truncate: truncateSchema,
               fields: z.array(z.string()).optional().describe("Campos a retornar por ticket"),
             }),
-      outputSchema: z.object({}).passthrough(),
       annotations: { readOnlyHint: true },
     },
     wrapReadOnly(async (args) => {
@@ -182,7 +181,6 @@ export function registerTicketTools(server: McpServer, client: GavrielClient, ro
               truncate: truncateSchema,
               fields: z.array(z.string()).optional().describe("Campos a retornar"),
             }),
-      outputSchema: z.object({}).passthrough(),
       annotations: { readOnlyHint: true },
     },
     wrapReadOnly(async (args) => {
