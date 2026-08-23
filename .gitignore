@@ -16,6 +16,10 @@ lib/
 *.tsbuildinfo
 .turbo/
 
+# SEA build artifacts (generados por pnpm build:bin)
+bin/
+sea-config.json
+
 # Env y secretos (nunca deberían tener contenido real, pero por las dudas)
 .env
 .env.*

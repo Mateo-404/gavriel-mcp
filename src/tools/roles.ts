@@ -31,8 +31,6 @@ interface ToolConfigBase {
 
 // Registra la tool solo si el rol activo alcanza el mínimo requerido.
 // Es el choke point único por el que pasan las tools de escritura.
-// Mismos overloads que McpServer.registerTool en SDK v2 (Standard Schema +
-// legacy raw shape) para mantener la inferencia del tipo de `args`.
 export function registerTool<
   InputArgs extends StandardSchemaWithJSON | undefined = undefined,
 >(

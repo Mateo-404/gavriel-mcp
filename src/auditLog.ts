@@ -15,8 +15,7 @@ export function setLogDir(dir: string): void {
 
 function ensureLogDir(): void {
   if (logDirReady) return;
-  try { mkdirSync(LOG_DIR, { recursive: true }); } catch { /* already exists */ }
-  logDirReady = true;
+  setLogDir(LOG_DIR);
 }
 
 // Ledger de rendimiento (MEASURE): mide la latencia real por endpoint para
@@ -61,8 +60,4 @@ export function logWrite(
   } catch (err) {
     console.error(`[auditLog] no se pudo escribir ${LOG_FILE()}:`, err);
   }
-}
-
-export function writesLogPath(): string {
-  return LOG_FILE();
 }

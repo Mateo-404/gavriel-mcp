@@ -1,0 +1,84 @@
+name: Release
+
+# Build native single-executable binaries (Node.js SEA) for each platform and
+# attach them to the GitHub Release created from the pushed tag.
+#
+# No third-party RUNTIME deps: SEA embeds Node natively. esbuild + postject
+# are build-time only (postject is a Node.js-org tool, not shipped in the
+# binary). This avoids deprecated/unmaintained packagers (e.g. pkg, CVE-2024-24828).
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions: {}
+
+jobs:
+  build:
+    name: ${{ matrix.platform }}-${{ matrix.arch }}
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            platform: linux
+            arch: x64
+          - os: macos-latest
+            platform: darwin
+            arch: arm64
+          - os: macos-latest
+            platform: darwin
+            arch: x64
+          - os: windows-latest
+            platform: win32
+            arch: x64
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          architecture: ${{ matrix.arch }}
+          cache: pnpm
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Build
+        run: pnpm build
+      - name: Build single-executable binary (Node SEA)
+        run: pnpm build:bin
+      - name: Checksum
+        shell: bash
+        run: |
+          cd bin
+          for f in gavriel-mcp-*; do
+            sha256sum "$f" > "$f.sha256"
+          done
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: gavriel-mcp-${{ matrix.platform }}-${{ matrix.arch }}
+          path: bin/gavriel-mcp-*
+          if-no-files-found: error
+
+  release:
+    name: Publish release
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "${GITHUB_REF_NAME}" artifacts/* \
+            --title "${GITHUB_REF_NAME}" \
+            --generate-notes
