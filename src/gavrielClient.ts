@@ -8,6 +8,13 @@ import { logPerf } from "./auditLog.js";
 const REQUEST_TIMEOUT_MS = 90_000;
 const REFRESH_MARGIN_SECONDS = 5 * 60;
 const MAX_BACKOFF_MS = 8_000;
+// Si un login recién hecho vuelve a dar 401, no insistir: re-loginear en loop
+// puede bloquear la cuenta. 15s cubre respuestas en vuelo del refresh.
+const LOGIN_RETRY_GUARD_MS = 15_000;
+// Recursos donde el backend tiene unique constraints que rompen con escrituras
+// concurrentes sobre hermanos (p.ej. `order` de account-contacts): sus escrituras
+// se serializan entre sí. El resto solo pasa por el semáforo global.
+const WRITE_SERIAL_PREFIXES = ["/account-contacts"];
 
 interface JwtState {
   token: string | null;
@@ -34,9 +41,15 @@ export class GavrielClient {
   private userEmail: string | null = null;
   private config: Config;
   private loginInFlight: Promise<string> | null = null;
+  private lastLoginAt = 0;
+  private readonly writeConcurrency: number;
+  private writeInFlight = 0;
+  private writeWaiters: Array<() => void> = [];
+  private serialQueues = new Map<string, Promise<void>>();
 
   constructor(config: Config) {
     this.config = config;
+    this.writeConcurrency = config.GAVRIEL_MCP_WRITE_CONCURRENCY ?? 5;
   }
 
   private get baseUrl(): string {
@@ -48,10 +61,14 @@ export class GavrielClient {
   }
 
   async login(): Promise<void> {
+    // Resetea la expiración previa: el header x-token-expires-at que doLogin
+    // pueda traer es la fuente más precisa; decodeExp del JWT es fallback.
+    this.jwt.expiresAt = null;
     const token = await this.doLogin();
     this.jwt.token = token;
-    this.jwt.expiresAt = decodeExp(token);
+    this.jwt.expiresAt ??= decodeExp(token);
     this.userEmail = this.config.GAVRIEL_EMAIL;
+    this.lastLoginAt = Date.now();
     console.error(
       `[gavrielClient] login ok (exp ${this.jwt.expiresAt ? new Date(this.jwt.expiresAt).toISOString() : "desconocida"})`,
     );
@@ -203,13 +220,21 @@ export class GavrielClient {
 
     if (res.status === 401 && _attempt < 1) {
       clearTimeout(timer);
-      console.error("[gavrielClient] 401, reintento con re-login");
+      const sinceLogin = Date.now() - this.lastLoginAt;
       this.jwt.token = null;
+      if (sinceLogin < LOGIN_RETRY_GUARD_MS) {
+        throw new Error(
+          `401 en ${method} ${path}: el JWT se renovó hace ${Math.round(sinceLogin / 1000)}s y fue rechazado igual. No reintento el login para no bloquear la cuenta; revisá credenciales/permisos.`,
+        );
+      }
+      console.error("[gavrielClient] 401, reintento con re-login");
       await this.login();
       return this.requestInner(method, path, body, _attempt + 1);
     }
 
-    if ((res.status === 429 || res.status >= 500) && _attempt < 2) {
+    // Retry automático solo para GET: repetir un POST/PATCH tras un 5xx puede
+    // duplicar la operación si el backend la aplicó antes de fallar la respuesta.
+    if (method === "GET" && (res.status === 429 || res.status >= 500) && _attempt < 2) {
       clearTimeout(timer);
       const retryAfter = Number(res.headers.get("retry-after") ?? 0) * 1000;
       const delay = Math.min(retryAfter || 500 * 2 ** _attempt, MAX_BACKOFF_MS);
@@ -265,38 +290,71 @@ export class GavrielClient {
     return { status: res.status, data: res.data as T };
   }
 
-  // Cola de escrituras: máximo 1 POST/PATCH/DELETE en vuelo por vez.
-  // El backend de Gavriel tiene un unique constraint en el campo `order` de
-  // account-contacts y rompe (o contesta JSON corrupto) con escrituras
-  // paralelas que tocan el mismo recurso. Las lecturas siguen concurrentes.
-  // ponytail: cola global simple; si alguna vez el throughput de escrituras
-  // importa, pasar a colas por recurso.
-  private writeQueue: Promise<void> = Promise.resolve();
-  private enqueueWrite<T>(op: () => Promise<T>): Promise<T> {
-    const run = this.writeQueue.then(op);
-    this.writeQueue = run.then(
-      () => undefined,
-      () => undefined,
+  // Escrituras: semáforo global (GAVRIEL_MCP_WRITE_CONCURRENCY, default 5) +
+  // cola FIFO por recurso para los prefijos con unique constraints del backend
+  // (WRITE_SERIAL_PREFIXES), donde escrituras hermanas paralelas rompen o
+  // contestan JSON corrupto. Las lecturas siguen concurrentes sin límite.
+  private async acquireWriteSlot(): Promise<void> {
+    if (this.writeInFlight < this.writeConcurrency) {
+      this.writeInFlight++;
+      return;
+    }
+    await new Promise<void>((resolve) => this.writeWaiters.push(resolve));
+    this.writeInFlight++;
+  }
+
+  private releaseWriteSlot(): void {
+    this.writeInFlight--;
+    this.writeWaiters.shift()?.();
+  }
+
+  private serialKeyFor(path: string): string | null {
+    const clean = path.split("?")[0];
+    for (const prefix of WRITE_SERIAL_PREFIXES) {
+      if (clean === prefix || clean.startsWith(`${prefix}/`)) return prefix;
+    }
+    return null;
+  }
+
+  private runWrite<T>(path: string, op: () => Promise<T>): Promise<T> {
+    const key = this.serialKeyFor(path);
+    if (!key) return this.withSlot(op);
+    const chained = (this.serialQueues.get(key) ?? Promise.resolve()).then(() => this.withSlot(op));
+    this.serialQueues.set(
+      key,
+      chained.then(
+        () => undefined,
+        () => undefined,
+      ),
     );
-    return run;
+    return chained;
+  }
+
+  private async withSlot<T>(op: () => Promise<T>): Promise<T> {
+    await this.acquireWriteSlot();
+    try {
+      return await op();
+    } finally {
+      this.releaseWriteSlot();
+    }
   }
 
   async post<T = unknown>(path: string, body?: unknown): Promise<{ status: number; data: T }> {
-    return this.enqueueWrite(async () => {
+    return this.runWrite(path, async () => {
       const res = await this.request("POST", path, body);
       return { status: res.status, data: res.data as T };
     });
   }
 
   async patch<T = unknown>(path: string, body?: unknown): Promise<{ status: number; data: T }> {
-    return this.enqueueWrite(async () => {
+    return this.runWrite(path, async () => {
       const res = await this.request("PATCH", path, body);
       return { status: res.status, data: res.data as T };
     });
   }
 
   async delete<T = unknown>(path: string): Promise<{ status: number; data: T }> {
-    return this.enqueueWrite(async () => {
+    return this.runWrite(path, async () => {
       const res = await this.request("DELETE", path);
       return { status: res.status, data: res.data as T };
     });

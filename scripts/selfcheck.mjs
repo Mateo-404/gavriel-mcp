@@ -232,6 +232,19 @@ await tAsync("gavrielClient: 401 persistente no reintenta en bucle (máx 1 reint
   });
 });
 
+await tAsync("gavrielClient: 401 con login recién hecho no reloguea (anti-tormenta)", async () => {
+  const client = newClient();
+  client.lastLoginAt = Date.now() - 1_000; // login hace 1s (< guard de 15s)
+  await withFetchStub([{ status: 401 }], async (stub) => {
+    await assert.rejects(
+      () => client.get("/tickets"),
+      /No reintento el login/,
+      "debe lanzar en vez de martillar /auth/login",
+    );
+    assert.equal(stub.calls.length, 1, "un solo intento HTTP, cero re-logins");
+  });
+});
+
 await tAsync("gavrielClient: 429 respeta retry-after y reintenta hasta tener éxito", async () => {
   const client = newClient();
   await withFetchStub(
@@ -351,23 +364,42 @@ await tAsync("4xx real => error genuino, no se disfraza ni relee", async () => {
   assert.equal(r.status, 409);
 });
 
-await tAsync("cola de escrituras: 5 PATCH en paralelo se serializan (máx 1 en vuelo)", async () => {
-  let inFlight = 0, maxInFlight = 0;
+function stubCountingRequest() {
+  let inFlight = 0;
+  const state = { maxInFlight: 0 };
+  GavrielClient.prototype.request = async function () {
+    inFlight++;
+    state.maxInFlight = Math.max(state.maxInFlight, inFlight);
+    await new Promise((r) => setTimeout(r, 30));
+    inFlight--;
+    return { status: 200, data: {} };
+  };
+  return state;
+}
+
+await tAsync("escrituras: PATCH a account-contacts en paralelo se serializan (unique constraint en order)", async () => {
+  const state = stubCountingRequest();
   const client = new GavrielClient({
     GAVRIEL_API_BASE: "http://localhost:1/api",
     GAVRIEL_EMAIL: "x@x",
     GAVRIEL_PASSWORD: "x",
   });
-  // stub del transporte: el request de la cola real (post/patch/delete)
-  GavrielClient.prototype.request = async function () {
-    inFlight++;
-    maxInFlight = Math.max(maxInFlight, inFlight);
-    await new Promise((r) => setTimeout(r, 30));
-    inFlight--;
-    return { status: 200, data: {} };
-  };
-  await Promise.all([1, 2, 3, 4, 5].map(() => client.patch("/x")));
-  assert.ok(maxInFlight <= 1, `maxInFlight=${maxInFlight}`);
+  await Promise.all([1, 2, 3, 4, 5].map((i) => client.patch(`/account-contacts/id${i}`, { order: i * 10 })));
+  assert.ok(state.maxInFlight <= 1, `maxInFlight=${state.maxInFlight}`);
+});
+
+await tAsync("escrituras: recursos sin constraint corren hasta WRITE_CONCURRENCY en paralelo", async () => {
+  const state = stubCountingRequest();
+  const client = new GavrielClient({
+    GAVRIEL_API_BASE: "http://localhost:1/api",
+    GAVRIEL_EMAIL: "x@x",
+    GAVRIEL_PASSWORD: "x",
+    GAVRIEL_MCP_WRITE_CONCURRENCY: 3,
+  });
+  await Promise.all([1, 2, 3].map(() => client.patch("/events/ev1", { status: "processed" })));
+  await Promise.all([1, 2, 3, 4, 5].map((i) => client.patch(`/events/ev${i}`, { status: "processed" })));
+  // primera tanda llena el semáforo (3); la segunda tiene 5 pedidos pero tope 3
+  assert.ok(state.maxInFlight === 3, `maxInFlight=${state.maxInFlight}, esperado exactamente 3`);
 });
 
 // --- secrets.ts: orden de resolución keyring > env > archivo legacy ---
