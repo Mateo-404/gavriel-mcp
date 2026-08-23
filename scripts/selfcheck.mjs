@@ -518,7 +518,10 @@ t("secrets: saveTrustedToken escribe al keyring cuando está disponible (no al l
     extraEnv: { PROBE_TOKEN_VALUE: "nuevo-token" },
   });
   const stored = JSON.parse(readFileSync(state, "utf8"));
-  assert.equal(stored["gavriel-mcp:trusted_device_token"], "nuevo-token");
+  assert.equal(stored["gavriel-mcp:trusted_device_token:test@example.com"], "nuevo-token",
+    "el token debe guardarse con clave email-scoped");
+  assert.ok(!("gavriel-mcp:trusted_device_token" in stored),
+    "no debe escribir la clave vieja sin email");
   const legacyPath = join(home, ".local/share/gavriel-mcp/trusted-device.json");
   assert.throws(() => readFileSync(legacyPath, "utf8"), "no debería haber tocado el archivo legacy");
 });

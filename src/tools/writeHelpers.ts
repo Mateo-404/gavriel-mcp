@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { ElicitRequestFormParams, ElicitResult } from "@modelcontextprotocol/server";
 import type { GavrielClient } from "../gavrielClient.js";
 import { logWrite } from "../auditLog.js";
 
@@ -21,6 +22,68 @@ export interface WriteExecution {
   params: unknown;
 }
 
+// ── Aprobación destructiva (defensa extra sobre confirm) ───────────
+// Tools que borran datos o escriben en masa. Con
+// GAVRIEL_MCP_DESTRUCTIVE_APPROVAL=elicitation, además del confirm la tool
+// le pregunta al usuario humano vía elicitation antes de ejecutar.
+const DESTRUCTIVE_TOOLS = new Set([
+  "delete_account_note",
+  "bulk_mark_events_by_filter",
+  "bulk_add_account_note",
+]);
+
+type ApprovalMode = "off" | "elicitation";
+// ponytail: estado de módulo — el server es un proceso único y el modo se
+// setea una vez al arrancar desde config; no hace falta inyectarlo por DI.
+let approvalMode: ApprovalMode = "off";
+
+export function setDestructiveApproval(mode: ApprovalMode): void {
+  approvalMode = mode;
+}
+
+export type ElicitFn = (params: ElicitRequestFormParams) => Promise<ElicitResult>;
+
+// Devuelve un guard para requireConfirm si corresponde preguntarle al humano.
+// Si el cliente no soporta elicitation (o falla), NO ejecuta (falla cerrado).
+// Nota: ctx.mcpReq.elicitInput está deprecado en la spec 2026-07-28 (usa
+// inputRequired) pero sigue funcional en clientes 2025-era; en un cliente
+// 2026-07-28 lanza → el catch lo trata como "no aprobado".
+export function destructiveGuard(
+  tool: string,
+  exec: WriteExecution,
+  elicit?: ElicitFn,
+): { confirmWithUser: () => Promise<boolean> } | undefined {
+  if (approvalMode !== "elicitation" || !DESTRUCTIVE_TOOLS.has(tool) || !elicit) return undefined;
+  return {
+    confirmWithUser: async () => {
+      try {
+        const res = await elicit({
+          mode: "form",
+          message:
+            `Operación destructiva: ${exec.tool}\n${exec.method} ${exec.path}\n` +
+            `¿Ejecutar? (el agente ya mostró el preview y pediste confirm)`,
+          requestedSchema: {
+            type: "object",
+            properties: {
+              aprobar: {
+                type: "boolean",
+                title: "¿Ejecutar?",
+                description: "Marcá true solo si aprobás explícitamente esta operación.",
+              },
+            },
+            required: ["aprobar"],
+          },
+        });
+        const aprobar = (res.content as { aprobar?: unknown } | undefined)?.aprobar;
+        return res.action === "accept" && aprobar === true;
+      } catch (e) {
+        console.error(`[writeHelpers] elicitation no disponible/falló: ${(e as Error).message}`);
+        return false;
+      }
+    },
+  };
+}
+
 /**
  * Gate de confirmación (Fase 0, regla 2).
  *
@@ -41,9 +104,18 @@ export async function requireConfirm(
   exec: WriteExecution,
   client: GavrielClient,
   run: () => Promise<{ status: number; data: unknown }>,
+  guard?: { confirmWithUser: () => Promise<boolean> },
 ): Promise<unknown> {
   if (confirm !== true) {
     return buildPreview(exec);
+  }
+
+  if (guard && !(await guard.confirmWithUser())) {
+    return {
+      ok: false,
+      writeStatus: "rejected_by_user",
+      mensaje: "El usuario rechazó la operación destructiva (o su cliente no soporta elicitation).",
+    };
   }
 
   logWrite({

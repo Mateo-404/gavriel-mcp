@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
+import { readFileSync, writeFileSync, mkdirSync, chmodSync } from "node:fs";
 import { join } from "node:path";
 
 const SERVICE = "gavriel-mcp";
@@ -97,15 +97,30 @@ function readLegacyTokens(): Record<string, string> {
 function writeLegacyTokens(all: Record<string, string>): void {
   try {
     mkdirSync(join(process.env.HOME || ".", ".local/share/gavriel-mcp"), { recursive: true });
-    writeFileSync(LEGACY_TOKENS_FILE, JSON.stringify(all), "utf8");
+    writeFileSync(LEGACY_TOKENS_FILE, JSON.stringify(all), { encoding: "utf8", mode: 0o600 });
+    try {
+      chmodSync(LEGACY_TOKENS_FILE, 0o600); // por si el archivo ya existía con permisos amplios
+    } catch {
+      // best effort
+    }
   } catch (err) {
     console.error("[gavrielClient] no se pudo guardar el trusted device token:", err);
   }
 }
 
+// Clave keyring del trusted token, por-email: dos cuentas de Gavriel no se
+// pisan el token. El lookup cae a la clave vieja sin email (migración).
+const LEGACY_KEYRING_TOKEN_ACCOUNT = "trusted_device_token";
+
+function tokenKeyringAccount(email: string): string {
+  return `${LEGACY_KEYRING_TOKEN_ACCOUNT}:${email.toLowerCase().trim()}`;
+}
+
 export function readTrustedToken(email: string): string | null {
-  const fromKeyring = keyringLookup("trusted_device_token");
-  if (fromKeyring) return fromKeyring;
+  const scoped = keyringLookup(tokenKeyringAccount(email));
+  if (scoped) return scoped;
+  const unscoped = keyringLookup(LEGACY_KEYRING_TOKEN_ACCOUNT);
+  if (unscoped) return unscoped;
   if (process.env.GAVRIEL_TRUSTED_DEVICE_TOKEN) return process.env.GAVRIEL_TRUSTED_DEVICE_TOKEN;
   const legacy = readLegacyTokens()[email.toLowerCase().trim()];
   if (legacy) {
@@ -118,14 +133,15 @@ export function readTrustedToken(email: string): string | null {
 }
 
 export function saveTrustedToken(email: string, token: string): void {
-  if (keyringStore("trusted_device_token", token)) return;
+  if (keyringStore(tokenKeyringAccount(email), token)) return;
   const all = readLegacyTokens();
   all[email.toLowerCase().trim()] = token;
   writeLegacyTokens(all);
 }
 
 export function clearTrustedToken(email: string): void {
-  keyringClear("trusted_device_token");
+  keyringClear(tokenKeyringAccount(email));
+  keyringClear(LEGACY_KEYRING_TOKEN_ACCOUNT); // limpia también la clave pre-scoping
   const all = readLegacyTokens();
   delete all[email.toLowerCase().trim()];
   writeLegacyTokens(all);

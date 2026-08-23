@@ -2,7 +2,7 @@ import type { GavrielClient } from "../gavrielClient.js";
 import { ok, err, paginationSchema, okStructured, wrapReadOnly, forwardParams, okTruncated, truncateSchema, selectFields, requireFilters } from "./shared.js";
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/server";
-import { requireConfirm, confirmSchema, runBatch } from "./writeHelpers.js";
+import { requireConfirm, confirmSchema, runBatch, destructiveGuard } from "./writeHelpers.js";
 import { registerTool, type Role } from "./roles.js";
 
 const EVENT_STATUSES = [
@@ -135,7 +135,7 @@ export function registerEventTools(server: McpServer, client: GavrielClient, rol
         confirm: confirmSchema,
       },
     },
-    async (args) => {
+    async (args, ctx) => {
       const params: Record<string, unknown> = {
         accountId: args.accountId,
         limit: args.maxEvents,
@@ -163,7 +163,7 @@ export function registerEventTools(server: McpServer, client: GavrielClient, rol
           ids.map((id) => ({ id, run: () => client.patch(`/events/${id}`, { status: args.targetStatus }) })),
         );
         return { status: 200, data: report };
-      }).then(ok);
+      }, destructiveGuard("bulk_mark_events_by_filter", exec, ctx.mcpReq.elicitInput)).then(ok);
     },
   );
 }
