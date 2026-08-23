@@ -112,6 +112,19 @@ export function requireFilters(
   );
 }
 
+// ── Status HTTP ─────────────────────────────────────────────────────
+// El cliente NO lanza en 4xx/5xx (devuelve {status, data}). Los getters de
+// detalle usan esto para convertir errores en excepciones claras en vez de
+// devolver el body del backend ({message: "not found"}) como si fuera data.
+export function ensureOk<T = unknown>(res: { status: number; data: unknown }, ctx?: string): T {
+  if (res.status >= 400) {
+    const raw = typeof res.data === "string" ? res.data : JSON.stringify(res.data);
+    const detail = raw ? raw.slice(0, 300) : "sin detalle";
+    throw new Error(`HTTP ${res.status}${ctx ? ` en ${ctx}` : ""}: ${detail}`);
+  }
+  return res.data as T;
+}
+
 // ── Responses ───────────────────────────────────────────────────────
 // Compact JSON: saves ~30-40% vs pretty-print.
 export function ok(value: unknown): CallToolResult {

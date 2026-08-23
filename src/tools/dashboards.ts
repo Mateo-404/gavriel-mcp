@@ -1,5 +1,5 @@
 import type { GavrielClient } from "../gavrielClient.js";
-import { ok, wrapReadOnly } from "./shared.js";
+import { ok, ensureOk, wrapReadOnly } from "./shared.js";
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/server";
 
@@ -25,7 +25,10 @@ export function registerDashboardTools(server: McpServer, client: GavrielClient)
       ]);
 
       const account = accountRes.status === "fulfilled"
-        ? (() => { const a = accountRes.value.data as Record<string, unknown>; return { id: a.id, name: a.name, accountNumber: a.accountNumber, phone: a.phone, address: a.address }; })()
+        ? (() => {
+            const a = ensureOk<Record<string, unknown>>(accountRes.value, `cuenta ${args.id}`);
+            return { id: a.id, name: a.name, accountNumber: a.accountNumber, phone: a.phone, address: a.address };
+          })()
         : { error: "No se pudo obtener la cuenta" };
 
       const devices = devicesRes.status === "fulfilled"
@@ -71,9 +74,10 @@ export function registerDashboardTools(server: McpServer, client: GavrielClient)
         client.get(`/activities/ticket/${args.id}`),
       ]);
 
-      const ticket = ticketRes.status === "fulfilled" ? ticketRes.value.data : null;
-      const ticketRecord = ticket as Record<string, unknown> | null;
-      const accountId = ticketRecord?.accountId as string | undefined;
+      const ticket = ticketRes.status === "fulfilled"
+        ? ensureOk<Record<string, unknown>>(ticketRes.value, `ticket ${args.id}`)
+        : null;
+      const accountId = (ticket as Record<string, unknown> | null)?.accountId as string | undefined;
 
       let account = null;
       if (accountId) {
@@ -108,7 +112,7 @@ export function registerDashboardTools(server: McpServer, client: GavrielClient)
     },
     wrapReadOnly(async (args) => {
       const eventRes = await client.get(`/events/${args.id}`);
-      const event = eventRes.data as Record<string, unknown>;
+      const event = ensureOk<Record<string, unknown>>(eventRes, `evento ${args.id}`);
       const account = event.account as Record<string, unknown> | undefined;
       const connection = event.connection as Record<string, unknown> | undefined;
 
