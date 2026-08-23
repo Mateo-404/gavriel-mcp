@@ -20,8 +20,12 @@ const envSchema = z.object({
     .url("GAVRIEL_API_BASE debe ser una URL válida")
     .default("https://app.gavriel.com.ar/api"),
   GAVRIEL_MCP_LOG_DIR: z.string().optional(),
-  // readonly: solo tools de lectura. full (default): todas + escritura.
-  GAVRIEL_MCP_ROLE: z.enum(["readonly", "full"]).default("full"),
+  // Roles: readonly (solo lectura) < lite (lectura + core writes) < full (todo).
+  GAVRIEL_MCP_ROLE: z.enum(["readonly", "lite", "full"]).default("full"),
+  // Escrituras en vuelo simultáneas por recurso (cola por path, ver gavrielClient).
+  GAVRIEL_MCP_WRITE_CONCURRENCY: z.coerce.number().int().min(1).max(20).default(5),
+  // Aprobación humana extra para tools destructivas: "off" (default) | "elicitation".
+  GAVRIEL_MCP_DESTRUCTIVE_APPROVAL: z.enum(["off", "elicitation"]).default("off"),
 });
 
 export type Config = Omit<z.infer<typeof envSchema>, "GAVRIEL_PASSWORD"> & {

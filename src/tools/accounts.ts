@@ -362,7 +362,9 @@ export function registerAccountTools(server: McpServer, client: GavrielClient, r
     server, role, "full", "add_account_contact",
     {
       title: "Agregar contacto a cuenta (ESCRITURA)",
-      description: "POST /account-contacts. Requiere confirm: true.",
+      description:
+        "POST /account-contacts. `order` = posición del contacto (menor = primero). " +
+        "Si la posición está rodeada de orders contiguos, llamá antes reorder_account_contacts para dejar lugar. Requiere confirm: true.",
       inputSchema: {
         accountId: z.string(),
         name: z.string().min(1),
@@ -392,14 +394,16 @@ export function registerAccountTools(server: McpServer, client: GavrielClient, r
     server, role, "full", "update_account_contact",
     {
       title: "Actualizar contacto de cuenta (ESCRITURA)",
-      description: "PATCH /account-contacts/{id}. Requiere confirm: true.",
+      description:
+        "PATCH /account-contacts/{id}. `order` = posición/prioridad del contacto (menor = primero). " +
+        "Para mover varios o insertar en una posición usá reorder_account_contacts, que correja el resto automáticamente. Requiere confirm: true.",
       inputSchema: {
         contactId: z.string(),
         name: z.string().optional(),
         phone: z.string().optional(),
         email: z.string().optional(),
         description: z.string().optional(),
-        order: z.number().int().optional(),
+        order: z.number().int().optional().describe("Posición del contacto (menor = primero)"),
         confirm: confirmSchema,
       },
     },
@@ -411,6 +415,119 @@ export function registerAccountTools(server: McpServer, client: GavrielClient, r
         client,
         () => client.patch(`/account-contacts/${args.contactId}`, body),
       ).then(ok);
+    },
+  );
+
+  registerTool(
+    server, role, "full", "reorder_account_contacts",
+    {
+      title: "Reordenar contactos de cuenta (ESCRITURA)",
+      description:
+        "Fija el orden final de TODOS los contactos de la cuenta según la secuencia pedida " +
+        "(orderedContactIds[0] = posición 1). Espacia las posiciones de a 10 para dejar lugar a " +
+        "inserciones futuras y corrige automáticamente a los demás contactos: solo hace PATCH de los que cambian. " +
+        "Para insertar un contacto nuevo en la posición k: pasá la secuencia completa deseada acá " +
+        "y después crealo con add_account_contact usando un order intermedio libre. Requiere confirm: true.",
+      inputSchema: {
+        accountId: z.string(),
+        orderedContactIds: z
+          .array(z.string())
+          .min(1)
+          .max(200)
+          .describe("IDs de contactos en el orden final deseado (índice 0 = posición 1). Debe incluir TODOS los contactos actuales."),
+        confirm: confirmSchema,
+      },
+      annotations: { idempotentHint: true },
+    },
+    async (args) => {
+      const accountId = normalizeAccountNumber(args.accountId);
+      const listRes = await client.get("/account-contacts", { accountId });
+      if (listRes.status >= 400) {
+        return err(`GET /account-contacts -> ${listRes.status}: ${JSON.stringify(listRes.data).slice(0, 200)}`);
+      }
+      const contacts = (Array.isArray(listRes.data) ? listRes.data : (listRes.data as { data?: unknown[] })?.data ?? []) as Array<{ id?: string; name?: string; order?: number }>;
+      const currentIds = contacts.filter((c) => c.id).map((c) => c.id as string);
+      const byId = new Map(contacts.filter((c) => c.id).map((c) => [c.id as string, c]));
+
+      const requested = args.orderedContactIds;
+      const dupes = requested.filter((id, i) => requested.indexOf(id) !== i);
+      if (dupes.length) return err(`IDs duplicados en orderedContactIds: ${dupes.join(", ")}`);
+      const missing = currentIds.filter((id) => !requested.includes(id));
+      if (missing.length) {
+        return err(
+          `Faltan contactos actuales en orderedContactIds: ${missing.join(", ")}. ` +
+            "La secuencia debe incluir TODOS los contactos de la cuenta. Consultalos con list_account_contacts.",
+        );
+      }
+      const extra = requested.filter((id) => !byId.has(id));
+      if (extra.length) {
+        return err(`IDs que no existen en la cuenta: ${extra.join(", ")}. Usá list_account_contacts para ver los válidos.`);
+      }
+
+      // Orden final espaciado ×10: deja gaps para insertar sin correr a nadie.
+      const finals = new Map(requested.map((id, i) => [id, (i + 1) * 10]));
+      const cambios = requested
+        .map((id) => ({ contactId: id, name: byId.get(id)?.name, from: byId.get(id)?.order ?? null, to: finals.get(id)! }))
+        .filter((c) => c.from !== c.to);
+
+      // Simula la secuencia de PATCHs y detecta colisiones transitorias
+      // (dos contactos con el mismo `order` al mismo tiempo). Si hay ciclo,
+      // barre todo a valores temporales altos antes de fijar los finales.
+      // ponytail: O(n²) por paso — n = contactos de una cuenta, sobra.
+      const state = new Map(currentIds.map((id) => [id, byId.get(id)?.order ?? Number.MAX_SAFE_INTEGER]));
+      const pending = new Set(cambios.map((c) => c.contactId));
+      let needsTempSweep = false;
+      while (pending.size > 0 && !needsTempSweep) {
+        const ready = [...pending].filter((id) =>
+          ![...pending].some((other) => other !== id && state.get(other) === finals.get(id)),
+        );
+        if (ready.length === 0) { needsTempSweep = true; break; }
+        for (const id of ready) { state.set(id, finals.get(id)!); pending.delete(id); }
+      }
+
+      type Move = { contactId: string; order: number };
+      const fases: Move[][] = [];
+      if (needsTempSweep) {
+        fases.push(cambios.map((c, i) => ({ contactId: c.contactId, order: 1_000_000 + i * 10 })));
+      }
+      fases.push(cambios.map((c) => ({ contactId: c.contactId, order: finals.get(c.contactId)! })));
+
+      if (!args.confirm) {
+        return ok({
+          preview: true,
+          mensaje: "Escritura NO ejecutada. Revisá el detalle y llamá de nuevo con `confirm: true` si querés ejecutarla.",
+          accountId,
+          ordenFinal: requested.map((id, i) => ({ posicion: i + 1, order: finals.get(id), contactId: id, name: byId.get(id)?.name })),
+          cambios: cambios.length ? cambios : "nada que cambiar (ya está en ese orden)",
+          ...(needsTempSweep ? { aviso: "Se necesita una pasada temporal para evitar orders duplicados durante el movimiento." } : {}),
+          patchsAejecutar: fases.flat().length,
+        });
+      }
+
+      const resultados: Array<{ contactId: string; ok: boolean; status?: number; error?: string }> = [];
+      for (const fase of fases) {
+        for (const move of fase) {
+          const path = `/account-contacts/${move.contactId}`;
+          try {
+            const r = (await requireConfirm(
+              true,
+              { tool: "reorder_account_contacts", method: "PATCH", path, params: { order: move.order } },
+              client,
+              () => client.patch(path, { order: move.order }),
+            )) as { ok?: boolean; status?: number };
+            resultados.push({ contactId: move.contactId, ok: r.ok !== false, status: r.status });
+          } catch (e) {
+            resultados.push({ contactId: move.contactId, ok: false, error: (e as Error).message });
+          }
+        }
+      }
+      const fallidos = resultados.filter((r) => !r.ok);
+      return ok({
+        writeStatus: fallidos.length ? "partial_failure" : "applied",
+        summary: { total: resultados.length, ok: resultados.length - fallidos.length, failed: fallidos.length },
+        resultados,
+        ...(fallidos.length ? { aviso: "Hubo fallos parciales: releé los contactos con list_account_contacts antes de reintentar." } : {}),
+      });
     },
   );
 }
