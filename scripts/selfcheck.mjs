@@ -10,7 +10,7 @@ import { tmpdir } from "node:os";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { setLogDir } from "../dist/auditLog.js";
-import { requireConfirm } from "../dist/tools/writeHelpers.js";
+import { requireConfirm, runBatch } from "../dist/tools/writeHelpers.js";
 import { buildQueryString, GavrielClient } from "../dist/gavrielClient.js";
 import { isAllowed, READ_PREFIXES } from "../dist/tools/rawGet.js";
 import { hasRole, registerTool } from "../dist/tools/roles.js";
@@ -362,6 +362,19 @@ await tAsync("4xx real => error genuino, no se disfraza ni relee", async () => {
   );
   assert.equal(r.ok, false);
   assert.equal(r.status, 409);
+});
+
+await tAsync("runBatch: fallos por ítem no cortan el lote y el resumen cuenta bien", async () => {
+  const report = await runBatch([
+    { id: "a", run: async () => ({ status: 200 }) },
+    { id: "b", run: async () => ({ status: 409 }) },
+    { id: "c", run: async () => { throw new Error("red"); } },
+    { id: "d", run: async () => ({ status: 201 }) },
+  ]);
+  assert.deepEqual(report.summary, { total: 4, ok: 2, failed: 2 });
+  assert.equal(report.results[0].ok, true);
+  assert.equal(report.results[1].status, 409);
+  assert.match(report.results[2].error, /red/);
 });
 
 function stubCountingRequest() {

@@ -2,7 +2,7 @@ import type { GavrielClient } from "../gavrielClient.js";
 import { ok, err, paginationSchema, okStructured, wrapReadOnly, forwardParams, okTruncated, truncateSchema, selectFields, requireFilters } from "./shared.js";
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/server";
-import { requireConfirm, confirmSchema } from "./writeHelpers.js";
+import { requireConfirm, confirmSchema, runBatch } from "./writeHelpers.js";
 import { registerTool, type Role } from "./roles.js";
 
 const EVENT_STATUSES = [
@@ -113,6 +113,56 @@ export function registerEventTools(server: McpServer, client: GavrielClient, rol
           results.push({ id, status: r.status, data: r.data });
         }
         return { status: 200, data: { results } };
+      }).then(ok);
+    },
+  );
+
+  registerTool(
+    server, role, "full", "bulk_mark_events_by_filter",
+    {
+      title: "Marcar eventos por filtro (ESCRITURA MASIVA)",
+      description:
+        "Resuelve eventos con filtros (cuenta obligatoria) y los marca al estado indicado. " +
+        "Sin confirm muestra los IDs afectados; con confirm ejecuta los PATCH en lote.",
+      inputSchema: {
+        accountId: z.string().describe("ID de la cuenta"),
+        port: z.string().optional(),
+        eventCode: z.string().optional(),
+        dateFrom: z.iso.datetime({ offset: true }).optional().describe("ISO datetime"),
+        dateTo: z.iso.datetime({ offset: true }).optional().describe("ISO datetime"),
+        targetStatus: z.enum(EVENT_STATUSES).default("processed").describe("Estado a asignar"),
+        maxEvents: z.number().int().min(1).max(200).default(50).describe("Tope de eventos por ejecución"),
+        confirm: confirmSchema,
+      },
+    },
+    async (args) => {
+      const params: Record<string, unknown> = {
+        accountId: args.accountId,
+        limit: args.maxEvents,
+        sortBy: "createdAt",
+        sortDirection: "desc",
+      };
+      if (args.port) params.port = args.port;
+      if (args.eventCode) params.eventCode = args.eventCode;
+      if (args.dateFrom) params.dateFrom = args.dateFrom;
+      if (args.dateTo) params.dateTo = args.dateTo;
+      const res = await client.get("/events", params);
+      const items = Array.isArray(res.data)
+        ? res.data
+        : ((res.data as { data?: unknown[] } | null)?.data ?? []);
+      if (!items.length) return ok({ matchedCount: 0, nota: "Ningún evento coincide con el filtro." });
+      const ids = items.map((i) => String((i as Record<string, unknown>).id));
+      const exec = {
+        tool: "bulk_mark_events_by_filter",
+        method: "PATCH",
+        path: `/events (${ids.length} eventos por filtro accountId=${args.accountId})`,
+        params: { eventIds: ids, status: args.targetStatus },
+      };
+      return requireConfirm(args.confirm, exec, client, async () => {
+        const report = await runBatch(
+          ids.map((id) => ({ id, run: () => client.patch(`/events/${id}`, { status: args.targetStatus }) })),
+        );
+        return { status: 200, data: report };
       }).then(ok);
     },
   );
