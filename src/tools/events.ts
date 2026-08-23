@@ -1,7 +1,7 @@
 import type { GavrielClient } from "../gavrielClient.js";
 import { ok, err, paginationSchema, okStructured, wrapReadOnly, forwardParams, okTruncated, truncateSchema, selectFields, requireFilters } from "./shared.js";
 import { z } from "zod";
-import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { McpServer } from "@modelcontextprotocol/server";
 import { requireConfirm, confirmSchema } from "./writeHelpers.js";
 import { registerTool, type Role } from "./roles.js";
 
@@ -20,11 +20,11 @@ export function registerEventTools(server: McpServer, client: GavrielClient, rol
     {
       title: "Obtener evento por ID",
       description: "Evento por ID con relaciones.",
-      inputSchema: {
-        id: z.string().describe("ID del evento"),
-        truncate: truncateSchema,
-        fields: z.array(z.string()).optional(),
-      },
+      inputSchema: z.object({
+              id: z.string().describe("ID del evento"),
+              truncate: truncateSchema,
+              fields: z.array(z.string()).optional(),
+            }),
       annotations: { readOnlyHint: true },
     },
     wrapReadOnly(async (args) => {
@@ -40,23 +40,23 @@ export function registerEventTools(server: McpServer, client: GavrielClient, rol
       title: "Listar eventos",
       description:
         "Lista eventos (alarmas). Requiere accountId. Catálogos: gavriel://catalog/events-types",
-      inputSchema: {
-        ...paginationSchema,
-        accountId: z.string(),
-        accountNumber: z.string().optional(),
-        port: z.string().optional(),
-        eventCode: z.string().optional(),
-        eventTypeName: z.string().optional(),
-        search: z.string().optional().describe("Búsqueda libre"),
-        requiresIntervention: z.boolean().optional(),
-        pending: z.boolean().optional().describe("Solo eventos pendientes"),
-        inProgress: z.boolean().optional().describe("Solo eventos en curso"),
-        bridgeId: z.string().optional(),
-        connectionId: z.string().optional(),
-        dateFrom: z.string().optional().describe("ISO datetime, ej 2026-08-01T00:00:00.000Z"),
-        dateTo: z.string().optional().describe("ISO datetime"),
-        fields: z.array(z.string()).optional().describe("Campos a retornar por evento"),
-      },
+      inputSchema: z.object({
+              ...paginationSchema,
+              accountId: z.string(),
+              accountNumber: z.string().optional(),
+              port: z.string().optional(),
+              eventCode: z.string().optional(),
+              eventTypeName: z.string().optional(),
+              search: z.string().optional().describe("Búsqueda libre"),
+              requiresIntervention: z.boolean().optional(),
+              pending: z.boolean().optional().describe("Solo eventos pendientes"),
+              inProgress: z.boolean().optional().describe("Solo eventos en curso"),
+              bridgeId: z.string().optional(),
+              connectionId: z.string().optional(),
+              dateFrom: z.string().optional().describe("ISO datetime, ej 2026-08-01T00:00:00.000Z"),
+              dateTo: z.string().optional().describe("ISO datetime"),
+              fields: z.array(z.string()).optional().describe("Campos a retornar por evento"),
+            }),
       outputSchema: z.object({}).passthrough(),
       annotations: { readOnlyHint: true },
     },

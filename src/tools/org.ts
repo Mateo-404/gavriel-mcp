@@ -1,7 +1,7 @@
 import type { GavrielClient } from "../gavrielClient.js";
 import { ok, err, paginationSchema, okTruncated, truncateSchema, selectFields, wrapReadOnly, forwardParams } from "./shared.js";
 import { z } from "zod";
-import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { McpServer } from "@modelcontextprotocol/server";
 import { requireConfirm, confirmSchema } from "./writeHelpers.js";
 import { registerTool, type Role } from "./roles.js";
 
@@ -11,12 +11,12 @@ export function registerOrgTools(server: McpServer, client: GavrielClient, role:
     {
       title: "Listar empresas",
       description: "Lista empresas.",
-      inputSchema: {
-        ...paginationSchema,
-        search: z.string().optional().describe("Búsqueda libre (nombre/código)"),
-        truncate: truncateSchema,
-        fields: z.array(z.string()).optional(),
-      },
+      inputSchema: z.object({
+              ...paginationSchema,
+              search: z.string().optional().describe("Búsqueda libre (nombre/código)"),
+              truncate: truncateSchema,
+              fields: z.array(z.string()).optional(),
+            }),
       annotations: { readOnlyHint: true },
     },
     wrapReadOnly(async (args) => {
@@ -31,11 +31,11 @@ export function registerOrgTools(server: McpServer, client: GavrielClient, role:
     {
       title: "Listar técnicos de empresa",
       description: "Técnicos de una empresa.",
-      inputSchema: {
-        id: z.string(),
-        truncate: truncateSchema,
-        fields: z.array(z.string()).optional(),
-      },
+      inputSchema: z.object({
+              id: z.string(),
+              truncate: truncateSchema,
+              fields: z.array(z.string()).optional(),
+            }),
       annotations: { readOnlyHint: true },
     },
     wrapReadOnly(async (args) => {
@@ -49,12 +49,12 @@ export function registerOrgTools(server: McpServer, client: GavrielClient, role:
     {
       title: "Listar usuarios",
       description: "Lista usuarios.",
-      inputSchema: {
-        ...paginationSchema,
-        search: z.string().optional().describe("Búsqueda libre (nombre/email)"),
-        truncate: truncateSchema,
-        fields: z.array(z.string()).optional(),
-      },
+      inputSchema: z.object({
+              ...paginationSchema,
+              search: z.string().optional().describe("Búsqueda libre (nombre/email)"),
+              truncate: truncateSchema,
+              fields: z.array(z.string()).optional(),
+            }),
       annotations: { readOnlyHint: true },
     },
     wrapReadOnly(async (args) => {
@@ -69,9 +69,9 @@ export function registerOrgTools(server: McpServer, client: GavrielClient, role:
     {
       title: "Listar roles",
       description: "Roles del sistema.",
-      inputSchema: {
-        truncate: truncateSchema,
-      },
+      inputSchema: z.object({
+              truncate: truncateSchema,
+            }),
       annotations: { readOnlyHint: true },
     },
     wrapReadOnly(async (args) => {
@@ -85,7 +85,7 @@ export function registerOrgTools(server: McpServer, client: GavrielClient, role:
     {
       title: "Obtener perfil propio",
       description: "Perfil del usuario logueado.",
-      inputSchema: {},
+      inputSchema: z.object({}),
       annotations: { readOnlyHint: true },
     },
     wrapReadOnly(async (_args) => {

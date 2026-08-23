@@ -1,4 +1,4 @@
-import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import { StdioServerTransport } from "@modelcontextprotocol/server/stdio";
 import { loadConfig, logDir } from "./config.js";
 import { GavrielClient } from "./gavrielClient.js";
 import { buildServer } from "./server.js";

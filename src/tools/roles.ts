@@ -1,6 +1,12 @@
-import type { McpServer, ToolCallback } from "@modelcontextprotocol/sdk/server/mcp.js";
-import type { ToolAnnotations } from "@modelcontextprotocol/sdk/types.js";
-import type { AnySchema, ZodRawShapeCompat } from "@modelcontextprotocol/sdk/server/zod-compat.js";
+import type {
+  McpServer,
+  ToolCallback,
+  ToolAnnotations,
+  StandardSchemaWithJSON,
+  ServerContext,
+  CallToolResult,
+} from "@modelcontextprotocol/server";
+import type { z } from "zod";
 
 // Rol del server (GAVRIEL_MCP_ROLE).
 // readonly: solo lectura (+ get y audit_logs).
@@ -14,27 +20,56 @@ export function hasRole(current: Role, min: Role): boolean {
   return ROLE_RANK[current] >= ROLE_RANK[min];
 }
 
+type RawShape = Record<string, z.ZodType>;
+
+interface ToolConfigBase {
+  title?: string;
+  description?: string;
+  annotations?: ToolAnnotations;
+  _meta?: Record<string, unknown>;
+}
+
 // Registra la tool solo si el rol activo alcanza el mínimo requerido.
 // Es el choke point único por el que pasan las tools de escritura.
-// Misma firma genérica que server.registerTool para mantener la inferencia
-// del tipo de `args` en el callback.
+// Mismos overloads que McpServer.registerTool en SDK v2 (Standard Schema +
+// legacy raw shape) para mantener la inferencia del tipo de `args`.
 export function registerTool<
-  OutputArgs extends ZodRawShapeCompat | AnySchema,
-  InputArgs extends undefined | ZodRawShapeCompat | AnySchema = undefined,
+  InputArgs extends StandardSchemaWithJSON | undefined = undefined,
 >(
   server: McpServer,
   role: Role,
   min: Role,
   name: string,
-  config: {
-    title?: string;
-    description?: string;
+  config: ToolConfigBase & {
     inputSchema?: InputArgs;
-    outputSchema?: OutputArgs;
-    annotations?: ToolAnnotations;
-    _meta?: Record<string, unknown>;
+    outputSchema?: StandardSchemaWithJSON;
   },
   cb: ToolCallback<InputArgs>,
+): void;
+export function registerTool<InputArgs extends RawShape>(
+  server: McpServer,
+  role: Role,
+  min: Role,
+  name: string,
+  config: ToolConfigBase & {
+    inputSchema?: InputArgs;
+    outputSchema?: StandardSchemaWithJSON;
+  },
+  cb: (
+    args: z.output<z.ZodObject<InputArgs>>,
+    ctx: ServerContext,
+  ) => CallToolResult | Promise<CallToolResult>,
+): void;
+export function registerTool(
+  server: McpServer,
+  role: Role,
+  min: Role,
+  name: string,
+  // ponytail: firma interna loose para satisfacer ambos overloads
+  config: unknown,
+  cb: unknown,
 ): void {
-  if (hasRole(role, min)) server.registerTool(name, config, cb);
+  if (hasRole(role, min)) {
+    server.registerTool(name, config as never, cb as never);
+  }
 }

@@ -1,7 +1,7 @@
 import type { GavrielClient } from "../gavrielClient.js";
 import { ok, err, wrapReadOnly, okTruncated, truncateSchema, selectFields } from "./shared.js";
 import { z } from "zod";
-import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { McpServer } from "@modelcontextprotocol/server";
 import { requireConfirm, confirmSchema } from "./writeHelpers.js";
 import { registerTool, type Role } from "./roles.js";
 
@@ -19,12 +19,12 @@ export function registerInterventionTools(server: McpServer, client: GavrielClie
     {
       title: "Intervenciones de cuenta",
       description: "Intervenciones de una cuenta.",
-      inputSchema: {
-        id: z.string().describe("ID de la cuenta"),
-        openOnly: z.boolean().default(false).describe("Solo intervenciones abiertas"),
-        truncate: truncateSchema,
-        fields: z.array(z.string()).optional().describe("Campos a retornar"),
-      },
+      inputSchema: z.object({
+              id: z.string().describe("ID de la cuenta"),
+              openOnly: z.boolean().default(false).describe("Solo intervenciones abiertas"),
+              truncate: truncateSchema,
+              fields: z.array(z.string()).optional().describe("Campos a retornar"),
+            }),
       annotations: { readOnlyHint: true },
     },
     wrapReadOnly(async (args) => {

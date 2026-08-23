@@ -1,7 +1,7 @@
 import type { GavrielClient } from "../gavrielClient.js";
 import { ok, wrapReadOnly } from "./shared.js";
 import { z } from "zod";
-import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { McpServer } from "@modelcontextprotocol/server";
 
 export function registerSearchTools(server: McpServer, client: GavrielClient): void {
   server.registerTool(
@@ -11,10 +11,10 @@ export function registerSearchTools(server: McpServer, client: GavrielClient): v
       description:
         "Busca cuentas por nombre o código y devuelve solo id, accountNumber y name. " +
         "Para el resultado completo usar get_account(id). Output: [{id, accountNumber, name}]",
-      inputSchema: {
-        query: z.string().min(1).describe("Texto de búsqueda (nombre o código de cuenta)"),
-        limit: z.number().int().min(1).max(25).default(10).describe("Máximo de resultados (default 10, máx 25)"),
-      },
+      inputSchema: z.object({
+              query: z.string().min(1).describe("Texto de búsqueda (nombre o código de cuenta)"),
+              limit: z.number().int().min(1).max(25).default(10).describe("Máximo de resultados (default 10, máx 25)"),
+            }),
       annotations: { readOnlyHint: true },
     },
     wrapReadOnly(async (args) => {
@@ -37,13 +37,13 @@ export function registerSearchTools(server: McpServer, client: GavrielClient): v
       description:
         "Busca tickets con filtros y devuelve campos reducidos. " +
         "Para el detalle completo usar get_ticket(id). Output: [{id, title, status, priority, accountId, createdAt}]",
-      inputSchema: {
-        status: z.string().optional().describe("Filtrar por estado (open, in_progress, resolved, closed)"),
-        priority: z.string().optional().describe("Filtrar por prioridad (low, medium, high, urgent)"),
-        accountId: z.string().optional().describe("Filtrar por ID de cuenta"),
-        accountSearch: z.string().optional().describe("Buscar tickets de una cuenta por nombre/número"),
-        limit: z.number().int().min(1).max(50).default(15).describe("Máximo de resultados (default 15, máx 50)"),
-      },
+      inputSchema: z.object({
+              status: z.string().optional().describe("Filtrar por estado (open, in_progress, resolved, closed)"),
+              priority: z.string().optional().describe("Filtrar por prioridad (low, medium, high, urgent)"),
+              accountId: z.string().optional().describe("Filtrar por ID de cuenta"),
+              accountSearch: z.string().optional().describe("Buscar tickets de una cuenta por nombre/número"),
+              limit: z.number().int().min(1).max(50).default(15).describe("Máximo de resultados (default 15, máx 50)"),
+            }),
       annotations: { readOnlyHint: true },
     },
     wrapReadOnly(async (args) => {
@@ -73,13 +73,13 @@ export function registerSearchTools(server: McpServer, client: GavrielClient): v
       description:
         "Busca eventos con filtros y devuelve campos reducidos. Backend lento: siempre filtrar por accountId y/o rango de fechas. " +
         "Para el detalle completo usar get_event(id). Output: [{id, type, accountName, port, status, createdAt}]",
-      inputSchema: {
-        accountId: z.string().describe("ID de cuenta (requerido para evitar queries lentas)"),
-        status: z.string().optional().describe("Estado del evento (pending, attending, processed, etc.)"),
-        dateFrom: z.string().optional().describe("Fecha inicio ISO datetime"),
-        dateTo: z.string().optional().describe("Fecha fin ISO datetime"),
-        limit: z.number().int().min(1).max(50).default(15).describe("Máximo de resultados (default 15, máx 50)"),
-      },
+      inputSchema: z.object({
+              accountId: z.string().describe("ID de cuenta (requerido para evitar queries lentas)"),
+              status: z.string().optional().describe("Estado del evento (pending, attending, processed, etc.)"),
+              dateFrom: z.string().optional().describe("Fecha inicio ISO datetime"),
+              dateTo: z.string().optional().describe("Fecha fin ISO datetime"),
+              limit: z.number().int().min(1).max(50).default(15).describe("Máximo de resultados (default 15, máx 50)"),
+            }),
       annotations: { readOnlyHint: true },
     },
     wrapReadOnly(async (args) => {
@@ -118,10 +118,10 @@ export function registerSearchTools(server: McpServer, client: GavrielClient): v
       description:
         "Busca usuarios por nombre o email y devuelve campos reducidos. " +
         "Output: [{id, name, email, role}]",
-      inputSchema: {
-        query: z.string().optional().describe("Texto de búsqueda (nombre o email)"),
-        limit: z.number().int().min(1).max(25).default(10).describe("Máximo de resultados (default 10, máx 25)"),
-      },
+      inputSchema: z.object({
+              query: z.string().optional().describe("Texto de búsqueda (nombre o email)"),
+              limit: z.number().int().min(1).max(25).default(10).describe("Máximo de resultados (default 10, máx 25)"),
+            }),
       annotations: { readOnlyHint: true },
     },
     wrapReadOnly(async (args) => {

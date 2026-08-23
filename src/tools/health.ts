@@ -1,7 +1,7 @@
 import type { GavrielClient } from "../gavrielClient.js";
 import { ok, err, wrapReadOnly, truncateSchema, okTruncated } from "./shared.js";
 import { z } from "zod";
-import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { McpServer } from "@modelcontextprotocol/server";
 import type { Role } from "./roles.js";
 
 export function registerHealthTools(server: McpServer, client: GavrielClient, _role: Role): void {
@@ -10,13 +10,13 @@ export function registerHealthTools(server: McpServer, client: GavrielClient, _r
     {
       title: "Salud de monitoreo",
       description: "Salud de conexiones y bridges.",
-      inputSchema: {
-        bridgeId: z.string().optional().describe("Filtra los logs de salud del bridge"),
-        connectionId: z.string().optional(),
-        limit: z.number().int().min(1).max(200).default(25),
-        include: z.array(z.enum(["connections", "bridges"])).optional().describe("Secciones (default: ambas)"),
-        truncate: truncateSchema,
-      },
+      inputSchema: z.object({
+              bridgeId: z.string().optional().describe("Filtra los logs de salud del bridge"),
+              connectionId: z.string().optional(),
+              limit: z.number().int().min(1).max(200).default(25),
+              include: z.array(z.enum(["connections", "bridges"])).optional().describe("Secciones (default: ambas)"),
+              truncate: truncateSchema,
+            }),
       annotations: { readOnlyHint: true },
     },
     wrapReadOnly(async (args) => {

@@ -1,7 +1,7 @@
 import type { GavrielClient } from "../gavrielClient.js";
 import { ok, err, paginationSchema, okStructured, okTruncated, buildBody, wrapReadOnly, forwardParams, truncateSchema, selectFields } from "./shared.js";
 import { z } from "zod";
-import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { McpServer } from "@modelcontextprotocol/server";
 import { requireConfirm, confirmSchema } from "./writeHelpers.js";
 import { registerTool, type Role } from "./roles.js";
 
@@ -138,22 +138,22 @@ export function registerTicketTools(server: McpServer, client: GavrielClient, ro
       title: "Listar tickets",
       description:
         "Lista tickets con filtros.",
-      inputSchema: {
-        ...paginationSchema,
-        search: z.string().optional().describe("Búsqueda libre (título/descripción)"),
-        status: singleOrArray.describe(
-          "Estado(s). Ver gavriel://catalog/tickets/status-options para valores válidos.",
-        ),
-        priority: singleOrArray.describe(
-          "Prioridad(es). Ver gavriel://catalog/tickets/priority-options para valores válidos.",
-        ),
-        accountSearch: z.string().optional().describe("Busca tickets de una cuenta por nombre/número"),
-        accountId: z.string().optional(),
-        categoryId: z.string().optional(),
-        assignedUserId: z.string().optional(),
-        truncate: truncateSchema,
-        fields: z.array(z.string()).optional().describe("Campos a retornar por ticket"),
-      },
+      inputSchema: z.object({
+              ...paginationSchema,
+              search: z.string().optional().describe("Búsqueda libre (título/descripción)"),
+              status: singleOrArray.describe(
+                "Estado(s). Ver gavriel://catalog/tickets/status-options para valores válidos.",
+              ),
+              priority: singleOrArray.describe(
+                "Prioridad(es). Ver gavriel://catalog/tickets/priority-options para valores válidos.",
+              ),
+              accountSearch: z.string().optional().describe("Busca tickets de una cuenta por nombre/número"),
+              accountId: z.string().optional(),
+              categoryId: z.string().optional(),
+              assignedUserId: z.string().optional(),
+              truncate: truncateSchema,
+              fields: z.array(z.string()).optional().describe("Campos a retornar por ticket"),
+            }),
       outputSchema: z.object({}).passthrough(),
       annotations: { readOnlyHint: true },
     },
@@ -176,12 +176,12 @@ export function registerTicketTools(server: McpServer, client: GavrielClient, ro
     {
       title: "Obtener ticket por ID",
       description: "Ticket y sus actividades.",
-      inputSchema: {
-        id: z.string().describe("ID del ticket"),
-        include: z.array(z.enum(["activities"])).optional().describe("Secciones extra (default: activities)"),
-        truncate: truncateSchema,
-        fields: z.array(z.string()).optional().describe("Campos a retornar"),
-      },
+      inputSchema: z.object({
+              id: z.string().describe("ID del ticket"),
+              include: z.array(z.enum(["activities"])).optional().describe("Secciones extra (default: activities)"),
+              truncate: truncateSchema,
+              fields: z.array(z.string()).optional().describe("Campos a retornar"),
+            }),
       outputSchema: z.object({}).passthrough(),
       annotations: { readOnlyHint: true },
     },
@@ -204,7 +204,7 @@ export function registerTicketTools(server: McpServer, client: GavrielClient, ro
     {
       title: "Estadísticas de tickets",
       description: "Estadísticas globales de tickets (GET /tickets/stats).",
-      inputSchema: {},
+      inputSchema: z.object({}),
       annotations: { readOnlyHint: true },
     },
     wrapReadOnly(async () => {
@@ -219,7 +219,7 @@ export function registerTicketTools(server: McpServer, client: GavrielClient, ro
       title: "Conteo de tickets técnicos abiertos",
       description:
         "GET /tickets/open-technical-count. Con accountId filtra por cuenta.",
-      inputSchema: { accountId: z.string().optional() },
+      inputSchema: z.object({ accountId: z.string().optional() }),
       annotations: { readOnlyHint: true },
     },
     wrapReadOnly(async (args) => {

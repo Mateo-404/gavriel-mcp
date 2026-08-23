@@ -10,9 +10,8 @@ const ACTION_SEGMENTS = new Set([
 ]);
 
 export const confirmSchema = z
-  .boolean({
-    description: "true = ejecutar. false/omitido = preview.",
-  })
+  .boolean()
+  .describe("true = ejecutar. false/omitido = preview.")
   .default(false);
 
 export interface WriteExecution {
