@@ -29,10 +29,13 @@ cp .env.example .env   # completar GAVRIEL_EMAIL y GAVRIEL_PASSWORD
 | `GAVRIEL_API_BASE` | no | `https://app.gavriel.com.ar/api` |
 | `GAVRIEL_MCP_LOG_DIR` | no | `~/.local/share/gavriel-mcp` |
 | `GAVRIEL_MCP_ROLE` | no | `full` |
+| `GAVRIEL_MCP_WRITE_CONCURRENCY` | no | `5` (1–20) |
+| `GAVRIEL_MCP_DESTRUCTIVE_APPROVAL` | no | `off` |
 
 ### Roles del server (`GAVRIEL_MCP_ROLE`)
 
 - `full` (default): todas las tools, incluidas las de escritura (con `confirm`).
+- `lite`: lectura + escrituras core (tickets, intervenciones, conversaciones).
 - `readonly`: solo lectura; las tools de escritura **no se registran** (no
   existen para el agente). Incluye `get` y `audit_logs`, que son GET.
 
