@@ -57,7 +57,7 @@ export function registerActivityTools(server: McpServer, client: GavrielClient, 
       inputSchema: {
         activityId: z.string(),
         readAt: z
-          .string()
+          .iso.datetime({ offset: true })
           .optional()
           .describe("ISO datetime de lectura (si no viene, usa la fecha actual)"),
         confirm: confirmSchema,

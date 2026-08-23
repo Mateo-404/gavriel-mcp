@@ -45,7 +45,7 @@ export function registerServiceTools(server: McpServer, client: GavrielClient, r
       description: "Agenda del técnico.",
       inputSchema: z.object({
               userId: z.string(),
-              date: z.string().describe("Fecha (ISO 8601)"),
+              date: z.iso.date().describe("Fecha (YYYY-MM-DD)"),
               truncate: truncateSchema,
               fields: z.array(z.string()).optional(),
             }),

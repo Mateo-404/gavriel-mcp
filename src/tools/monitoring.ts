@@ -124,8 +124,12 @@ export function registerMonitoringTools(server: McpServer, client: GavrielClient
       const path = args.connectionId
         ? "/monitoring/events-chart"
         : "/monitoring/all-connections-events-chart";
-      const res = await client.get(path, args.connectionId ? { connectionId: args.connectionId } : undefined);
-      return okTruncated(res.data, args.truncate);
+      try {
+        const res = await client.get(path, args.connectionId ? { connectionId: args.connectionId } : undefined);
+        return okTruncated(res.data, args.truncate);
+      } catch (e) {
+        return err((e as Error).message);
+      }
     },
   );
 

@@ -102,8 +102,8 @@ export function registerOrgTools(server: McpServer, client: GavrielClient, role:
         "POST /users/{id}/non-working-days/range. Marca días no laborales del técnico. Requiere confirm: true.",
       inputSchema: {
         userId: z.string(),
-        from: z.string().describe("Fecha de inicio (YYYY-MM-DD)"),
-        to: z.string().describe("Fecha de fin (YYYY-MM-DD)"),
+        from: z.iso.date().describe("Fecha de inicio (YYYY-MM-DD)"),
+        to: z.iso.date().describe("Fecha de fin (YYYY-MM-DD)"),
         label: z.string().optional().describe("Etiqueta/razón opcional"),
         confirm: confirmSchema,
       },
@@ -129,7 +129,7 @@ export function registerOrgTools(server: McpServer, client: GavrielClient, role:
         "POST /companies/{id}/non-working-days. Marca un día no laboral de la empresa. Requiere confirm: true.",
       inputSchema: {
         companyId: z.string(),
-        date: z.string().describe("Fecha (YYYY-MM-DD)"),
+        date: z.iso.date().describe("Fecha (YYYY-MM-DD)"),
         label: z.string().optional().describe("Etiqueta/razón opcional"),
         confirm: confirmSchema,
       },

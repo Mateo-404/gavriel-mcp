@@ -31,6 +31,9 @@ const CATALOGS = [
 // ponytail: cache global por path con TTL 1h; si hiciera falta invalidación por evento,
 // se agrega un Map de versiones o se baja el TTL — hoy alcanza para catálogos semi-estáticos.
 const cache = new Map<string, { expiresAt: number; data: unknown }>();
+// single-flight: lecturas concurrentes del mismo catálogo frío comparten un único GET
+// (sin esto, el primer arranque dispara N fetches idénticos en paralelo).
+const inFlight = new Map<string, Promise<unknown>>();
 
 function compactEventsTypes(data: unknown): unknown {
   const items = Array.isArray(data) ? data : (data as { data?: unknown[] })?.data ?? [];
@@ -62,11 +65,21 @@ export function registerCatalogResources(server: McpServer, client: GavrielClien
         if (hit && hit.expiresAt > now) {
           return { contents: [{ uri, mimeType: "application/json", text: JSON.stringify(hit.data) }] };
         }
+        let p = inFlight.get(path);
+        if (!p) {
+          p = client
+            .get(path, { limit: 200 })
+            .then(({ data }) => {
+              const compacted = isEventsTypes ? compactEventsTypes(data) : data;
+              cache.set(path, { expiresAt: Date.now() + TTL_MS, data: compacted });
+              return compacted;
+            })
+            .finally(() => inFlight.delete(path));
+          inFlight.set(path, p);
+        }
         try {
-          const { data } = await client.get(path, { limit: 200 });
-          const compacted = isEventsTypes ? compactEventsTypes(data) : data;
-          cache.set(path, { expiresAt: now + TTL_MS, data: compacted });
-          return { contents: [{ uri, mimeType: "application/json", text: JSON.stringify(compacted) }] };
+          const data = await p;
+          return { contents: [{ uri, mimeType: "application/json", text: JSON.stringify(data) }] };
         } catch (e) {
           const errorData = { error: (e as Error).message, path };
           return { contents: [{ uri, mimeType: "application/json", text: JSON.stringify(errorData) }] };
