@@ -7,6 +7,11 @@ Marinozzi Sistemas de Seguridad) como tools para agentes. La API base es
 `https://app.gavriel.com.ar/api` y el server hace login con
 `GAVRIEL_EMAIL`/`GAVRIEL_PASSWORD` (leídas de `.env` o variables de entorno).
 
+Implementado sobre el **MCP TypeScript SDK v2** (`@modelcontextprotocol/server`
++ `/client`, spec 2026-07-28), zod 4 y TypeScript 7. Las tools se registran
+con `server.registerTool(name, config, cb)`; el gate de escrituras vive en
+`src/tools/writeHelpers.ts` (`requireConfirm`).
+
 Datos de producción: **+170.000 tickets**. Siempre acotá las consultas de
 lectura con filtros y/o `limit` bajo (default 25, tope 200).
 
@@ -60,8 +65,11 @@ Escritura (requieren `confirm`): `create_intervention`,
 `conversation_set_status`, `conversation_mark_read`,
 `mark_activity_read`, `mark_activity_unread`, `update_activity`,
 `add_account_contact`, `update_account_contact`,
-`schedule_service`, `update_service`,
+`reorder_account_contacts`, `schedule_service`, `update_service`,
 `add_technician_non_working_days`, `add_company_non_working_day`.
+Escritura masiva (requieren `confirm`): `bulk_mark_events_by_filter`,
+`bulk_add_account_note` (preview del lote antes de confirmar; salida unificada
+`{summary:{total,ok,failed}, results:[{id,ok,status?,error?}]}`).
 
 Catálogos (resources, cache 1 h): `gavriel://catalog/...` (estados/prioridades
 de ticket, categorías, tipos de evento, protocolos, marcas, etc.). Para
@@ -106,6 +114,11 @@ Estados de evento: `pending`, `attending`, `processed`, `self-processed`,
 - Contacto de cuenta: `POST /account-contacts`
   `{ accountId, name, phone?, email?, description?, order? }`
   / `PATCH /account-contacts/{id}` (mismos campos sin accountId)
+- Reordenar contactos: `reorder_account_contacts` (tool propia, no un endpoint
+  único): recibe `accountId` + `orderedContactIds` y deja los `order` espaciados
+  por 10 (`(i+1)*10`) para dejar lugar a inserciones futuras; simula
+  colisiones transitorias y, si hay ciclo, hace un barrido temporal antes de
+  fijar los valores finales. Solo PATCHea los que cambian.
 - Agendar servicio: `PATCH /services/{id}/schedule`
   `{ scheduledDate, slotCount?, assignedUserId? }`
 - Editar servicio: `PATCH /services/{id}`
@@ -119,13 +132,21 @@ Los endpoints de escritura que exceden el perfil de riesgo aprobado (borrados,
 gestión de usuarios/roles, activación de monitoreo, facturación, catálogos,
 archivos) están en `TIER3_PENDIENTE.md`: **documentados pero no implementados**.
 
-## Escrituras: serialización y robustez (Fase B)
+## Escrituras: concurrencia y robustez
 
-- `src/gavrielClient.ts` **serializa** internamente post/patch/delete (cola
-  propia, máx 1 en vuelo; los GET quedan concurrentes). Se puede lanzar un
-  grupo de PATCH de reordenamiento (`order` de contactos, etc.) en paralelo
-  sin riesgo de conflictos 409 del lado del cliente. Si se requiere orden
-  estricto entre procesos/sesiones distintas, pedirlas de a una igualmente.
+- `src/gavrielClient.ts` ejecuta escrituras (post/patch/delete) bajo un
+  **semáforo** de `GAVRIEL_MCP_WRITE_CONCURRENCY` (default 5) en vuelo, y una
+  **cola FIFO por prefijo** para recursos con unique constraints del backend
+  (`/account-contacts`: el campo `order` rompe con escrituras hermanas en
+  paralelo). Los GET quedan concurrentes sin límite. Esto permite lanzar un
+  grupo de PATCH de reordenamiento en paralelo sin conflictos 409 desde el
+  cliente (ver `reorder_account_contacts`).
+- **Reintento automático solo en GET** (429/5xx con backoff). Repetir una
+  escritura tras un 5xx puede duplicarla si el backend la aplicó antes de
+  fallar la respuesta; por eso las escrituras no se reintentan.
+- **Anti-tormenta de login**: tras un login exitoso, un `401` en los próximos
+  15 s lanza error claro en vez de re-loginear en loop (evita bloqueo de
+  cuenta).
 - El backend de Gavriel falla de forma **intermitente** (a veces devuelve un
   body truncado con HTTP 200). El cliente detecta esto: devuelve
   `writeStatus: "applied_response_unparseable"`, loguea el body crudo en
@@ -170,6 +191,22 @@ las reglas es necesario para crear event codes correctos:
 usan **R**, el resto mantiene **GT**. La regla es del bridge, no del backend.
 Otros formatos pueden tener reglas diferentes — verificar con eventos reales
 antes de crear codes para un formato nuevo.
+
+## Configuración (variables de entorno)
+
+- `GAVRIEL_MCP_ROLE`: `readonly` | `lite` | `full` (default `full`). `lite`
+  expone lectura + escrituras core (tickets, intervenciones, conversaciones);
+  `readonly` solo lectura (+ `get`, `audit_logs`). Rol y `confirm` son capas
+  distintas (disponibilidad vs aprobación).
+- `GAVRIEL_MCP_WRITE_CONCURRENCY`: entero 1–20, default 5. Máximo de
+  escrituras en vuelo simultáneas.
+- `GAVRIEL_MCP_DESTRUCTIVE_APPROVAL`: `off` (default) | `elicitation`. Con
+  `elicitation`, las tools destructivas (`delete_account_note`,
+  `bulk_mark_events_by_filter`, `bulk_add_account_note`) piden **aprobación
+  humana por elicitation** (form con boolean) además del `confirm`. Si el
+  cliente no soporta elicitation o el usuario rechaza, no se ejecuta (falla
+  cerrado). Nota: `ctx.mcpReq.elicitInput` está deprecado en la spec
+  2026-07-28 (usa `inputRequired`) pero sigue funcional en clientes 2025-era.
 
 ## Reglas de proyecto
 
