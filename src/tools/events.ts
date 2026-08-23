@@ -1,5 +1,5 @@
 import type { GavrielClient } from "../gavrielClient.js";
-import { ok, err, paginationSchema, okStructured, wrapReadOnly, forwardParams, okTruncated, truncateSchema, selectFields, requireFilters, fieldsSchema } from "./shared.js";
+import { ok, paginationSchema, okStructured, wrapReadOnly, forwardParams, okTruncated, truncateSchema, selectFields, requireFilters, fieldsSchema } from "./shared.js";
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/server";
 import { requireConfirm, confirmSchema, runBatch, destructiveGuard } from "./writeHelpers.js";
