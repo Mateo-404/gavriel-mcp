@@ -2,7 +2,7 @@ import type { GavrielClient } from "../gavrielClient.js";
 import { ok, err, paginationSchema, okStructured, okTruncated, truncateSchema, selectFields, normalizeAccountNumber, buildBody, wrapReadOnly, forwardParams } from "./shared.js";
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/server";
-import { requireConfirm, confirmSchema } from "./writeHelpers.js";
+import { requireConfirm, confirmSchema, runBatch } from "./writeHelpers.js";
 import { registerTool, type Role } from "./roles.js";
 
 const ACCOUNT_FIELDS = [
@@ -165,6 +165,43 @@ export function registerAccountTools(server: McpServer, client: GavrielClient, r
         client,
         () => client.post(`/accounts/${args.accountId}/notes`, body),
       ).then(ok);
+    },
+  );
+
+  registerTool(
+    server, role, "full", "bulk_add_account_note",
+    {
+      title: "Agregar nota a varias cuentas (ESCRITURA MASIVA)",
+      description:
+        "POST /accounts/{id}/notes a cada cuenta de la lista con el mismo cuerpo. " +
+        "Sin confirm muestra el preview; con confirm ejecuta los POST en lote.",
+      inputSchema: {
+        accountIds: z.array(z.string()).min(1).max(100).describe("IDs de las cuentas destino"),
+        type: z.enum(["bitacora", "temporal", "fija"]).describe("Tipo de nota"),
+        content: z.string().min(1),
+        validFrom: z.iso.datetime({ offset: true }).optional().describe("ISO datetime, solo para tipo temporal"),
+        validUntil: z.iso.datetime({ offset: true }).optional().describe("ISO datetime, solo para tipo temporal"),
+        confirm: confirmSchema,
+      },
+    },
+    async (args) => {
+      const body = buildBody(args as Record<string, unknown>, {
+        required: ["type", "content"],
+        optional: ["validFrom", "validUntil"],
+      });
+      const ids = [...new Set(args.accountIds)];
+      const exec = {
+        tool: "bulk_add_account_note",
+        method: "POST",
+        path: `/accounts/{id}/notes (${ids.length} cuentas)`,
+        params: { accountIds: ids, ...body },
+      };
+      return requireConfirm(args.confirm, exec, client, async () => {
+        const report = await runBatch(
+          ids.map((id) => ({ id, run: () => client.post(`/accounts/${id}/notes`, body) })),
+        );
+        return { status: 200, data: report };
+      }).then(ok);
     },
   );
 

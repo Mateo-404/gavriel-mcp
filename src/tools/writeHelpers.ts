@@ -149,3 +149,32 @@ function summarize(data: unknown, maxLen = 1000): unknown {
   // truncado lanza (bug C-2); el log solo necesita una muestra legible.
   return { _truncatedPreview: json.slice(0, maxLen), totalLength: json.length };
 }
+
+// ── Lotes ───────────────────────────────────────────────────────────
+// Ejecuta N operaciones en paralelo; la concurrencia real la limita el
+// semáforo del cliente (GAVRIEL_MCP_WRITE_CONCURRENCY). Un fallo por ítem
+// no corta el lote: cada entrada reporta ok/status/error.
+export interface BatchOp {
+  id: string;
+  run: () => Promise<{ status: number }>;
+}
+
+export interface BatchReport {
+  summary: { total: number; ok: number; failed: number };
+  results: Array<{ id: string; ok: boolean; status?: number; error?: string }>;
+}
+
+export async function runBatch(ops: BatchOp[]): Promise<BatchReport> {
+  const results = await Promise.all(
+    ops.map(async (op) => {
+      try {
+        const r = await op.run();
+        return { id: op.id, ok: r.status >= 200 && r.status < 300, status: r.status };
+      } catch (e) {
+        return { id: op.id, ok: false, error: (e as Error).message };
+      }
+    }),
+  );
+  const failed = results.filter((r) => !r.ok).length;
+  return { summary: { total: ops.length, ok: ops.length - failed, failed }, results };
+}
