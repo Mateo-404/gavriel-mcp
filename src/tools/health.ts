@@ -1,5 +1,5 @@
 import type { GavrielClient } from "../gavrielClient.js";
-import { ok, err, wrapReadOnly, truncateSchema, okTruncated } from "./shared.js";
+import { wrapReadOnly, truncateSchema, okTruncated } from "./shared.js";
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/server";
 import type { Role } from "./roles.js";

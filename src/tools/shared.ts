@@ -100,7 +100,7 @@ export function forwardParams(
 export function requireFilters(
   args: Record<string, unknown>,
   required: string[],
-  toolHint: string,
+  _toolHint?: string,
 ): CallToolResult | null {
   const missing = required.filter((k) => {
     const v = args[k];

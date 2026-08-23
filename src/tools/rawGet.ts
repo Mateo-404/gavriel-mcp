@@ -1,5 +1,5 @@
 import type { GavrielClient } from "../gavrielClient.js";
-import { ok, err, okTruncated } from "./shared.js";
+import { err, okTruncated } from "./shared.js";
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/server";
 import type { Role } from "./roles.js";
@@ -16,6 +16,7 @@ export const READ_PREFIXES = [
   "/events",
   "/integrations",
   "/interventions/account",
+  "/interventions",
   "/tickets",
   "/ticket-categories",
   "/activities",
