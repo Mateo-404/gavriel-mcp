@@ -1,7 +1,7 @@
 import type { GavrielClient } from "../gavrielClient.js";
 import { ok, err, paginationSchema, MAX_LIMIT, okTruncated, truncateSchema, selectFields, wrapReadOnly, forwardParams } from "./shared.js";
 import { z } from "zod";
-import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { McpServer } from "@modelcontextprotocol/server";
 import type { Role } from "./roles.js";
 
 export function registerMonitoringTools(server: McpServer, client: GavrielClient, _role: Role): void {
@@ -10,15 +10,15 @@ export function registerMonitoringTools(server: McpServer, client: GavrielClient
     {
       title: "Listar conexiones",
       description: "Conexiones con filtros.",
-      inputSchema: {
-        ...paginationSchema,
-        bridgeId: z.string().optional().describe("ID del bridge"),
-        type: z.string().optional().describe("Tipo de conexión"),
-        activated: z.boolean().optional().describe("Solo conexiones activadas"),
-        search: z.string().optional().describe("Búsqueda libre"),
-        truncate: truncateSchema,
-        fields: z.array(z.string()).optional().describe("Campos a retornar"),
-      },
+      inputSchema: z.object({
+              ...paginationSchema,
+              bridgeId: z.string().optional().describe("ID del bridge"),
+              type: z.string().optional().describe("Tipo de conexión"),
+              activated: z.boolean().optional().describe("Solo conexiones activadas"),
+              search: z.string().optional().describe("Búsqueda libre"),
+              truncate: truncateSchema,
+              fields: z.array(z.string()).optional().describe("Campos a retornar"),
+            }),
       annotations: { readOnlyHint: true },
     },
     wrapReadOnly(async (args) => {
@@ -33,11 +33,11 @@ export function registerMonitoringTools(server: McpServer, client: GavrielClient
     {
       title: "Reporte de conexión",
       description: "Reporte de conexión.",
-      inputSchema: {
-        id: z.string(),
-        truncate: truncateSchema,
-        fields: z.array(z.string()).optional().describe("Campos a retornar"),
-      },
+      inputSchema: z.object({
+              id: z.string(),
+              truncate: truncateSchema,
+              fields: z.array(z.string()).optional().describe("Campos a retornar"),
+            }),
       annotations: { readOnlyHint: true },
     },
     wrapReadOnly(async (args) => {
@@ -51,20 +51,20 @@ export function registerMonitoringTools(server: McpServer, client: GavrielClient
     {
       title: "Logs de bridge",
       description: "Logs de bridge paginados.",
-      inputSchema: {
-        id: z.string(),
-        port: z.string().describe("Puerto (obligatorio)"),
-        nextToken: z.string().optional().describe("Token de continuación"),
-        limit: z
-          .number()
-          .int()
-          .min(1)
-          .max(MAX_LIMIT)
-          .optional()
-          .describe(`Cantidad por página (máximo ${MAX_LIMIT})`),
-        truncate: truncateSchema,
-        fields: z.array(z.string()).optional().describe("Campos a retornar"),
-      },
+      inputSchema: z.object({
+              id: z.string(),
+              port: z.string().describe("Puerto (obligatorio)"),
+              nextToken: z.string().optional().describe("Token de continuación"),
+              limit: z
+                .number()
+                .int()
+                .min(1)
+                .max(MAX_LIMIT)
+                .optional()
+                .describe(`Cantidad por página (máximo ${MAX_LIMIT})`),
+              truncate: truncateSchema,
+              fields: z.array(z.string()).optional().describe("Campos a retornar"),
+            }),
       annotations: { readOnlyHint: true },
     },
     wrapReadOnly(async (args) => {
@@ -81,10 +81,10 @@ export function registerMonitoringTools(server: McpServer, client: GavrielClient
     {
       title: "Disco del bridge",
       description: "Disco del bridge.",
-      inputSchema: {
-        id: z.string(),
-        truncate: truncateSchema,
-      },
+      inputSchema: z.object({
+              id: z.string(),
+              truncate: truncateSchema,
+            }),
       annotations: { readOnlyHint: true },
     },
     wrapReadOnly(async (args) => {
@@ -98,9 +98,9 @@ export function registerMonitoringTools(server: McpServer, client: GavrielClient
     {
       title: "Cuentas con eventos pendientes",
       description: "Cuentas con eventos pendientes.",
-      inputSchema: {
-        truncate: truncateSchema,
-      },
+      inputSchema: z.object({
+              truncate: truncateSchema,
+            }),
       annotations: { readOnlyHint: true },
     },
     wrapReadOnly(async (args) => {
@@ -114,10 +114,10 @@ export function registerMonitoringTools(server: McpServer, client: GavrielClient
     {
       title: "Gráfico de eventos",
       description: "Gráfico de eventos.",
-      inputSchema: {
-        connectionId: z.string().optional(),
-        truncate: truncateSchema,
-      },
+      inputSchema: z.object({
+              connectionId: z.string().optional(),
+              truncate: truncateSchema,
+            }),
       annotations: { readOnlyHint: true },
     },
     async (args) => {
@@ -134,9 +134,9 @@ export function registerMonitoringTools(server: McpServer, client: GavrielClient
     {
       title: "Ubicación de técnicos",
       description: "Ubicación de técnicos.",
-      inputSchema: {
-        truncate: truncateSchema,
-      },
+      inputSchema: z.object({
+              truncate: truncateSchema,
+            }),
       annotations: { readOnlyHint: true },
     },
     wrapReadOnly(async (args) => {

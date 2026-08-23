@@ -1,7 +1,7 @@
 import type { GavrielClient } from "../gavrielClient.js";
 import { ok, err, paginationSchema, okTruncated, truncateSchema, selectFields, wrapReadOnly } from "./shared.js";
 import { z } from "zod";
-import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { McpServer } from "@modelcontextprotocol/server";
 import { requireConfirm, confirmSchema } from "./writeHelpers.js";
 import { registerTool, type Role } from "./roles.js";
 
@@ -11,11 +11,11 @@ export function registerConversationTools(server: McpServer, client: GavrielClie
     {
       title: "Conversaciones del usuario",
       description: "Conversaciones del usuario.",
-      inputSchema: {
-        ...paginationSchema,
-        truncate: truncateSchema,
-        fields: z.array(z.string()).optional().describe("Campos a retornar"),
-      },
+      inputSchema: z.object({
+              ...paginationSchema,
+              truncate: truncateSchema,
+              fields: z.array(z.string()).optional().describe("Campos a retornar"),
+            }),
       annotations: { readOnlyHint: true },
     },
     wrapReadOnly(async (args) => {
@@ -29,12 +29,12 @@ export function registerConversationTools(server: McpServer, client: GavrielClie
     {
       title: "Mensajes de conversación",
       description: "Mensajes de conversación.",
-      inputSchema: {
-        id: z.string(),
-        ...paginationSchema,
-        truncate: truncateSchema,
-        fields: z.array(z.string()).optional().describe("Campos a retornar"),
-      },
+      inputSchema: z.object({
+              id: z.string(),
+              ...paginationSchema,
+              truncate: truncateSchema,
+              fields: z.array(z.string()).optional().describe("Campos a retornar"),
+            }),
       annotations: { readOnlyHint: true },
     },
     wrapReadOnly(async (args) => {
@@ -131,9 +131,9 @@ export function registerConversationTools(server: McpServer, client: GavrielClie
     {
       title: "Stats de conversaciones",
       description: "Stats de conversaciones.",
-      inputSchema: {
-        truncate: truncateSchema,
-      },
+      inputSchema: z.object({
+              truncate: truncateSchema,
+            }),
       annotations: { readOnlyHint: true },
     },
     wrapReadOnly(async (args) => {

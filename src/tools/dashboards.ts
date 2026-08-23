@@ -1,7 +1,7 @@
 import type { GavrielClient } from "../gavrielClient.js";
 import { ok, wrapReadOnly } from "./shared.js";
 import { z } from "zod";
-import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { McpServer } from "@modelcontextprotocol/server";
 
 export function registerDashboardTools(server: McpServer, client: GavrielClient): void {
   server.registerTool(
@@ -11,9 +11,9 @@ export function registerDashboardTools(server: McpServer, client: GavrielClient)
       description:
         "Combina info de cuenta + dispositivos + intervenciones + eventos pendientes en UNA sola llamada. " +
         "Ahorra 4 llamadas vs hacer cada una por separado.",
-      inputSchema: {
-        id: z.string().describe("ID de la cuenta"),
-      },
+      inputSchema: z.object({
+              id: z.string().describe("ID de la cuenta"),
+            }),
       annotations: { readOnlyHint: true },
     },
     wrapReadOnly(async (args) => {
@@ -60,9 +60,9 @@ export function registerDashboardTools(server: McpServer, client: GavrielClient)
       description:
         "Combina ticket + cuenta + actividades en UNA sola llamada. " +
         "Útil para entender un ticket sin hacer múltiples queries.",
-      inputSchema: {
-        id: z.string().describe("ID del ticket"),
-      },
+      inputSchema: z.object({
+              id: z.string().describe("ID del ticket"),
+            }),
       annotations: { readOnlyHint: true },
     },
     wrapReadOnly(async (args) => {
@@ -101,9 +101,9 @@ export function registerDashboardTools(server: McpServer, client: GavrielClient)
       description:
         "Combina evento + cuenta + conexión en UNA sola llamada. " +
         "Útil para entender un evento sin hacer múltiples queries.",
-      inputSchema: {
-        id: z.string().describe("ID del evento"),
-      },
+      inputSchema: z.object({
+              id: z.string().describe("ID del evento"),
+            }),
       annotations: { readOnlyHint: true },
     },
     wrapReadOnly(async (args) => {
@@ -138,9 +138,9 @@ export function registerDashboardTools(server: McpServer, client: GavrielClient)
       description:
         "Lista cuentas con eventos pendientes y sus detalles. " +
         "Útil para procesamiento masivo de eventos.",
-      inputSchema: {
-        limit: z.number().int().min(1).max(50).default(10).describe("Máximo de cuentas a mostrar"),
-      },
+      inputSchema: z.object({
+              limit: z.number().int().min(1).max(50).default(10).describe("Máximo de cuentas a mostrar"),
+            }),
       annotations: { readOnlyHint: true },
     },
     wrapReadOnly(async (args) => {

@@ -1,4 +1,4 @@
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { McpServer } from "@modelcontextprotocol/server";
 import { readFileSync } from "node:fs";
 import type { GavrielClient } from "./gavrielClient.js";
 import { registerTicketTools } from "./tools/tickets.js";

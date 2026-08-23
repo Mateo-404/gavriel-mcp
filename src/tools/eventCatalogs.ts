@@ -1,7 +1,7 @@
 import type { GavrielClient } from "../gavrielClient.js";
 import { ok, err, buildBody, wrapReadOnly, okTruncated } from "./shared.js";
 import { z } from "zod";
-import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { McpServer } from "@modelcontextprotocol/server";
 import { requireConfirm, confirmSchema } from "./writeHelpers.js";
 import { registerTool, type Role } from "./roles.js";
 
@@ -220,9 +220,9 @@ export function registerEventCatalogTools(server: McpServer, client: GavrielClie
     {
       title: "Detectar tipos de evento duplicados",
       description: "Busca tipos con el mismo name. Devuelve grupos duplicados con sus IDs y códigos.",
-      inputSchema: {
-        truncate: z.number().int().min(1000).optional(),
-      },
+      inputSchema: z.object({
+              truncate: z.number().int().min(1000).optional(),
+            }),
       annotations: { readOnlyHint: true },
     },
     wrapReadOnly(async (args) => {
@@ -258,10 +258,10 @@ export function registerEventCatalogTools(server: McpServer, client: GavrielClie
     {
       title: "Detectar códigos de evento duplicados",
       description: "Busca códigos duplicados dentro de un eventsFormatId.",
-      inputSchema: {
-        eventsFormatId: z.string().describe("ID del formato a analizar"),
-        truncate: z.number().int().min(1000).optional(),
-      },
+      inputSchema: z.object({
+              eventsFormatId: z.string().describe("ID del formato a analizar"),
+              truncate: z.number().int().min(1000).optional(),
+            }),
       annotations: { readOnlyHint: true },
     },
     wrapReadOnly(async (args) => {
@@ -292,10 +292,10 @@ export function registerEventCatalogTools(server: McpServer, client: GavrielClie
     {
       title: "Validar integridad de mapeo de eventos",
       description: "Chequea: tipos sin códigos, códigos sin tipo, duplicados, códigos apuntando a _UNK.",
-      inputSchema: {
-        eventsFormatId: z.string().describe("ID del formato a validar"),
-        truncate: z.number().int().min(1000).optional(),
-      },
+      inputSchema: z.object({
+              eventsFormatId: z.string().describe("ID del formato a validar"),
+              truncate: z.number().int().min(1000).optional(),
+            }),
       annotations: { readOnlyHint: true },
     },
     wrapReadOnly(async (args) => {

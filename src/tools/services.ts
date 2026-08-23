@@ -1,7 +1,7 @@
 import type { GavrielClient } from "../gavrielClient.js";
 import { ok, err, okTruncated, truncateSchema, selectFields, wrapReadOnly, buildBody } from "./shared.js";
 import { z } from "zod";
-import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { McpServer } from "@modelcontextprotocol/server";
 import { requireConfirm, confirmSchema } from "./writeHelpers.js";
 import { registerTool, type Role } from "./roles.js";
 
@@ -11,9 +11,9 @@ export function registerServiceTools(server: McpServer, client: GavrielClient, r
     {
       title: "Obtener panel de servicios",
       description: "Panel de servicios.",
-      inputSchema: {
-        truncate: truncateSchema,
-      },
+      inputSchema: z.object({
+              truncate: truncateSchema,
+            }),
       annotations: { readOnlyHint: true },
     },
     wrapReadOnly(async (args) => {
@@ -27,9 +27,9 @@ export function registerServiceTools(server: McpServer, client: GavrielClient, r
     {
       title: "Obtener resumen del panel de servicios",
       description: "Resumen del panel.",
-      inputSchema: {
-        truncate: truncateSchema,
-      },
+      inputSchema: z.object({
+              truncate: truncateSchema,
+            }),
       annotations: { readOnlyHint: true },
     },
     wrapReadOnly(async (args) => {
@@ -43,12 +43,12 @@ export function registerServiceTools(server: McpServer, client: GavrielClient, r
     {
       title: "Listar agenda de técnicos",
       description: "Agenda del técnico.",
-      inputSchema: {
-        userId: z.string(),
-        date: z.string().describe("Fecha (ISO 8601)"),
-        truncate: truncateSchema,
-        fields: z.array(z.string()).optional(),
-      },
+      inputSchema: z.object({
+              userId: z.string(),
+              date: z.string().describe("Fecha (ISO 8601)"),
+              truncate: truncateSchema,
+              fields: z.array(z.string()).optional(),
+            }),
       annotations: { readOnlyHint: true },
     },
     wrapReadOnly(async (args) => {
@@ -65,10 +65,10 @@ export function registerServiceTools(server: McpServer, client: GavrielClient, r
     {
       title: "Obtener servicio",
       description: "Servicio por ID.",
-      inputSchema: {
-        id: z.string(),
-        fields: z.array(z.string()).optional(),
-      },
+      inputSchema: z.object({
+              id: z.string(),
+              fields: z.array(z.string()).optional(),
+            }),
       annotations: { readOnlyHint: true },
     },
     wrapReadOnly(async (args) => {

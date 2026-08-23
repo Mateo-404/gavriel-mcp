@@ -1,5 +1,5 @@
 import type { GavrielClient } from "../gavrielClient.js";
-import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { McpServer } from "@modelcontextprotocol/server";
 import type { Role } from "../tools/roles.js";
 
 const TTL_MS = 60 * 60 * 1000; // 1h

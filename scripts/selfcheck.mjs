@@ -118,8 +118,8 @@ const WRITE_TOOLS = [
 ];
 
 const tListTools = async (server) => {
-  const { InMemoryTransport } = await import("@modelcontextprotocol/sdk/inMemory.js");
-  const { Client } = await import("@modelcontextprotocol/sdk/client/index.js");
+  const { InMemoryTransport } = await import("@modelcontextprotocol/server");
+  const { Client } = await import("@modelcontextprotocol/client");
   const [c2s, s2c] = InMemoryTransport.createLinkedPair();
   const client = new Client({ name: "selfcheck", version: "0.0.0" });
   await server.connect(c2s);

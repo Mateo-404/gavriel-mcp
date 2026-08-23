@@ -1,7 +1,7 @@
 import type { GavrielClient } from "../gavrielClient.js";
 import { ok, err, paginationSchema, okStructured, okTruncated, truncateSchema, selectFields, normalizeAccountNumber, buildBody, wrapReadOnly, forwardParams } from "./shared.js";
 import { z } from "zod";
-import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { McpServer } from "@modelcontextprotocol/server";
 import { requireConfirm, confirmSchema } from "./writeHelpers.js";
 import { registerTool, type Role } from "./roles.js";
 
@@ -17,13 +17,13 @@ export function registerAccountTools(server: McpServer, client: GavrielClient, r
     {
       title: "Obtener cuenta",
       description: "Devuelve una cuenta con sus zonas, contactos, usuarios e intervenciones.",
-      inputSchema: {
-        id: z.string(),
-        include: z.array(z.enum(["zones", "contacts", "users", "interventions", "devices"]))
-          .optional()
-          .describe("Secciones a incluir (default: todas)"),
-        fields: z.array(z.string()).optional().describe("Campos a retornar (default: todos)"),
-      },
+      inputSchema: z.object({
+              id: z.string(),
+              include: z.array(z.enum(["zones", "contacts", "users", "interventions", "devices"]))
+                .optional()
+                .describe("Secciones a incluir (default: todas)"),
+              fields: z.array(z.string()).optional().describe("Campos a retornar (default: todos)"),
+            }),
       outputSchema: z.object({}).passthrough(),
       annotations: { readOnlyHint: true },
     },
@@ -93,14 +93,14 @@ export function registerAccountTools(server: McpServer, client: GavrielClient, r
     {
       title: "Listar cuentas",
       description: "Lista cuentas para ubicar un ID por nombre/código/número.",
-      inputSchema: {
-        ...paginationSchema,
-        search: z.string().optional().describe("Búsqueda libre (nombre/código)"),
-        name: z.string().optional(),
-        code: z.string().optional(),
-        truncate: truncateSchema,
-        fields: z.array(z.string()).optional().describe("Campos a retornar por objeto"),
-      },
+      inputSchema: z.object({
+              ...paginationSchema,
+              search: z.string().optional().describe("Búsqueda libre (nombre/código)"),
+              name: z.string().optional(),
+              code: z.string().optional(),
+              truncate: truncateSchema,
+              fields: z.array(z.string()).optional().describe("Campos a retornar por objeto"),
+            }),
       annotations: { readOnlyHint: true },
     },
     async (args) => {
@@ -220,14 +220,14 @@ export function registerAccountTools(server: McpServer, client: GavrielClient, r
     {
       title: "Listar dispositivos de cuenta",
       description: "Dispositivos de una cuenta.",
-      inputSchema: {
-        id: z.string(),
-        brandId: z.string().optional().describe("Filtrar por marca"),
-        modelId: z.string().optional().describe("Filtrar por modelo"),
-        status: z.string().optional().describe("Filtrar por estado"),
-        truncate: truncateSchema,
-        fields: z.array(z.string()).optional().describe("Campos a retornar por objeto"),
-      },
+      inputSchema: z.object({
+              id: z.string(),
+              brandId: z.string().optional().describe("Filtrar por marca"),
+              modelId: z.string().optional().describe("Filtrar por modelo"),
+              status: z.string().optional().describe("Filtrar por estado"),
+              truncate: truncateSchema,
+              fields: z.array(z.string()).optional().describe("Campos a retornar por objeto"),
+            }),
       annotations: { readOnlyHint: true },
     },
     wrapReadOnly(async (args) => {
@@ -249,11 +249,11 @@ export function registerAccountTools(server: McpServer, client: GavrielClient, r
     {
       title: "Listar particiones de cuenta",
       description: "Particiones de una cuenta.",
-      inputSchema: {
-        id: z.string(),
-        truncate: truncateSchema,
-        fields: z.array(z.string()).optional().describe("Campos a retornar por objeto"),
-      },
+      inputSchema: z.object({
+              id: z.string(),
+              truncate: truncateSchema,
+              fields: z.array(z.string()).optional().describe("Campos a retornar por objeto"),
+            }),
       annotations: { readOnlyHint: true },
     },
     wrapReadOnly(async (args) => {
@@ -271,11 +271,11 @@ export function registerAccountTools(server: McpServer, client: GavrielClient, r
     {
       title: "Listar usuarios de cuenta",
       description: "Usuarios de una cuenta.",
-      inputSchema: {
-        id: z.string(),
-        truncate: truncateSchema,
-        fields: z.array(z.string()).optional().describe("Campos a retornar por objeto"),
-      },
+      inputSchema: z.object({
+              id: z.string(),
+              truncate: truncateSchema,
+              fields: z.array(z.string()).optional().describe("Campos a retornar por objeto"),
+            }),
       annotations: { readOnlyHint: true },
     },
     wrapReadOnly(async (args) => {
@@ -293,11 +293,11 @@ export function registerAccountTools(server: McpServer, client: GavrielClient, r
     {
       title: "Listar contactos de cuenta",
       description: "Contactos de una cuenta.",
-      inputSchema: {
-        accountId: z.string(),
-        truncate: truncateSchema,
-        fields: z.array(z.string()).optional().describe("Campos a retornar por objeto"),
-      },
+      inputSchema: z.object({
+              accountId: z.string(),
+              truncate: truncateSchema,
+              fields: z.array(z.string()).optional().describe("Campos a retornar por objeto"),
+            }),
       annotations: { readOnlyHint: true },
     },
     wrapReadOnly(async (args) => {
@@ -316,11 +316,11 @@ export function registerAccountTools(server: McpServer, client: GavrielClient, r
     {
       title: "Listar contactos útiles",
       description: "Contactos útiles (por jurisdicción opcional).",
-      inputSchema: {
-        jurisdictionId: z.string().optional().describe("Filtra por jurisdicción si viene"),
-        truncate: truncateSchema,
-        fields: z.array(z.string()).optional().describe("Campos a retornar por objeto"),
-      },
+      inputSchema: z.object({
+              jurisdictionId: z.string().optional().describe("Filtra por jurisdicción si viene"),
+              truncate: truncateSchema,
+              fields: z.array(z.string()).optional().describe("Campos a retornar por objeto"),
+            }),
       annotations: { readOnlyHint: true },
     },
     wrapReadOnly(async (args) => {
@@ -341,11 +341,11 @@ export function registerAccountTools(server: McpServer, client: GavrielClient, r
     {
       title: "Listar zonas de cuenta",
       description: "Zonas de una cuenta.",
-      inputSchema: {
-        id: z.string(),
-        truncate: truncateSchema,
-        fields: z.array(z.string()).optional().describe("Campos a retornar por objeto"),
-      },
+      inputSchema: z.object({
+              id: z.string(),
+              truncate: truncateSchema,
+              fields: z.array(z.string()).optional().describe("Campos a retornar por objeto"),
+            }),
       annotations: { readOnlyHint: true },
     },
     wrapReadOnly(async (args) => {

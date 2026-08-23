@@ -1,7 +1,7 @@
 import type { GavrielClient } from "../gavrielClient.js";
 import { ok, err, wrapReadOnly, buildBody, okTruncated, truncateSchema, selectFields } from "./shared.js";
 import { z } from "zod";
-import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { McpServer } from "@modelcontextprotocol/server";
 import { requireConfirm, confirmSchema } from "./writeHelpers.js";
 import { registerTool, type Role } from "./roles.js";
 
@@ -20,11 +20,11 @@ export function registerActivityTools(server: McpServer, client: GavrielClient, 
     {
       title: "Actividades de ticket",
       description: "Actividades de un ticket.",
-      inputSchema: {
-        id: z.string(),
-        truncate: truncateSchema,
-        fields: z.array(z.string()).optional().describe("Campos a retornar"),
-      },
+      inputSchema: z.object({
+              id: z.string(),
+              truncate: truncateSchema,
+              fields: z.array(z.string()).optional().describe("Campos a retornar"),
+            }),
       annotations: { readOnlyHint: true },
     },
     wrapReadOnly(async (args) => {
@@ -38,9 +38,9 @@ export function registerActivityTools(server: McpServer, client: GavrielClient, 
     {
       title: "Stats de actividades",
       description: "Stats de actividades.",
-      inputSchema: {
-        truncate: truncateSchema,
-      },
+      inputSchema: z.object({
+              truncate: truncateSchema,
+            }),
       annotations: { readOnlyHint: true },
     },
     wrapReadOnly(async (args) => {
