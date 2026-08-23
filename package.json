@@ -1,10 +1,13 @@
 {
   "name": "gavriel-mcp",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "MCP server local que expone la API de Gavriel (alarmas) como herramientas para agentes de IA",
   "private": true,
   "type": "module",
   "main": "dist/index.js",
+  "bin": {
+    "gavriel-mcp": "dist/index.js"
+  },
   "packageManager": "pnpm@11.21.0",
   "engines": {
     "node": ">=20.0.0"
@@ -15,7 +18,9 @@
     "dev": "tsx src/index.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "selfcheck": "node scripts/selfcheck.mjs",
-    "regression": "node scripts/regression.mjs"
+    "regression": "node scripts/regression.mjs",
+    "build:bin": "node scripts/build-bin.mjs",
+    "test:fast": "bun run selfcheck"
   },
   "dependencies": {
     "@modelcontextprotocol/client": "^2.0.0",
@@ -24,6 +29,8 @@
   },
   "devDependencies": {
     "@types/node": "^26.2.0",
+    "esbuild": "^0.28.2",
+    "postject": "1.0.0-alpha.6",
     "tsx": "^4.23.12",
     "typescript": "^7.0.2"
   }

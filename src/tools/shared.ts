@@ -31,8 +31,7 @@ export const truncateSchema = z
 
 // ── Field selection ──────────────────────────────────────────────────
 // Selecciona solo los campos pedidos de un objeto/array. Si fields está
-// vacío/undefined, retorna el original. Soporta objetos anidados con dot
-// notation (ej "account.name") y arrays de objetos.
+// vacío/undefined, retorna el original.
 export function selectFields<T extends Record<string, unknown>>(
   data: T | T[],
   fields?: string[],
@@ -71,7 +70,9 @@ export function buildBody(
 }
 
 // ── Read-only wrapper ───────────────────────────────────────────────
-export function wrapReadOnly<T>(
+export function wrapReadOnly<
+  T,
+>(
   fn: (args: T) => Promise<CallToolResult>,
 ): (args: T) => Promise<CallToolResult> {
   return async (args) => {

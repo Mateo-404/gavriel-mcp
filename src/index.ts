@@ -5,6 +5,15 @@ import { buildServer } from "./server.js";
 import { setLogDir } from "./auditLog.js";
 import { setDestructiveApproval } from "./tools/writeHelpers.js";
 
+// Injected at bundle time by esbuild (see scripts/build-bin.mjs).
+declare const __GAVRIEL_VERSION__: string | undefined;
+const APP_VERSION = typeof __GAVRIEL_VERSION__ !== "undefined" ? __GAVRIEL_VERSION__ : "dev";
+
+if (process.argv.includes("--version") || process.argv.includes("-v")) {
+  console.log(`gavriel-mcp ${APP_VERSION}`);
+  process.exit(0);
+}
+
 async function main(): Promise<void> {
   const config = loadConfig();
   setLogDir(logDir(config));

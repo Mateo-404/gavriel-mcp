@@ -1,5 +1,4 @@
 import { McpServer } from "@modelcontextprotocol/server";
-import { readFileSync } from "node:fs";
 import type { GavrielClient } from "./gavrielClient.js";
 import { registerTicketTools } from "./tools/tickets.js";
 import { registerEventTools } from "./tools/events.js";
@@ -21,18 +20,8 @@ import { registerBatchTools } from "./tools/batch.js";
 import { registerCatalogResources } from "./resources/catalogs.js";
 import type { Role } from "./tools/roles.js";
 
-// Versión tomada de package.json (fuente única, evita desincronización).
-const VERSION = (() => {
-  try {
-    return (
-      JSON.parse(
-        readFileSync(new URL("../package.json", import.meta.url), "utf8"),
-      ).version ?? "dev"
-    );
-  } catch {
-    return "dev";
-  }
-})();
+declare const __GAVRIEL_VERSION__: string | undefined;
+const VERSION = typeof __GAVRIEL_VERSION__ !== "undefined" ? __GAVRIEL_VERSION__ : "dev";
 
 export function buildServer(client: GavrielClient, role: Role = "full"): McpServer {
   const server = new McpServer({ name: "gavriel-mcp", version: VERSION });
