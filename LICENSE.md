@@ -61,4 +61,4 @@ You're excused for unknowingly breaking Notices if you take all practical steps 
 
 For commercial use beyond the thirty-day trial period (including use by companies in the alarm monitoring / security industry), contact for a commercial license:
 
-https://matecito.tech
+https://mateogariboglio.is-a.dev
