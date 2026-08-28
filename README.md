@@ -132,12 +132,17 @@ opencode antepone el nombre del server: `create_ticket` se expone como
 |---|---|
 | `list_tickets` | Lista tickets (filtros: status, priority, accountId, categoryId, assignedUserId, search). Paginación máx. 200. |
 | `get_ticket` | Ticket + actividades (comentarios) por ID. |
+| `get_ticket_context` | Ticket + cuenta + actividades en UNA llamada. |
 | `ticket_stats` | Estadísticas globales de tickets. |
 | `get_open_technical_tickets_count` | Cantidad de tickets técnicos abiertos (por accountId). |
 | `list_events` | Lista eventos/alarmas (accountId, port, eventCode, dateFrom, dateTo, pendientes…). |
 | `list_accounts_pending_events` | Cuentas con eventos pendientes (para intervención masiva). |
 | `get_monitoring_events_chart` | Gráfico de eventos 24 h (por conexión o global). |
+| `get_event` | Evento por ID con sus relaciones. |
+| `get_event_context` | Evento + cuenta + conexión en UNA llamada. |
 | `get_account` | Cuenta completa (zonas, contactos, usuarios, intervenciones). |
+| `get_account_dashboard` | Cuenta + dispositivos + intervenciones + eventos pendientes en UNA llamada. |
+| `get_pending_events_dashboard` | Cuentas con eventos pendientes y sus detalles (procesamiento masivo). |
 | `list_accounts` | Buscar cuentas por nombre/código. |
 | `list_account_devices` / `list_account_partitions` / `list_account_zones` | Dispositivos, particiones y zonas de una cuenta. |
 | `list_account_users` / `list_account_contacts` | Usuarios y contactos de una cuenta. |
@@ -152,6 +157,8 @@ opencode antepone el nombre del server: `create_ticket` se expone como
 | `list_users` / `list_roles` / `get_my_profile` | Usuarios, roles y perfil propio. |
 | `audit_logs` | Logs de auditoría del sistema. |
 | `health` | Logs de salud de conexiones y bridges. |
+| `search_accounts` / `search_tickets` / `search_events` / `search_users` | Búsqueda rápida con campos reducidos (para resolver IDs). |
+| `find_duplicate_event_codes` / `find_duplicate_event_types` / `validate_event_mapping` | Auditoría del mapeo tipos/códigos de evento. |
 | `get` | GET libre sobre whitelist de endpoints de lectura. |
 
 ### Escritura — **todas requieren `confirm: true`**
@@ -171,14 +178,21 @@ El gate es la **Fase 0, regla 2**: si `confirm` falta o es `false`, la tool
 | `close_ticket` | Cerrar ticket con resolución. |
 | `add_ticket_activity` | Agregar comentario/actividad a un ticket. |
 | `mark_events_processed` | Marcar uno o más eventos como procesados. |
+| `bulk_process_events` | Marcar varios eventos como procesados en lote. |
+| `bulk_mark_events_by_filter` | Marcar eventos a un estado por filtro (cuenta obligatoria; preview de IDs antes de confirmar). |
+| `bulk_close_tickets` | Cerrar varios tickets en lote con la misma resolución. |
+| `bulk_add_account_note` | Misma nota a hasta 100 cuentas (dedupe de IDs). |
 | `update_account` | Actualizar campos de una cuenta. |
 | `add_account_note` / `update_account_note` / `delete_account_note` | Bitácora/notas de cuenta. |
 | `send_conversation_message` | Enviar mensaje en conversación de helpdesk. |
 | `conversation_claim` / `conversation_release` / `conversation_set_status` / `conversation_mark_read` | Gestión de conversaciones. |
 | `mark_activity_read` / `mark_activity_unread` / `update_activity` | Marcar leída/no leída y editar una actividad. |
 | `add_account_contact` / `update_account_contact` | Alta y edición de contactos de una cuenta. |
+| `reorder_account_contacts` | Fijar el orden final de todos los contactos (espaciado ×10 para inserciones futuras). |
 | `schedule_service` / `update_service` | Agendar y editar servicios. |
 | `add_technician_non_working_days` / `add_company_non_working_day` | Días no laborales de técnico y de empresa. |
+| `create_/update_/delete_event_type`, `create_/update_/delete_event_code`, `bulk_create_event_codes` | CRUD del catálogo de tipos y códigos de evento. |
+| `create_/update_/delete_device_brand`, `create_/update_/delete_device_model`, `create_/update_/delete_device` | CRUD del catálogo de marcas/modelos y dispositivos. |
 
 **Importante:** probá siempre primero con `confirm` ausente/false y revisá el
 preview. La primera ejecución real de cada tool hacela en presencia del
@@ -211,6 +225,15 @@ Esto es adicional al audit log propio de Gavriel (`/audit/logs`).
 
 No se despliega: es local, transporte stdio. No requiere Docker ni el host
 Hyper-V.
+
+## Verificación
+
+```bash
+pnpm typecheck   # tipos
+pnpm build       # compila a dist/
+pnpm selfcheck   # suite offline rápida de invariantes core (sin red)
+pnpm regression  # compara tool vs endpoint contra el backend real (requiere .env y red)
+```
 
 ## Seguridad
 

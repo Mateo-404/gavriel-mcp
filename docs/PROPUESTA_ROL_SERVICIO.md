@@ -13,8 +13,8 @@ un rol que solo pueda **leer** lo que las tools de lectura usan, y nada más.
 La matriz de permisos granular no es un catálogo fijo del frontend: el
 backend la emite por usuario en `login`/`profile` (`permissions`). La lista
 siguiente es la del rol Admin actual, que es el universo de módulos que el
-backend expone. Las tools del MCP (65, ya construidas) se cruzaron contra
-esa matriz.
+backend expone. Las tools del MCP (ver el inventario actual en
+`README.md · Herramientas`) se cruzaron contra esa matriz.
 
 ## Permisos del sistema → ¿lo necesita el MCP? → tools que lo usan
 
@@ -119,7 +119,7 @@ Usuario: una sola cuenta humana tipo servicio, p. ej.
 
 ## Nota sobre escrituras
 
-El MCP tiene 27 tools de escritura (gated por `confirm`). Esta propuesta las
+El MCP tiene tools de escritura (gated por `confirm`). Esta propuesta las
 deja **fuera del rol**: son operaciones que conviene que haga una cuenta
 humana (hay auditoría, responsabilidad de quién acciona). Si más adelante se
 quiere que la cuenta de servicio escriba, se habilitan solo estos módulos:
