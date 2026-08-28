@@ -3,6 +3,14 @@
 Servidor MCP local (TypeScript) que expone la API de **Gavriel** — sistema de
 monitoreo de alarmas — como herramientas para agentes de IA (OpenCode, Claude Desktop).
 
+## Documentación
+
+| Documento | Para qué |
+|---|---|
+| [`docs/PROPUESTA_ROL_SERVICIO.md`](docs/PROPUESTA_ROL_SERVICIO.md) | Rol de servicio mínimo `MCP Service` (decisión pendiente). |
+| [`docs/PERF.md`](docs/PERF.md) | Ledger de optimización y métricas de contexto. |
+| [`TIER3_PENDIENTE.md`](TIER3_PENDIENTE.md) | Endpoints inventariados y no implementados (backlog). |
+
 ## Requisitos
 
 - Node.js 20+ (probado con Node 22/24)
@@ -45,7 +53,7 @@ seguridad es el usuario de Gavriel con el que se loguea el server.
 
 ### Configuración del rol de servicio
 
-El rol de servicio está definido en `PROPUESTA_ROL_SERVICIO.md`. La
+El rol de servicio está definido en `docs/PROPUESTA_ROL_SERVICIO.md`. La
 configuración recomendada es usar el rol `MCP Service` (solo lectura) como
 default.
 
