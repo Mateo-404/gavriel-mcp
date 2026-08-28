@@ -39,37 +39,11 @@ Los nombres MCP no llevan prefijo (`create_ticket`, `list_tickets`…). En las
 sesiones de opencode se exponen antepuestos con el nombre del server
 (`gavriel_`): `create_ticket` → `gavriel_create_ticket`.
 
-Lectura: `list_tickets`, `get_ticket`, `ticket_stats`,
-`get_open_technical_tickets_count`, `list_events`,
-`list_accounts_pending_events`, `get_monitoring_events_chart`,
-`get_account`, `list_accounts`, `list_account_devices`,
-`list_account_partitions`, `list_account_zones`, `list_account_users`,
-`list_account_contacts`, `list_useful_contacts`,
-`list_interventions`, `list_activities_by_ticket`, `get_activity_stats`,
-`list_conversations`, `list_conversation_messages`, `get_conversation_stats`,
-`list_connections`, `get_connection_report`, `list_bridge_logs`,
-`get_bridge_disk_space`, `get_service_panel`, `get_service_panel_summary`,
-`get_service`, `list_technician_agenda`, `get_technician_locations`,
-`list_companies`, `list_company_technicians`, `list_users`, `list_roles`,
-`get_my_profile`, `audit_logs`, `health`,
-`get` (GET libre con whitelist).
-
-Escritura (requieren `confirm`): `create_intervention`,
-`create_bulk_interventions`, `close_intervention`,
-`set_intervention_observation`, `create_ticket`,
-`update_ticket`, `close_ticket`, `add_ticket_activity`,
-`mark_events_processed`, `update_account`,
-`add_account_note`, `update_account_note`,
-`delete_account_note`, `send_conversation_message`,
-`conversation_claim`, `conversation_release`,
-`conversation_set_status`, `conversation_mark_read`,
-`mark_activity_read`, `mark_activity_unread`, `update_activity`,
-`add_account_contact`, `update_account_contact`,
-`reorder_account_contacts`, `schedule_service`, `update_service`,
-`add_technician_non_working_days`, `add_company_non_working_day`.
-Escritura masiva (requieren `confirm`): `bulk_mark_events_by_filter`,
-`bulk_add_account_note` (preview del lote antes de confirmar; salida unificada
-`{summary:{total,ok,failed}, results:[{id,ok,status?,error?}]}`).
+El inventario completo (98 tools, lectura vs escritura) está en
+`README.md · Herramientas`. Regla corta que no se pierde con la
+compactación: toda tool de **escritura** lleva `confirm`, toda tool de
+**lectura** no. Las batch (`bulk_*`) devuelven `{ summary:{total,ok,failed},
+results:[{id,ok,status?,error?}] }`.
 
 Catálogos (resources, cache 1 h): `gavriel://catalog/...` (estados/prioridades
 de ticket, categorías, tipos de evento, protocolos, marcas, etc.). Para
@@ -194,12 +168,9 @@ antes de crear codes para un formato nuevo.
 
 ## Configuración (variables de entorno)
 
-- `GAVRIEL_MCP_ROLE`: `readonly` | `lite` | `full` (default `full`). `lite`
-  expone lectura + escrituras core (tickets, intervenciones, conversaciones);
-  `readonly` solo lectura (+ `get`, `audit_logs`). Rol y `confirm` son capas
-  distintas (disponibilidad vs aprobación).
-- `GAVRIEL_MCP_WRITE_CONCURRENCY`: entero 1–20, default 5. Máximo de
-  escrituras en vuelo simultáneas.
+La tabla completa de variables vive en `README.md · Configuración`. Nota
+operativa:
+
 - `GAVRIEL_MCP_DESTRUCTIVE_APPROVAL`: `off` (default) | `elicitation`. Con
   `elicitation`, las tools destructivas (`delete_account_note`,
   `bulk_mark_events_by_filter`, `bulk_add_account_note`) piden **aprobación
