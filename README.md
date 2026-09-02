@@ -1,252 +1,252 @@
 # 🪽 Gavriel MCP
 
-Servidor MCP local (TypeScript) que expone la API de **Gavriel** — sistema de
-monitoreo de alarmas — como herramientas para agentes de IA (OpenCode, Claude Desktop).
+Local MCP server (TypeScript) that exposes the **Gavriel** API — alarm
+monitoring system — as tools for AI agents (OpenCode, Claude Desktop).
 
-## Documentación
+## Documentation
 
-| Documento | Para qué |
-|---|---|
-| [`docs/PROPUESTA_ROL_SERVICIO.md`](docs/PROPUESTA_ROL_SERVICIO.md) | Rol de servicio mínimo `MCP Service` (decisión pendiente). |
-| [`docs/PERF.md`](docs/PERF.md) | Ledger de optimización y métricas de contexto. |
-| [`TIER3_PENDIENTE.md`](TIER3_PENDIENTE.md) | Endpoints inventariados y no implementados (backlog). |
+| Document                                                           | Purpose                                                |
+| ------------------------------------------------------------------ | ------------------------------------------------------ |
+| [`docs/PROPUESTA_ROL_SERVICIO.md`](docs/PROPUESTA_ROL_SERVICIO.md) | Minimum `MCP Service` service role (decision pending). |
+| [`docs/PERF.md`](docs/PERF.md)                                     | Optimization ledger and context metrics.               |
+| [`TIER3_PENDIENTE.md`](TIER3_PENDIENTE.md)                         | Inventoried and unimplemented endpoints (backlog).     |
 
-## Requisitos
+## Requirements
 
-- Node.js 20+ (probado con Node 22/24)
-- Credenciales de usuario de Gavriel (`app.gavriel.com.ar`)
+* Node.js 20+ (tested with Node 22/24)
+* Gavriel user credentials (`app.gavriel.com.ar`)
 
-## Instalación
+## Installation
 
 ```bash
 cd ~/proyectos/gavriel-mcp
-pnpm install          # package manager: pnpm (ver packageManager en package.json)
+pnpm install          # package manager: pnpm (see packageManager in package.json)
 pnpm build
-cp .env.example .env   # completar GAVRIEL_EMAIL y GAVRIEL_PASSWORD
+cp .env.example .env   # fill in GAVRIEL_EMAIL and GAVRIEL_PASSWORD
 ```
 
-## Configuración
+## Configuration
 
-`src/config.ts` lee estas variables (de `.env` o del entorno):
+`src/config.ts` reads these variables (from `.env` or the environment):
 
-| Variable | Requerida | Default |
-|---|---|---|
-| `GAVRIEL_EMAIL` | sí | — |
-| `GAVRIEL_PASSWORD` | no* | — (ver resolución de secretos) |
-| `GAVRIEL_TRUSTED_DEVICE_TOKEN` | no | — (fallback dev; normalmente en keyring) |
-| `GAVRIEL_API_BASE` | no | `https://app.gavriel.com.ar/api` |
-| `GAVRIEL_MCP_LOG_DIR` | no | `~/.local/share/gavriel-mcp` |
-| `GAVRIEL_MCP_ROLE` | no | `full` |
-| `GAVRIEL_MCP_WRITE_CONCURRENCY` | no | `5` (1–20) |
-| `GAVRIEL_MCP_DESTRUCTIVE_APPROVAL` | no | `off` |
+| Variable                           | Required | Default                               |
+| ---------------------------------- | -------- | ------------------------------------- |
+| `GAVRIEL_EMAIL`                    | yes      | —                                     |
+| `GAVRIEL_PASSWORD`                 | no*      | — (see secret resolution)             |
+| `GAVRIEL_TRUSTED_DEVICE_TOKEN`     | no       | — (dev fallback; normally in keyring) |
+| `GAVRIEL_API_BASE`                 | no       | `https://app.gavriel.com.ar/api`      |
+| `GAVRIEL_MCP_LOG_DIR`              | no       | `~/.local/share/gavriel-mcp`          |
+| `GAVRIEL_MCP_ROLE`                 | no       | `full`                                |
+| `GAVRIEL_MCP_WRITE_CONCURRENCY`    | no       | `5` (1–20)                            |
+| `GAVRIEL_MCP_DESTRUCTIVE_APPROVAL` | no       | `off`                                 |
 
-### Roles del server (`GAVRIEL_MCP_ROLE`)
+### Server Roles (`GAVRIEL_MCP_ROLE`)
 
-- `full` (default): todas las tools, incluidas las de escritura (con `confirm`).
-- `lite`: lectura + escrituras core (tickets, intervenciones, conversaciones).
-- `readonly`: solo lectura; las tools de escritura **no se registran** (no
-  existen para el agente). Incluye `get` y `audit_logs`, que son GET.
+* `full` (default): all tools, including write tools (with `confirm`).
+* `lite`: read access + core writes (tickets, interventions, conversations).
+* `readonly`: read-only; write tools are **not registered** (they do not
+  exist for the agent). Includes `get` and `audit_logs`, which are GETs.
 
-Sin variable → `full` (comportamiento actual). `confirm` sigue vigente en
-todos los roles: rol = disponibilidad, confirm = aprobación. El rol real de
-seguridad es el usuario de Gavriel con el que se loguea el server.
+Without the variable → `full` (current behavior). `confirm` remains in effect in
+all roles: role = availability, confirm = approval. The actual security role is
+the Gavriel user the server logs in with.
 
-### Configuración del rol de servicio
+### Service Role Configuration
 
-El rol de servicio está definido en `docs/PROPUESTA_ROL_SERVICIO.md`. La
-configuración recomendada es usar el rol `MCP Service` (solo lectura) como
+The service role is defined in `docs/PROPUESTA_ROL_SERVICIO.md`. The
+recommended configuration is to use the `MCP Service` role (read-only) as the
 default.
 
-> **Nota:** hoy el MCP se loguea con una cuenta `Admin` (CRUD completo). Ese
-> es el estado actual **no deseado** que la propuesta de rol busca reemplazar,
-> no un modo de uso soportado. Configurar la cuenta `Admin` solo tiene sentido
-> como paso previo hasta crear el rol `MCP Service`.
+> **Note:** currently the MCP logs in with an `Admin` account (full CRUD).
+> This is the current **undesired** state that the role proposal aims to replace,
+> not a supported usage mode. Configuring the `Admin` account only makes sense
+> as an interim step until the `MCP Service` role is created.
 
-El JWT se cachea **en memoria** (nunca en disco) y se renueva ~5 min antes de
-expirar o ante un 401. La API renueva el token vía el header `x-new-token`, que
-el cliente respeta automáticamente.
+The JWT is cached **in memory** (never on disk) and renewed ~5 minutes before
+expiration or after a 401. The API renews the token through the `x-new-token`
+header, which the client automatically respects.
 
-## Resolución de secretos
+## Secret Resolution
 
-El server resuelve `password` y `trusted_device_token` al arrancar, en este
-orden (ver `src/secrets.ts`):
+The server resolves `password` and `trusted_device_token` at startup, in this
+order (see `src/secrets.ts`):
 
-1. **Keyring del sistema** (`secret-tool`, paquete `libsecret-tools`): más
-   seguro, es el modo recomendado.
-2. **Variables de entorno** `GAVRIEL_PASSWORD` / `GAVRIEL_TRUSTED_DEVICE_TOKEN`
-   (útil para dev local fuera de opencode).
-3. **Archivos legacy** (`~/.secrets/gavriel-password` y
-   `~/.local/share/gavriel-mcp/trusted-device.json`): solo último recurso, con
-   warning explícito en stderr.
+1. **System keyring** (`secret-tool`, `libsecret-tools` package): most
+   secure, and the recommended method.
+2. **Environment variables** `GAVRIEL_PASSWORD` / `GAVRIEL_TRUSTED_DEVICE_TOKEN`
+   (useful for local development outside OpenCode).
+3. **Legacy files** (`~/.secrets/gavriel-password` and
+   `~/.local/share/gavriel-mcp/trusted-device.json`): last resort only, with
+   an explicit warning on stderr.
 
-El JWT se cachea **en memoria** (nunca en disco) y se renueva ~5 min antes de
-expirar o ante un 401. La API renueva el token vía el header `x-new-token`, que
-el cliente respeta automáticamente. El `trusted_device_token` (válido ~20 días,
-salta el 2FA en logins posteriores) también va al keyring.
+The JWT is cached **in memory** (never on disk) and renewed ~5 minutes before
+expiration or after a 401. The API renews the token through the `x-new-token`
+header, which the client automatically respects. The `trusted_device_token` (valid
+for ~20 days and bypasses 2FA on subsequent logins) is also stored in the keyring.
 
-## Registrarlo en OpenCode
+## Registering it in OpenCode
 
-Instalar `libsecret-tools` (si no está) y guardar ambos secretos una sola vez,
-de forma interactiva (el valor se pide por stdin, no va en la línea de
-comando):
+Install `libsecret-tools` (if not already installed) and store both secrets once,
+interactively (the value is requested through stdin and is not included on the
+command line):
 
 ```bash
-sudo apt install libsecret-tools    # si hace falta (daemon: gnome-keyring)
+sudo apt install libsecret-tools    # if needed (daemon: gnome-keyring)
 
 secret-tool store --label="Gavriel MCP - password" service gavriel-mcp account password
 secret-tool store --label="Gavriel MCP - trusted device token" service gavriel-mcp account trusted_device_token
 ```
 
-El server los lee solo del keyring; la config de opencode ya no necesita el
-secret:
+The server reads them only from the keyring; the OpenCode config no longer needs
+the secret:
 
 ```json
 {
   "mcp": {
     "gavriel": {
       "type": "local",
-      "command": ["node", "/ruta/al/proyecto/gavriel-mcp/dist/index.js"],
+      "command": ["node", "/path/to/project/gavriel-mcp/dist/index.js"],
       "environment": {
         "GAVRIEL_EMAIL": "user@example.com"
-      },
-      "enabled": true
-    }
+      }
+    },
+    "enabled": true
   }
 }
 ```
 
-> Interino (hasta migrar): si `secret-tool` no está instalado, el server cae al
-> archivo `~/.secrets/gavriel-password` (chmod 600) con warning. En ese caso la
-> config de opencode puede seguir usando `{file:~/.secrets/gavriel-password}`
-> como hoy.
+> Interim (until migration): if `secret-tool` is not installed, the server falls back
+> to `~/.secrets/gavriel-password` (chmod 600) with a warning. In that case the
+> OpenCode config can still use `{file:~/.secrets/gavriel-password}`
+> as it does today.
 
-## Herramientas
+## Tools
 
-Los nombres MCP no llevan prefijo. Al usarlas desde una sesión de opencode,
-opencode antepone el nombre del server: `create_ticket` se expone como
+MCP names do not use a prefix. When using them from an OpenCode session,
+OpenCode prepends the server name: `create_ticket` is exposed as
 `gavriel_create_ticket`.
 
-### Lectura (no requieren `confirm`)
+### Read Operations (do not require `confirm`)
 
-| Tool | Qué hace |
-|---|---|
-| `list_tickets` | Lista tickets (filtros: status, priority, accountId, categoryId, assignedUserId, search). Paginación máx. 200. |
-| `get_ticket` | Ticket + actividades (comentarios) por ID. |
-| `get_ticket_context` | Ticket + cuenta + actividades en UNA llamada. |
-| `ticket_stats` | Estadísticas globales de tickets. |
-| `get_open_technical_tickets_count` | Cantidad de tickets técnicos abiertos (por accountId). |
-| `list_events` | Lista eventos/alarmas (accountId, port, eventCode, dateFrom, dateTo, pendientes…). |
-| `list_accounts_pending_events` | Cuentas con eventos pendientes (para intervención masiva). |
-| `get_monitoring_events_chart` | Gráfico de eventos 24 h (por conexión o global). |
-| `get_event` | Evento por ID con sus relaciones. |
-| `get_event_context` | Evento + cuenta + conexión en UNA llamada. |
-| `get_account` | Cuenta completa (zonas, contactos, usuarios, intervenciones). |
-| `get_account_dashboard` | Cuenta + dispositivos + intervenciones + eventos pendientes en UNA llamada. |
-| `get_pending_events_dashboard` | Cuentas con eventos pendientes y sus detalles (procesamiento masivo). |
-| `list_accounts` | Buscar cuentas por nombre/código. |
-| `list_account_devices` / `list_account_partitions` / `list_account_zones` | Dispositivos, particiones y zonas de una cuenta. |
-| `list_account_users` / `list_account_contacts` | Usuarios y contactos de una cuenta. |
-| `list_useful_contacts` | Contactos útiles (por jurisdicción). |
-| `list_interventions` | Intervenciones de una cuenta (openOnly para solo abiertas). |
-| `list_activities_by_ticket` / `get_activity_stats` | Actividades de un ticket / estadísticas globales. |
-| `list_conversations` / `list_conversation_messages` / `get_conversation_stats` | Conversaciones de helpdesk, sus mensajes y stats. |
-| `list_connections` / `get_connection_report` | Conexiones y reporte de estado por conexión. |
-| `list_bridge_logs` / `get_bridge_disk_space` | Logs y espacio en disco de un bridge. |
-| `get_service_panel` / `get_service_panel_summary` / `get_service` / `list_technician_agenda` / `get_technician_locations` | Panel de servicios, agenda de técnicos y ubicaciones. |
-| `list_companies` / `list_company_technicians` | Empresas y sus técnicos. |
-| `list_users` / `list_roles` / `get_my_profile` | Usuarios, roles y perfil propio. |
-| `audit_logs` | Logs de auditoría del sistema. |
-| `health` | Logs de salud de conexiones y bridges. |
-| `search_accounts` / `search_tickets` / `search_events` / `search_users` | Búsqueda rápida con campos reducidos (para resolver IDs). |
-| `find_duplicate_event_codes` / `find_duplicate_event_types` / `validate_event_mapping` | Auditoría del mapeo tipos/códigos de evento. |
-| `get` | GET libre sobre whitelist de endpoints de lectura. |
+| Tool                                                                                                                      | What it does                                                                                                   |
+| ------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| `list_tickets`                                                                                                            | Lists tickets (filters: status, priority, accountId, categoryId, assignedUserId, search). Max. pagination 200. |
+| `get_ticket`                                                                                                              | Ticket + activities (comments) by ID.                                                                          |
+| `get_ticket_context`                                                                                                      | Ticket + account + activities in ONE call.                                                                     |
+| `ticket_stats`                                                                                                            | Global ticket statistics.                                                                                      |
+| `get_open_technical_tickets_count`                                                                                        | Number of open technical tickets (by accountId).                                                               |
+| `list_events`                                                                                                             | Lists events/alarms (accountId, port, eventCode, dateFrom, dateTo, pending…).                                  |
+| `list_accounts_pending_events`                                                                                            | Accounts with pending events (for bulk intervention).                                                          |
+| `get_monitoring_events_chart`                                                                                             | 24-hour event chart (per connection or global).                                                                |
+| `get_event`                                                                                                               | Event by ID with its relationships.                                                                            |
+| `get_event_context`                                                                                                       | Event + account + connection in ONE call.                                                                      |
+| `get_account`                                                                                                             | Full account (zones, contacts, users, interventions).                                                          |
+| `get_account_dashboard`                                                                                                   | Account + devices + interventions + pending events in ONE call.                                                |
+| `get_pending_events_dashboard`                                                                                            | Accounts with pending events and their details (bulk processing).                                              |
+| `list_accounts`                                                                                                           | Search accounts by name/code.                                                                                  |
+| `list_account_devices` / `list_account_partitions` / `list_account_zones`                                                 | Devices, partitions, and zones of an account.                                                                  |
+| `list_account_users` / `list_account_contacts`                                                                            | Users and contacts of an account.                                                                              |
+| `list_useful_contacts`                                                                                                    | Useful contacts (by jurisdiction).                                                                             |
+| `list_interventions`                                                                                                      | Interventions for an account (`openOnly` for open ones only).                                                  |
+| `list_activities_by_ticket` / `get_activity_stats`                                                                        | Activities for a ticket / global statistics.                                                                   |
+| `list_conversations` / `list_conversation_messages` / `get_conversation_stats`                                            | Helpdesk conversations, their messages, and stats.                                                             |
+| `list_connections` / `get_connection_report`                                                                              | Connections and status report per connection.                                                                  |
+| `list_bridge_logs` / `get_bridge_disk_space`                                                                              | Logs and disk space for a bridge.                                                                              |
+| `get_service_panel` / `get_service_panel_summary` / `get_service` / `list_technician_agenda` / `get_technician_locations` | Service panel, technician agenda, and locations.                                                               |
+| `list_companies` / `list_company_technicians`                                                                             | Companies and their technicians.                                                                               |
+| `list_users` / `list_roles` / `get_my_profile`                                                                            | Users, roles, and own profile.                                                                                 |
+| `audit_logs`                                                                                                              | System audit logs.                                                                                             |
+| `health`                                                                                                                  | Connection and bridge health logs.                                                                             |
+| `search_accounts` / `search_tickets` / `search_events` / `search_users`                                                   | Quick search with reduced fields (for resolving IDs).                                                          |
+| `find_duplicate_event_codes` / `find_duplicate_event_types` / `validate_event_mapping`                                    | Audit of event type/code mapping.                                                                              |
+| `get`                                                                                                                     | Free GET over a whitelist of read-only endpoints.                                                              |
 
-### Escritura — **todas requieren `confirm: true`**
+### Write Operations — **all require `confirm: true`**
 
-El gate es la **Fase 0, regla 2**: si `confirm` falta o es `false`, la tool
-**no ejecuta nada** y devuelve un preview (método + path + body). Si
-`confirm: true`, ejecuta y loguea la operación en `writes.log`.
+The gate is **Phase 0, rule 2**: if `confirm` is missing or `false`, the tool
+**does not execute anything** and returns a preview (method + path + body). If
+`confirm: true`, it executes and logs the operation in `writes.log`.
 
-| Tool | Acción |
-|---|---|
-| `create_intervention` | Crear intervención en progreso sobre una cuenta. |
-| `create_bulk_interventions` | Procesar eventos pendientes en masa (motivo + cuentas). |
-| `close_intervention` | Cerrar intervención (crea/cierra ticket y marca eventos procesados). |
-| `set_intervention_observation` | Poner intervención en observación con comentario. |
-| `create_ticket` | Crear ticket. |
-| `update_ticket` | Cambiar status/prioridad/asignado/campos de un ticket. |
-| `close_ticket` | Cerrar ticket con resolución. |
-| `add_ticket_activity` | Agregar comentario/actividad a un ticket. |
-| `mark_events_processed` | Marcar uno o más eventos como procesados. |
-| `bulk_process_events` | Marcar varios eventos como procesados en lote. |
-| `bulk_mark_events_by_filter` | Marcar eventos a un estado por filtro (cuenta obligatoria; preview de IDs antes de confirmar). |
-| `bulk_close_tickets` | Cerrar varios tickets en lote con la misma resolución. |
-| `bulk_add_account_note` | Misma nota a hasta 100 cuentas (dedupe de IDs). |
-| `update_account` | Actualizar campos de una cuenta. |
-| `add_account_note` / `update_account_note` / `delete_account_note` | Bitácora/notas de cuenta. |
-| `send_conversation_message` | Enviar mensaje en conversación de helpdesk. |
-| `conversation_claim` / `conversation_release` / `conversation_set_status` / `conversation_mark_read` | Gestión de conversaciones. |
-| `mark_activity_read` / `mark_activity_unread` / `update_activity` | Marcar leída/no leída y editar una actividad. |
-| `add_account_contact` / `update_account_contact` | Alta y edición de contactos de una cuenta. |
-| `reorder_account_contacts` | Fijar el orden final de todos los contactos (espaciado ×10 para inserciones futuras). |
-| `schedule_service` / `update_service` | Agendar y editar servicios. |
-| `add_technician_non_working_days` / `add_company_non_working_day` | Días no laborales de técnico y de empresa. |
-| `create_/update_/delete_event_type`, `create_/update_/delete_event_code`, `bulk_create_event_codes` | CRUD del catálogo de tipos y códigos de evento. |
-| `create_/update_/delete_device_brand`, `create_/update_/delete_device_model`, `create_/update_/delete_device` | CRUD del catálogo de marcas/modelos y dispositivos. |
+| Tool                                                                                                          | Action                                                                                   |
+| ------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| `create_intervention`                                                                                         | Create an in-progress intervention on an account.                                        |
+| `create_bulk_interventions`                                                                                   | Process pending events in bulk (reason + accounts).                                      |
+| `close_intervention`                                                                                          | Close an intervention (creates/closes a ticket and marks events as processed).           |
+| `set_intervention_observation`                                                                                | Put an intervention under observation with a comment.                                    |
+| `create_ticket`                                                                                               | Create a ticket.                                                                         |
+| `update_ticket`                                                                                               | Change the status/priority/assignee/fields of a ticket.                                  |
+| `close_ticket`                                                                                                | Close a ticket with a resolution.                                                        |
+| `add_ticket_activity`                                                                                         | Add a comment/activity to a ticket.                                                      |
+| `mark_events_processed`                                                                                       | Mark one or more events as processed.                                                    |
+| `bulk_process_events`                                                                                         | Mark multiple events as processed in bulk.                                               |
+| `bulk_mark_events_by_filter`                                                                                  | Mark events to a state by filter (account required; preview of IDs before confirmation). |
+| `bulk_close_tickets`                                                                                          | Close multiple tickets in bulk with the same resolution.                                 |
+| `bulk_add_account_note`                                                                                       | Add the same note to up to 100 accounts (ID deduplication).                              |
+| `update_account`                                                                                              | Update account fields.                                                                   |
+| `add_account_note` / `update_account_note` / `delete_account_note`                                            | Account log/notes.                                                                       |
+| `send_conversation_message`                                                                                   | Send a message in a helpdesk conversation.                                               |
+| `conversation_claim` / `conversation_release` / `conversation_set_status` / `conversation_mark_read`          | Conversation management.                                                                 |
+| `mark_activity_read` / `mark_activity_unread` / `update_activity`                                             | Mark as read/unread and edit an activity.                                                |
+| `add_account_contact` / `update_account_contact`                                                              | Add and edit account contacts.                                                           |
+| `reorder_account_contacts`                                                                                    | Set the final order of all contacts (spacing ×10 for future insertions).                 |
+| `schedule_service` / `update_service`                                                                         | Schedule and edit services.                                                              |
+| `add_technician_non_working_days` / `add_company_non_working_day`                                             | Technician and company non-working days.                                                 |
+| `create_/update_/delete_event_type`, `create_/update_/delete_event_code`, `bulk_create_event_codes`           | CRUD for the event type and code catalog.                                                |
+| `create_/update_/delete_device_brand`, `create_/update_/delete_device_model`, `create_/update_/delete_device` | CRUD for the brand/model and device catalog.                                             |
 
-**Importante:** probá siempre primero con `confirm` ausente/false y revisá el
-preview. La primera ejecución real de cada tool hacela en presencia del
-operador — son datos reales de clientes en producción.
+**Important:** always test first with `confirm` omitted/false and review the
+preview. Perform the first real execution of each tool in the presence of the
+operator — these are real production customer data.
 
-### Recursos (catálogos semi-estáticos, cache 1 h)
+### Resources (semi-static catalogs, 1 h cache)
 
-`gavriel://catalog/...` para eventos-types, events-codes, events-formats,
-protocols, intervention-categories, device-brands (y activas), device-models,
-device-connection-types (y activos), device-taxonomies, states, cities,
-jurisdictions, zones, tickets status/priority options, ticket-categories,
-activities type-options, events-types/gavriel-intervention y
-companies/type/technical.
+`gavriel://catalog/...` for event-types, event-codes, event-formats,
+protocols, intervention-categories, device-brands (and active ones), device-models,
+device-connection-types (and active ones), device-taxonomies, states, cities,
+jurisdictions, zones, ticket status/priority options, ticket-categories,
+activity type-options, event-types/gavriel-intervention, and
+company/type/technical.
 
-## Endpoints no implementados (Tier 3)
+## Unimplemented Endpoints (Tier 3)
 
-Los endpoints de escritura que exceden el perfil de riesgo aprobado (borrados,
-gestión de usuarios/roles, activación de monitoreo, facturación, catálogos,
-archivos) están inventariados en `TIER3_PENDIENTE.md` y **no se implementan**
-sin instrucción explícita.
+Write endpoints that exceed the approved risk profile (deletions,
+user/role management, monitoring activation, billing, catalogs,
+files) are inventoried in `TIER3_PENDIENTE.md` and **are not implemented**
+without explicit instruction.
 
-## Log de escrituras
+## Write Log
 
-Toda escritura ejecutada queda registrada en
-`~/.local/share/gavriel-mcp/writes.log` (JSONL): timestamp, tool, parámetros,
-email del usuario del JWT, y respuesta de la API (status + body resumido).
-Esto es adicional al audit log propio de Gavriel (`/audit/logs`).
+Every executed write operation is logged in
+`~/.local/share/gavriel-mcp/writes.log` (JSONL): timestamp, tool, parameters,
+JWT user email, and API response (status + summarized body).
+This is in addition to Gavriel's own audit log (`/audit/logs`).
 
-## Despliegue
+## Deployment
 
-No se despliega: es local, transporte stdio. No requiere Docker ni el host
-Hyper-V.
+It is not deployed: it is local, using stdio transport. It does not require Docker
+or the Hyper-V host.
 
-## Verificación
+## Verification
 
 ```bash
-pnpm typecheck   # tipos
-pnpm build       # compila a dist/
-pnpm selfcheck   # suite offline rápida de invariantes core (sin red)
-pnpm regression  # compara tool vs endpoint contra el backend real (requiere .env y red)
+pnpm typecheck   # types
+pnpm build       # compiles to dist/
+pnpm selfcheck   # quick offline core invariants suite (no network)
+pnpm regression  # compares tool vs endpoint against the real backend (requires .env and network)
 ```
 
-## Seguridad
+## Security
 
-- Los secretos (`password` y `trusted_device_token`) viven en el **keyring del
-  sistema** (recomendado); el archivo legacy `~/.secrets/gavriel-password`
-  (chmod 600) queda solo como fallback interino con warning. El `.env` del repo
-  (gitignoreado) es un fallback de ejecución local.
-- El JWT nunca se persiste en disco.
-- El gate de `confirm` evita ejecuciones accidentales; el control de *cuándo*
-  se usan las escrituras queda a nivel de skill/prompt del agente, no
-  bloqueado en el código (decisión del dueño del proyecto).
-- **Respuestas no parseables**: ocasionalmente el backend puede devolver HTTP 200
-  con un body truncado o inválido. Esta tool lo detecta (`writeStatus:
-  "applied_response_unparseable"`), loguea el body crudo y re-lee el recurso
-  para verificar el estado real. No asumir éxito ni fallo ante ese status:
-  consultar el `verifiedState` devuelto o re-consultar el recurso.
+* Secrets (`password` and `trusted_device_token`) live in the **system keyring**
+  (recommended); the legacy `~/.secrets/gavriel-password`
+  (chmod 600) remains only as an interim fallback with a warning. The `.env` file in the repository
+  (gitignored) is a local runtime fallback.
+* The JWT is never persisted to disk.
+* The `confirm` gate prevents accidental executions; control over *when*
+  writes are used remains at the agent's skill/prompt level rather than being
+  blocked in code (project owner's decision).
+* **Unparseable responses**: occasionally the backend may return HTTP 200
+  with a truncated or invalid body. This tool detects it (`writeStatus:
+  "applied_response_unparseable"`), logs the raw body, and re-reads the resource
+  to verify the actual state. Do not assume success or failure for this status:
+  check the returned `verifiedState` or re-query the resource.
