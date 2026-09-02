@@ -1,58 +1,51 @@
 # Contributing
 
-Gracias por querer aportar a **gavriel-mcp**.
+Thank you for wanting to contribute to **gavriel-mcp**.
 
-## Cómo arrancar
+## Getting Started
 
 ```bash
 pnpm install
 pnpm build
-pnpm selfcheck   # levanta el server contra el entorno y valida el handshake
-pnpm dev         # corre desde src con tsx (sin build previo)
+pnpm selfcheck   # starts the server against the environment and validates the handshake
+pnpm dev         # runs from src using tsx (no prior build required)
 ```
 
-Requerís Node >= 20. Usamos **pnpm**; no mezcles con npm/yarn en el lockfile.
+Node >= 20 is required. We use **pnpm**; do not mix it with npm/yarn in the lockfile.
 
-### Desarrollo rápido (opcional)
+### Quick Development (optional)
 
-Si tenés [Bun](https://bun.sh) instalado, `pnpm run test:fast` corre el
-selfcheck más rápido para iterar localmente (Bun ejecuta el mismo script Node
-más veloz). No reemplaza `pnpm selfcheck` ni el camino canónico de CI — eso es
-lo que hay que confirmar en verde antes de abrir un PR.
+If you have [Bun](https://bun.sh) installed, `pnpm run test:fast` runs the selfcheck faster for local iteration (Bun executes the same Node script more quickly). It does not replace `pnpm selfcheck` or the canonical CI path — that is what must pass before opening a PR.
 
-## Convenciones
+## Conventions
 
-- **Commits**: [Conventional Commits](https://www.conventionalcommits.org/)
-  (`feat:`, `fix:`, `docs:`, `refactor:`, `chore:`). Se usan para generar las
-  notas de release automáticas.
-- **Mantené el scope del PR chico.** Una herramienta / un cambio por PR cuando
-  sea posible.
-- **Sin dependencias de runtime de terceros sin revisión.** Si una feature
-  nueva introduce un `dependency`, justificalo en el PR. Las de build-time
-  (esbuild, postject, tsx, typescript) ya están aprobadas.
+* **Commits**: [Conventional Commits](https://www.conventionalcommits.org/)
+  (`feat:`, `fix:`, `docs:`, `refactor:`, `chore:`). These are used to generate automatic release notes.
+* **Keep PR scope small.** One tool / one change per PR whenever possible.
+* **No third-party runtime dependencies without review.** If a new feature introduces a `dependency`, justify it in the PR. Build-time dependencies (esbuild, postject, tsx, typescript) are already approved.
 
-## Seguridad
+## Security
 
-- Nunca commitees secretos. El token de Gavriel vive en el keyring del sistema
-  (o en `GAVRIEL_API_TOKEN`); el server lo lee en runtime, no se guarda en el
-  repo.
-- Las escrituras (crear/cerrar/eliminar) pasan por un gate de `confirm`
-  (ver `config.GAVRIEL_MCP_DESTRUCTIVE_APPROVAL`). No lo saltees en código.
+* Never commit secrets. The Gavriel token lives in the system keyring
+  (or in `GAVRIEL_API_TOKEN`); the server reads it at runtime and does not
+  store it in the repository.
+* Writes (create/close/delete) go through a `confirm` gate (see
+  `config.GAVRIEL_MCP_DESTRUCTIVE_APPROVAL`). Do not bypass it in code.
 
 ## Releases
 
-- El versionado es SemVer manual en `package.json`.
-- Para publicar: subí un tag `vX.Y.Z` (pushed tag dispara
-  `.github/workflows/release.yml`). Ese workflow construye los binarios
-  single-executable (Node.js SEA) por plataforma y los adjunta al Release de
-  GitHub con checksums `sha256`.
-- No publiques a npm: el paquete es `private: true`. La distribución es vía
-  binarios en GitHub Releases.
+* Versioning is manual SemVer in `package.json`.
+* To publish: push a `vX.Y.Z` tag (a pushed tag triggers
+  `.github/workflows/release.yml`). This workflow builds the single-executable
+  binaries (Node.js SEA) for each platform and attaches them to the GitHub
+  Release with `sha256` checksums.
+* Do not publish to npm: the package is `private: true`. Distribution is via
+  binaries in GitHub Releases.
 
-## Estructura
+## Structure
 
-- `src/` — servidor MCP, client, tools.
-- `scripts/` — `selfcheck.mjs`, `regression.mjs`, `build-bin.mjs` (SEA).
-- `TIER3_PENDIENTE.md` — endpoints pendientes de implementar.
+* `src/` — MCP server, client, tools.
+* `scripts/` — `selfcheck.mjs`, `regression.mjs`, `build-bin.mjs` (SEA).
+* `TIER3_PENDIENTE.md` — endpoints pending implementation.
 
-Consultá también `AGENTS.md` (reglas de agentes) y `CHANGELOG.md`.
+Also consult `AGENTS.md` (agent rules) and `CHANGELOG.md`.
