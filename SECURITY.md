@@ -1,22 +1,18 @@
-# Política de seguridad
+# Security Policy
 
-Este proyecto se conecta a un sistema real de monitoreo de alarmas.
-Tomamos en serio cualquier reporte de vulnerabilidad.
+This project connects to a real alarm monitoring system.
+We take any vulnerability report seriously.
 
-## Cómo reportar
+## How to Report
 
-Si encontrás una vulnerabilidad de seguridad, **no abras un issue
-público**. Escribí directamente a mgariboglio@marinozzi.com.ar con:
+If you find a security vulnerability, **do not open a public issue**. Please email [mateogariboglio.job@gmail.com](mailto:mateogariboglio.job@gmail.com) directly with:
 
-- Descripción del problema.
-- Pasos para reproducirlo, si es posible.
-- Impacto potencial.
+* A description of the issue.
+* Steps to reproduce it, if possible.
+* Potential impact.
 
-Vamos a confirmar la recepción en un plazo razonable y coordinar la
-divulgación una vez resuelto.
+We will confirm receipt within a reasonable timeframe and coordinate disclosure once the issue has been resolved.
 
-## Alcance
+## Scope
 
-Esto incluye vulnerabilidades en el código de este repositorio (el MCP
-server). No cubre vulnerabilidades del backend de Gavriel en sí — para
-eso, contactar por el mismo medio y lo derivamos internamente.
+This includes vulnerabilities in the code of this repository (the MCP server). It does not cover vulnerabilities in the Gavriel backend itself — for those, please contact us through the same channel and we will route the report internally.
