@@ -6,6 +6,14 @@ Todas las versiones se documentan aquí. El formato sigue
 generan automáticamente desde los commits (conventional commits) al crear el
 tag `vX.Y.Z`.
 
+## [Unreleased]
+
+### Fixed
+- El fallback para encontrar el `.env` en la raíz del proyecto no funcionaba
+  en Windows (`URL.pathname` devuelve `/C:/...` y `process.loadEnvFile()`
+  falla con `ENOENT`). Ahora se resuelve con `fileURLToPath()`. Afectaba a
+  cualquier cliente que lanzara el server con un cwd distinto de la raíz.
+
 ## [1.2.0] - 2026-08-23
 
 ### Added
