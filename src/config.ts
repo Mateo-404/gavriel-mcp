@@ -1,3 +1,4 @@
+import { fileURLToPath } from "node:url";
 import { z } from "zod";
 import { resolvePassword } from "./secrets.js";
 
@@ -40,7 +41,8 @@ function loadDotEnv(): void {
     // no .env in cwd, try alongside the built dist/
   }
   try {
-    const root = new URL("../", import.meta.url).pathname; // raíz del proyecto (src/ o dist/)
+    // fileURLToPath y no .pathname: en Windows .pathname da "/C:/..." y loadEnvFile falla con ENOENT.
+    const root = fileURLToPath(new URL("../", import.meta.url)); // raíz del proyecto (src/ o dist/)
     process.loadEnvFile?.(`${root}.env`);
   } catch {
     // no .env found anywhere, env vars del sistema alcanzan
