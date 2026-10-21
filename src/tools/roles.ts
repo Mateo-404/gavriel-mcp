@@ -7,6 +7,7 @@ import type {
   CallToolResult,
 } from "@modelcontextprotocol/server";
 import type { z } from "zod";
+import { isDestructive } from "./writeHelpers.js";
 
 // Rol del server (GAVRIEL_MCP_ROLE).
 // readonly: solo lectura (+ get y audit_logs).
@@ -68,6 +69,25 @@ export function registerTool(
   cb: unknown,
 ): void {
   if (hasRole(role, min)) {
-    server.registerTool(name, config as never, cb as never);
+    server.registerTool(name, withDefaultAnnotations(name, config as ToolConfigBase) as never, cb as never);
   }
+}
+
+// Defaults de annotations: este choke point registra casi solo escrituras.
+// Lo declarado explícitamente en la tool siempre gana.
+const IDEMPOTENT_NAME = /^(update_|set_|conversation_set_|conversation_mark_|mark_|reorder_|conversation_claim|conversation_release)/;
+
+export function withDefaultAnnotations<C extends ToolConfigBase>(name: string, config: C): C {
+  const a = config.annotations ?? {};
+  const readOnly = a.readOnlyHint === true;
+  return {
+    ...config,
+    annotations: {
+      readOnlyHint: false,
+      destructiveHint: !readOnly && isDestructive(name),
+      idempotentHint: readOnly || IDEMPOTENT_NAME.test(name),
+      openWorldHint: false,
+      ...a,
+    },
+  };
 }

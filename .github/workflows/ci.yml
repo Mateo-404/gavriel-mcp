@@ -1,10 +1,7 @@
 name: CI
 
-# Build + typecheck + selfcheck en cada push/PR. Todo corre offline: nada acá
-# se conecta a app.gavriel.com.ar ni necesita credenciales de Gavriel.
-# `pnpm run regression` (contra el backend real) queda deliberadamente fuera
-# de este workflow — no tiene sentido correrlo en CI.
-# Package manager: pnpm (ver `packageManager` en package.json).
+# Todo corre offline salvo `pnpm audit` (no bloqueante). Nada se conecta a
+# app.gavriel.com.ar ni necesita credenciales.
 
 on:
   push:
@@ -16,26 +13,28 @@ permissions:
 
 jobs:
   build-and-test:
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        node: [20, 22, 24]
     steps:
       - uses: actions/checkout@v7
-
-      # Instala pnpm según `packageManager` (no depende de corepack).
       - uses: pnpm/action-setup@v6
-
       - uses: actions/setup-node@v7
         with:
-          node-version: latest
-          cache: "pnpm"
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Typecheck
-        run: pnpm run typecheck
-
-      - name: Build
-        run: pnpm run build
-
-      - name: Selfcheck (mocks, sin red)
-        run: pnpm run selfcheck
+          node-version: ${{ matrix.node }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run typecheck
+      - run: pnpm run build
+      - run: pnpm run selfcheck
+      - name: Test
+        run: node --test "test/*.test.mjs"
+      - name: Audit (prod deps, no bloqueante)
+        continue-on-error: true
+        run: pnpm audit --prod
+      - name: Biome lint (no bloqueante)
+        continue-on-error: true
+        run: npx --yes @biomejs/biome@2.2.0 lint src test scripts

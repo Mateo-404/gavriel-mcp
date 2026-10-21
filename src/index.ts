@@ -3,6 +3,7 @@ import { loadConfig, logDir } from "./config.js";
 import { GavrielClient } from "./gavrielClient.js";
 import { buildServer } from "./server.js";
 import { setLogDir } from "./auditLog.js";
+import { startPoller } from "./notifications/poller.js";
 import { setDestructiveApproval } from "./tools/writeHelpers.js";
 
 // Injected at bundle time by esbuild (see scripts/build-bin.mjs).
@@ -20,7 +21,10 @@ async function main(): Promise<void> {
   setDestructiveApproval(config.GAVRIEL_MCP_DESTRUCTIVE_APPROVAL);
   const client = new GavrielClient(config);
   const server = buildServer(client, config.GAVRIEL_MCP_ROLE);
+  server.server.registerCapabilities({ logging: {} });
   await server.connect(new StdioServerTransport());
+  const stopPoller = startPoller(server, client);
+  if (stopPoller) server.server.onclose = stopPoller;
 }
 
 main().catch((err) => {

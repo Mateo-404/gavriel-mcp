@@ -25,6 +25,12 @@ pnpm build
 cp .env.example .env   # fill in GAVRIEL_EMAIL and GAVRIEL_PASSWORD
 ```
 
+### MCPB bundle (Claude Desktop)
+
+`manifest.json` follows the [MCPB](https://github.com/modelcontextprotocol/mcpb) spec (credentials are asked
+as `user_config`, the password is sensitive). After `pnpm install && pnpm build`, run `pnpm mcpb:pack`
+(uses `npx @anthropic-ai/mcpb pack`) to produce `gavriel-mcp.mcpb`. Not published anywhere.
+
 ## Configuration
 
 `src/config.ts` reads these variables (from `.env` or the environment):
@@ -38,7 +44,10 @@ cp .env.example .env   # fill in GAVRIEL_EMAIL and GAVRIEL_PASSWORD
 | `GAVRIEL_MCP_LOG_DIR`              | no       | `~/.local/share/gavriel-mcp`          |
 | `GAVRIEL_MCP_ROLE`                 | no       | `full`                                |
 | `GAVRIEL_MCP_WRITE_CONCURRENCY`    | no       | `5` (1–20)                            |
-| `GAVRIEL_MCP_DESTRUCTIVE_APPROVAL` | no       | `off`                                 |
+| `GAVRIEL_MCP_DESTRUCTIVE_APPROVAL` | no       | `elicitation` (`off` to disable)      |
+| `GAVRIEL_MCP_TOOLSETS`             | no       | `all` (comma-separated toolsets)      |
+| `GAVRIEL_ALLOW_PLAINTEXT`          | no       | unset (`1` allows plaintext token storage when no secure store exists) |
+| `GAVRIEL_POLL_SEC`                 | no       | off (min 30; polls pending events, emits log notifications) |
 
 ### Server Roles (`GAVRIEL_MCP_ROLE`)
 
@@ -119,6 +128,10 @@ the secret:
 > to `~/.secrets/gavriel-password` (chmod 600) with a warning. In that case the
 > OpenCode config can still use `{file:~/.secrets/gavriel-password}`
 > as it does today.
+
+## Toolsets
+
+`GAVRIEL_MCP_TOOLSETS` (comma-separated, default `all`) selects which tool modules are registered. Groups: `core` (tickets, events, accounts, interventions, activities, conversations, search, dashboards, batch, health, audit, get, services, org, monitoring, devices, event catalogs, catalog/entity resources, prompts), `notifications`, `video`, `telephony`, `infrastructure`, `coreGaps`, `composites`. Unknown names abort startup with the list of valid ones.
 
 ## Tools
 

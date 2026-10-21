@@ -14,7 +14,23 @@ on:
 permissions: {}
 
 jobs:
+  verify:
+    name: Verify tag matches version
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+      - name: Check package.json version and CHANGELOG entry
+        shell: bash
+        run: |
+          v="${GITHUB_REF_NAME#v}"
+          pv=$(node -p "require('./package.json').version")
+          [ "$v" = "$pv" ] || { echo "tag $v != package.json $pv"; exit 1; }
+          grep -qF "## [$v]" CHANGELOG.md || { echo "CHANGELOG.md sin entrada para $v"; exit 1; }
+
   build:
+    needs: verify
     name: ${{ matrix.platform }}-${{ matrix.arch }}
     runs-on: ${{ matrix.os }}
     permissions:

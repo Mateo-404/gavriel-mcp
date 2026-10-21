@@ -14,7 +14,6 @@ export const READ_PREFIXES = [
   "/events-formats",
   "/events-chart",
   "/events",
-  "/integrations",
   "/interventions/account",
   "/interventions",
   "/tickets",
@@ -23,7 +22,7 @@ export const READ_PREFIXES = [
   "/me/conversations",
   "/conversations",
   "/audit/logs",
-  "/auth",
+  "/auth/me",
   "/bridges",
   "/connections",
   "/users",
@@ -40,6 +39,7 @@ export const READ_PREFIXES = [
   "/device-models",
   "/device-connection-types",
   "/device-taxonomies",
+  "/device-kinds",
   "/orders",
   "/orders-products",
   "/orderstates",
@@ -57,11 +57,41 @@ export const READ_PREFIXES = [
   "/devices",
 ] as const;
 
+// Devuelve el path normalizado o null si es sospechoso (traversal, encoding,
+// query/fragment embebidos, caracteres de control, backslash).
+export function normalizePath(raw: string): string | null {
+  // eslint-disable-next-line no-control-regex
+  if (!raw.startsWith("/") || /\.\.|[%?#\\\x00-\x1f]/.test(raw)) return null;
+  const p = raw.replace(/\/+/g, "/").replace(/\/$/, "");
+  return p === "" ? null : p;
+}
+
 // Exportada solo para poder testear la whitelist directamente desde
 // scripts/selfcheck.mjs sin tener que simular un McpServer completo.
 export function isAllowed(path: string): boolean {
-  if (!path.startsWith("/")) return false;
-  return READ_PREFIXES.some((p) => path === p || path.startsWith(`${p}/`));
+  const p = normalizePath(path);
+  if (!p) return false;
+  return READ_PREFIXES.some((x) => p === x || p.startsWith(`${x}/`));
+}
+
+const SENSITIVE_QUERY_KEY = /pass|token|secret|auth|2fa/i;
+
+// Solo claves simples y valores primitivos (o arrays de ellos); descarta el resto.
+export function sanitizeQuery(q?: Record<string, unknown>): Record<string, unknown> | undefined {
+  if (!q) return undefined;
+  const out: Record<string, unknown> = {};
+  const prim = (v: unknown) => ["string", "number", "boolean"].includes(typeof v);
+  for (const [k, v] of Object.entries(q)) {
+    if (!/^[\w.[\]-]{1,64}$/.test(k) || SENSITIVE_QUERY_KEY.test(k)) continue;
+    if (prim(v) || (Array.isArray(v) && v.every(prim))) out[k] = v;
+  }
+  return Object.keys(out).length ? out : undefined;
+}
+
+function nearest(path: string): string[] {
+  const seg = path.split("/")[1]?.slice(0, 4) ?? "";
+  const near = READ_PREFIXES.filter((p) => seg && p.slice(1).startsWith(seg));
+  return (near.length ? near : READ_PREFIXES.slice(0, 5)).slice(0, 5);
 }
 
 export function registerRawGetTool(server: McpServer, client: GavrielClient, _role: Role): void {
@@ -87,15 +117,12 @@ export function registerRawGetTool(server: McpServer, client: GavrielClient, _ro
       annotations: { readOnlyHint: true },
     },
     async (args) => {
-      const path = args.path.startsWith("/") ? args.path : `/${args.path}`;
-      if (!isAllowed(path)) {
-        return err(
-          `Path no permitido: ${path}. Whitelist: ${READ_PREFIXES.join(", ")}. ` +
-            "Si falta un endpoint de lectura, agregalo en src/tools/rawGet.ts.",
-        );
+      const path = normalizePath(args.path);
+      if (!path || !isAllowed(path)) {
+        return err(`Path no permitido. Prefijos cercanos: ${nearest(path ?? "").join(", ")}. Preferí las tools específicas.`);
       }
       try {
-        const res = await client.get(path, args.query as Record<string, unknown> | undefined);
+        const res = await client.get(path, sanitizeQuery(args.query as Record<string, unknown> | undefined));
         return okTruncated(res.data, args.truncate);
       } catch (e) {
         return err((e as Error).message);

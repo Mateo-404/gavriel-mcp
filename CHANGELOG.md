@@ -6,6 +6,24 @@ Todas las versiones se documentan aquí. El formato sigue
 generan automáticamente desde los commits (conventional commits) al crear el
 tag `vX.Y.Z`.
 
+## [Unreleased]
+
+### Added
+- ~100 new tools: notifications, video, SIP/operator telephony, infrastructure, core-gap endpoints; toolsets via `GAVRIEL_MCP_TOOLSETS`; server `instructions`.
+- Opt-in pending-events poller (`GAVRIEL_POLL_SEC`, min 30): logging notifications (warning) and `resources/updated` for `gavriel://events/pending`.
+- Tests (`node --test`, `pnpm test`): client cache/dedupe/retry/401, write helpers, rawGet, redact, poller diff, stdio contract test with `test/tools.snapshot.json` (`pnpm test:snapshot` to update).
+- MCPB `manifest.json`, `biome.json` (lint only), Dependabot, CI matrix (ubuntu/windows, Node 20/22/24), `pnpm audit`.
+
+### Changed
+- Destructive tools now require human approval via elicitation by default (`GAVRIEL_MCP_DESTRUCTIVE_APPROVAL=off` to opt out).
+- Performance: GET cache/dedupe, circuit breaker, bounded concurrency.
+- Release workflow fails if the tag differs from `package.json` or CHANGELOG has no entry.
+- `tsconfig`: dropped `DOM` lib; `test:fast` no longer uses bun.
+
+### Security
+- Hardening: stricter `get` path/query sanitizing, wider log redaction, https-only API base.
+- Windows DPAPI secret storage; plaintext fallback only with `GAVRIEL_ALLOW_PLAINTEXT=1`.
+
 ## [1.2.0] - 2026-08-23
 
 ### Added

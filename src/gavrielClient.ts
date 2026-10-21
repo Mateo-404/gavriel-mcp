@@ -15,6 +15,51 @@ const LOGIN_RETRY_GUARD_MS = 15_000;
 // concurrentes sobre hermanos (p.ej. `order` de account-contacts): sus escrituras
 // se serializan entre sí. El resto solo pasa por el semáforo global.
 const WRITE_SERIAL_PREFIXES = ["/account-contacts"];
+const BREAKER_THRESHOLD = 5;
+const BREAKER_OPEN_MS = 30_000;
+const NET_RETRY_CODES = /^(ECONNRESET|EPIPE|ETIMEDOUT|UND_ERR_)/;
+
+export interface GetOptions {
+  /** Cachea la respuesta 200 durante `ttl` ms (opt-in). */
+  ttl?: number;
+  signal?: AbortSignal;
+}
+
+// Retry-After en segundos o fecha HTTP -> ms (null si no viene o es inválido).
+export function parseRetryAfter(h: string | null, now = Date.now()): number | null {
+  if (!h) return null;
+  const secs = Number(h);
+  if (Number.isFinite(secs)) return Math.max(0, secs * 1000);
+  const t = Date.parse(h);
+  return Number.isNaN(t) ? null : Math.max(0, t - now);
+}
+
+// Backoff exponencial con jitter (0.5x..1.5x); un Retry-After del server manda tal cual.
+export function retryDelayMs(attempt: number, retryAfter: string | null, rand = Math.random(), now = Date.now()): number {
+  const ra = parseRetryAfter(retryAfter, now);
+  return Math.min(ra ?? 500 * 2 ** attempt * (0.5 + rand), MAX_BACKOFF_MS);
+}
+
+function sleep(ms: number, signal?: AbortSignal): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (signal?.aborted) return reject(signal.reason);
+    const onAbort = () => {
+      clearTimeout(t);
+      reject(signal!.reason);
+    };
+    const t = setTimeout(() => {
+      signal?.removeEventListener("abort", onAbort);
+      resolve();
+    }, ms);
+    signal?.addEventListener("abort", onAbort, { once: true });
+  });
+}
+
+function isRetryableNetError(err: unknown): boolean {
+  const e = err as { name?: string; code?: string; cause?: { code?: string } };
+  if (e?.name === "TimeoutError") return true;
+  return NET_RETRY_CODES.test(e?.code ?? e?.cause?.code ?? "");
+}
 
 interface JwtState {
   token: string | null;
@@ -46,6 +91,11 @@ export class GavrielClient {
   private writeInFlight = 0;
   private writeWaiters: Array<() => void> = [];
   private serialQueues = new Map<string, Promise<void>>();
+  private cache = new Map<string, { exp: number; status: number; data: unknown }>();
+  private getInFlight = new Map<string, Promise<{ status: number; data: unknown }>>();
+  private loginShared: Promise<void> | null = null;
+  private getFailures = 0;
+  private breakerOpenUntil = 0;
 
   constructor(config: Config) {
     this.config = config;
@@ -60,7 +110,15 @@ export class GavrielClient {
     return this.userEmail;
   }
 
-  async login(): Promise<void> {
+  // Logins concurrentes (p.ej. varios 401 a la vez) comparten uno solo.
+  login(): Promise<void> {
+    this.loginShared ??= this.loginOnce().finally(() => {
+      this.loginShared = null;
+    });
+    return this.loginShared;
+  }
+
+  private async loginOnce(): Promise<void> {
     // Resetea la expiración previa: el header x-token-expires-at que doLogin
     // pueda traer es la fuente más precisa; decodeExp del JWT es fallback.
     this.jwt.expiresAt = null;
@@ -195,11 +253,16 @@ export class GavrielClient {
     path: string,
     body?: unknown,
     _attempt = 0,
+    signal?: AbortSignal,
+    _authRetried = false,
+    _netRetried = false,
   ): Promise<{ status: number; data: unknown; headers: Headers }> {
     const token = await this.ensureToken();
     const url = path.startsWith("http") ? path : `${this.baseUrl}${path.startsWith("/") ? path : `/${path}`}`;
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+    const timeout = AbortSignal.timeout(REQUEST_TIMEOUT_MS);
+    const sig = signal ? AbortSignal.any([timeout, signal]) : timeout;
+    const again = (att: number, auth: boolean, net: boolean) =>
+      this.requestInner(method, path, body, att, signal, auth, net);
 
     let res: Response;
     try {
@@ -211,50 +274,52 @@ export class GavrielClient {
           Authorization: `Bearer ${token}`,
         },
         body: body !== undefined ? JSON.stringify(body) : undefined,
-        signal: controller.signal,
+        signal: sig,
       });
     } catch (err) {
-      clearTimeout(timer);
+      // Un reintento para GET ante errores de red transitorios (no si abortó el caller).
+      if (method === "GET" && !_netRetried && !signal?.aborted && isRetryableNetError(err)) {
+        console.error(`[gavrielClient] error de red transitorio en GET ${path}, reintento`);
+        await sleep(retryDelayMs(0, null), signal);
+        return again(_attempt, _authRetried, true);
+      }
       throw new Error(`Error de red hacia ${method} ${path}: ${(err as Error).message}`);
     }
 
-    if (res.status === 401 && _attempt < 1) {
-      clearTimeout(timer);
+    if (res.status === 401 && !_authRetried) {
+      // Otro request ya renovó el token mientras este volaba: reintentar con el nuevo.
+      if (this.jwt.token && this.jwt.token !== token) return again(_attempt, true, _netRetried);
       const sinceLogin = Date.now() - this.lastLoginAt;
-      this.jwt.token = null;
       if (sinceLogin < LOGIN_RETRY_GUARD_MS) {
+        if (this.jwt.token === token) this.jwt.token = null;
         throw new Error(
           `401 en ${method} ${path}: el JWT se renovó hace ${Math.round(sinceLogin / 1000)}s y fue rechazado igual. No reintento el login para no bloquear la cuenta; revisá credenciales/permisos.`,
         );
       }
       console.error("[gavrielClient] 401, reintento con re-login");
-      await this.login();
-      return this.requestInner(method, path, body, _attempt + 1);
+      if (this.jwt.token === token) this.jwt.token = null;
+      await this.login(); // compartido entre 401 concurrentes
+      return again(_attempt, true, _netRetried);
     }
 
     // Retry automático solo para GET: repetir un POST/PATCH tras un 5xx puede
     // duplicar la operación si el backend la aplicó antes de fallar la respuesta.
     if (method === "GET" && (res.status === 429 || res.status >= 500) && _attempt < 2) {
-      clearTimeout(timer);
-      const retryAfter = Number(res.headers.get("retry-after") ?? 0) * 1000;
-      const delay = Math.min(retryAfter || 500 * 2 ** _attempt, MAX_BACKOFF_MS);
-      console.error(`[gavrielClient] ${res.status}, backoff ${delay}ms`);
-      await new Promise((r) => setTimeout(r, delay));
-      return this.requestInner(method, path, body, _attempt + 1);
+      const delay = retryDelayMs(_attempt, res.headers.get("retry-after"));
+      console.error(`[gavrielClient] ${res.status}, backoff ${Math.round(delay)}ms`);
+      await sleep(delay, signal);
+      return again(_attempt + 1, _authRetried, _netRetried);
     }
 
     this.handleNewToken(res);
 
-    // El abort (REQUEST_TIMEOUT_MS) debe cubrir también la lectura del body:
-    // si el stream se estanca (conexión keep-alive reusada que el server
-    // dejó a medias), sin esto el request colgaba para siempre.
+    // El abort (REQUEST_TIMEOUT_MS) cubre también la lectura del body:
+    // si el stream se estanca, sin esto el request colgaba para siempre.
     let text: string;
     try {
       text = await res.text();
     } catch (err) {
       throw new Error(`Error de red leyendo el body de ${method} ${path}: ${(err as Error).message}`);
-    } finally {
-      clearTimeout(timer);
     }
     let data: unknown;
     try {
@@ -271,11 +336,11 @@ export class GavrielClient {
     method: "GET" | "POST" | "PATCH" | "PUT" | "DELETE",
     path: string,
     body?: unknown,
-    _attempt = 0,
+    signal?: AbortSignal,
   ): Promise<{ status: number; data: unknown; headers: Headers }> {
     const start = Date.now();
     try {
-      const res = await this.requestInner(method, path, body, _attempt);
+      const res = await this.requestInner(method, path, body, 0, signal);
       logPerf({ method, path: path.split("?")[0], status: res.status, ms: Date.now() - start });
       return res;
     } catch (e) {
@@ -284,10 +349,65 @@ export class GavrielClient {
     }
   }
 
-  async get<T = unknown>(path: string, params?: Record<string, unknown>): Promise<{ status: number; data: T }> {
-    const qs = params ? buildQueryString(params) : "";
-    const res = await this.request("GET", `${path}${qs}`);
-    return { status: res.status, data: res.data as T };
+  async get<T = unknown>(
+    path: string,
+    params?: Record<string, unknown>,
+    opts: GetOptions = {},
+  ): Promise<{ status: number; data: T }> {
+    // Claves ordenadas: mismos params en distinto orden comparten cache/dedupe.
+    const sorted = params ? Object.fromEntries(Object.entries(params).sort(([a], [b]) => a.localeCompare(b))) : undefined;
+    const full = `${path}${sorted ? buildQueryString(sorted) : ""}`;
+
+    if (opts.ttl) {
+      const hit = this.cache.get(full);
+      if (hit && hit.exp > Date.now()) return { status: hit.status, data: hit.data as T };
+    }
+    if (Date.now() < this.breakerOpenUntil) {
+      throw new Error(`Circuit breaker abierto: el backend falló ${BREAKER_THRESHOLD} veces seguidas; reintentar en unos segundos.`);
+    }
+
+    // Dedupe: GETs idénticos concurrentes comparten un solo request (salvo con signal propio).
+    const shared = opts.signal ? undefined : this.getInFlight.get(full);
+    if (shared) return (await shared) as { status: number; data: T };
+
+    const p = (async () => {
+      let res: { status: number; data: unknown };
+      try {
+        res = await this.request("GET", full, undefined, opts.signal);
+      } catch (e) {
+        if (!opts.signal?.aborted) this.noteGetFailure();
+        throw e;
+      }
+      if (res.status >= 500) this.noteGetFailure();
+      else this.getFailures = 0;
+      if (opts.ttl && res.status === 200) {
+        this.cache.set(full, { exp: Date.now() + opts.ttl, status: res.status, data: res.data });
+      }
+      return res;
+    })();
+    if (opts.signal) return (await p) as { status: number; data: T };
+    this.getInFlight.set(full, p);
+    try {
+      return (await p) as { status: number; data: T };
+    } finally {
+      this.getInFlight.delete(full);
+    }
+  }
+
+  private noteGetFailure(): void {
+    if (++this.getFailures >= BREAKER_THRESHOLD) {
+      this.breakerOpenUntil = Date.now() + BREAKER_OPEN_MS;
+      this.getFailures = 0;
+    }
+  }
+
+  // Una escritura exitosa invalida las entradas cuyo path comparte prefijo (en cualquier sentido).
+  private invalidate(path: string): void {
+    const w = path.split("?")[0];
+    for (const k of this.cache.keys()) {
+      const kp = k.split("?")[0];
+      if (kp.startsWith(w) || w.startsWith(kp)) this.cache.delete(k);
+    }
   }
 
   // Escrituras: semáforo global (GAVRIEL_MCP_WRITE_CONCURRENCY, default 5) +
@@ -339,23 +459,34 @@ export class GavrielClient {
     }
   }
 
-  async post<T = unknown>(path: string, body?: unknown): Promise<{ status: number; data: T }> {
+  async post<T = unknown>(path: string, body?: unknown, signal?: AbortSignal): Promise<{ status: number; data: T }> {
     return this.runWrite(path, async () => {
-      const res = await this.request("POST", path, body);
+      const res = await this.request("POST", path, body, signal);
+      if (res.status < 400) this.invalidate(path);
       return { status: res.status, data: res.data as T };
     });
   }
 
-  async patch<T = unknown>(path: string, body?: unknown): Promise<{ status: number; data: T }> {
+  async patch<T = unknown>(path: string, body?: unknown, signal?: AbortSignal): Promise<{ status: number; data: T }> {
     return this.runWrite(path, async () => {
-      const res = await this.request("PATCH", path, body);
+      const res = await this.request("PATCH", path, body, signal);
+      if (res.status < 400) this.invalidate(path);
       return { status: res.status, data: res.data as T };
     });
   }
 
-  async delete<T = unknown>(path: string): Promise<{ status: number; data: T }> {
+  async put<T = unknown>(path: string, body?: unknown, signal?: AbortSignal): Promise<{ status: number; data: T }> {
     return this.runWrite(path, async () => {
-      const res = await this.request("DELETE", path);
+      const res = await this.request("PUT", path, body, signal);
+      if (res.status < 400) this.invalidate(path);
+      return { status: res.status, data: res.data as T };
+    });
+  }
+
+  async delete<T = unknown>(path: string, signal?: AbortSignal): Promise<{ status: number; data: T }> {
+    return this.runWrite(path, async () => {
+      const res = await this.request("DELETE", path, undefined, signal);
+      if (res.status < 400) this.invalidate(path);
       return { status: res.status, data: res.data as T };
     });
   }

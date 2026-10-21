@@ -1,4 +1,4 @@
-import type { CallToolResult } from "@modelcontextprotocol/server";
+import type { CallToolResult, ServerContext } from "@modelcontextprotocol/server";
 import { z } from "zod";
 
 export const DEFAULT_LIMIT = 25;
@@ -19,6 +19,10 @@ export const paginationSchema = {
     .default(DEFAULT_LIMIT)
     .describe(`Por página (default ${DEFAULT_LIMIT}, máx ${MAX_LIMIT})`),
 };
+
+// Valores conocidos (ver gavriel://catalog/tickets/status-options y priority-options).
+export const TICKET_STATUSES = ["open", "in_progress", "pending_customer", "closed"] as const;
+export const TICKET_PRIORITIES = ["low", "medium", "high", "critical"] as const;
 
 export const fieldsSchema = z.array(z.string()).optional().describe("Campos a devolver");
 
@@ -73,11 +77,11 @@ export function buildBody(
 export function wrapReadOnly<
   T,
 >(
-  fn: (args: T) => Promise<CallToolResult>,
-): (args: T) => Promise<CallToolResult> {
-  return async (args) => {
+  fn: (args: T, ctx: ServerContext) => Promise<CallToolResult>,
+): (args: T, ctx: ServerContext) => Promise<CallToolResult> {
+  return async (args, ctx) => {
     try {
-      return await fn(args);
+      return await fn(args, ctx);
     } catch (e) {
       return err((e as Error).message);
     }
@@ -129,42 +133,51 @@ export function ensureOk<T = unknown>(res: { status: number; data: unknown }, ct
 }
 
 // ── Responses ───────────────────────────────────────────────────────
-// Compact JSON: saves ~30-40% vs pretty-print.
+// structuredContent exige un objeto: arrays se envuelven en {data}, primitivos no llevan.
+function toStructured(value: unknown): Record<string, unknown> | undefined {
+  if (Array.isArray(value)) return { data: value };
+  if (value !== null && typeof value === "object") return value as Record<string, unknown>;
+  return undefined;
+}
+
+// Compact JSON: saves ~30-40% vs pretty-print. El texto queda completo para
+// clientes que ignoran structuredContent.
 export function ok(value: unknown): CallToolResult {
-  return { content: [{ type: "text", text: JSON.stringify(value) }] };
+  const text = JSON.stringify(value) ?? "null";
+  const structuredContent = toStructured(value);
+  return { content: [{ type: "text", text }], ...(structuredContent ? { structuredContent } : {}) };
 }
 
-// Truncated: warns explicitly when data is cut.
+// Truncated: corta en límites de ítem de array (JSON siempre válido) y avisa.
 export function okTruncated(value: unknown, maxChars?: number): CallToolResult {
-  const text = JSON.stringify(value);
-  if (maxChars === undefined || text.length <= maxChars) {
-    return { content: [{ type: "text", text }] };
+  const text = JSON.stringify(value) ?? "null";
+  if (maxChars === undefined || text.length <= maxChars) return ok(value);
+  const note = (kept?: number, total?: number) =>
+    kept !== undefined
+      ? `Respuesta truncada: se devuelven ${kept} de ${total} ítems. Usá truncate más alto o paginá para el completo.`
+      : `Respuesta truncada: ${text.length} chars totales. Usá truncate más alto si necesitás el completo.`;
+  // Array de primer nivel, o {data|items|rows: [...]}: se descartan ítems finales.
+  const v = value as Record<string, unknown>;
+  const key = Array.isArray(value) ? null : (["data", "items", "rows"].find((k) => Array.isArray(v?.[k])) ?? undefined);
+  if (Array.isArray(value) || key) {
+    const arr = (Array.isArray(value) ? value : v[key as string]) as unknown[];
+    const wrap = (n: number) =>
+      Array.isArray(value) ? { data: arr.slice(0, n), _truncado: note(n, arr.length) } : { ...v, [key as string]: arr.slice(0, n), _truncado: note(n, arr.length) };
+    // Búsqueda binaria del mayor n que entra (al menos 1 ítem).
+    let lo = 0, hi = arr.length;
+    while (lo < hi) {
+      const mid = Math.ceil((lo + hi) / 2);
+      if (JSON.stringify(wrap(mid)).length <= maxChars) lo = mid; else hi = mid - 1;
+    }
+    return ok(wrap(Math.max(1, lo)));
   }
-  return {
-    content: [
-      {
-        type: "text",
-        text: `${text.slice(0, maxChars)}...\nRESPUESTA TRUNCADA: ${text.length} chars totales. ` +
-          "Usá truncate más alto si necesitás el completo.",
-      },
-    ],
-  };
+  // Fallback no-array: preview como string dentro de un JSON válido.
+  return ok({ _truncadoPreview: text.slice(0, maxChars), _truncado: note() });
 }
 
-// Structured: full data in structuredContent, summary in text.
+// Structured: igual que ok(); el texto lleva el payload completo (no un stub).
 export function okStructured(value: unknown): CallToolResult {
-  const v = value as Record<string, unknown>;
-  const data = Array.isArray(value) ? value : v?.data ? (v.data as unknown) : undefined;
-  const count = Array.isArray(data) ? data.length : undefined;
-  const text = JSON.stringify({
-    _resumen: true,
-    ...(count !== undefined ? { count } : {}),
-    nota: "Datos completos en structuredContent.",
-  });
-  return {
-    content: [{ type: "text", text }],
-    structuredContent: v,
-  };
+  return ok(value);
 }
 
 // Compact error: no pretty-print (saves tokens on error path too).

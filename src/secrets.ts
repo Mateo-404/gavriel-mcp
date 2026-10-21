@@ -1,17 +1,56 @@
 import { spawnSync } from "node:child_process";
-import { readFileSync, writeFileSync, mkdirSync, chmodSync } from "node:fs";
+import { readFileSync, writeFileSync, mkdirSync, chmodSync, existsSync, rmSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { homedir } from "node:os";
 import { join } from "node:path";
 
 const SERVICE = "gavriel-mcp";
 const SECRET_TOOL_TIMEOUT_MS = 5_000;
+const POWERSHELL_TIMEOUT_MS = 15_000;
+const IS_WIN = process.platform === "win32";
 
-const LEGACY_PASSWORD_FILE = join(process.env.HOME || ".", ".secrets/gavriel-password");
-const LEGACY_TOKENS_FILE = join(process.env.HOME || ".", ".local/share/gavriel-mcp/trusted-device.json");
+const LEGACY_PASSWORD_FILE = join(homedir(), ".secrets/gavriel-password");
+const LEGACY_TOKENS_DIR = join(homedir(), ".local/share/gavriel-mcp");
+const LEGACY_TOKENS_FILE = join(LEGACY_TOKENS_DIR, "trusted-device.json");
+
+// Los archivos en texto plano solo se usan con opt-in explícito.
+function plaintextAllowed(): boolean {
+  return process.env.GAVRIEL_ALLOW_PLAINTEXT === "1";
+}
+
+// ── Windows: DPAPI (ConvertTo/From-SecureString), blob cifrado en %APPDATA% ──
+// El secreto viaja por stdin, nunca por argv ni interpolado en el script.
+// shortcut: DPAPI ata el blob al usuario de Windows; no hay backend macOS (la CLI
+// `security` solo acepta el secreto por argv, visible en la lista de procesos).
+const PS_ARGS = ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command"];
+const PS_PROTECT =
+  "$p=[Console]::In.ReadToEnd(); ConvertTo-SecureString -String $p -AsPlainText -Force | ConvertFrom-SecureString";
+const PS_UNPROTECT =
+  "$b=[Console]::In.ReadToEnd().Trim(); $s=ConvertTo-SecureString -String $b; " +
+  "[Runtime.InteropServices.Marshal]::PtrToStringBSTR([Runtime.InteropServices.Marshal]::SecureStringToBSTR($s))";
+
+function dpapiFile(account: string): string {
+  const base = process.env.APPDATA || join(homedir(), "AppData", "Roaming");
+  const id = createHash("sha256").update(account).digest("hex").slice(0, 24);
+  return join(base, SERVICE, "secrets", `${id}.dpapi`);
+}
+
+function powershell(script: string, input: string): string | null {
+  const r = spawnSync("powershell.exe", [...PS_ARGS, script], {
+    input,
+    timeout: POWERSHELL_TIMEOUT_MS,
+    windowsHide: true,
+    encoding: "utf8",
+  });
+  if (r.status !== 0 || r.error) return null;
+  return r.stdout.replace(/[\r\n]+$/, "");
+}
 
 let secretToolChecked = false;
 let secretToolOK = false;
 
 function hasSecretTool(): boolean {
+  if (IS_WIN) return true; // DPAPI siempre disponible
   if (secretToolChecked) return secretToolOK;
   secretToolChecked = true;
   try {
@@ -22,14 +61,23 @@ function hasSecretTool(): boolean {
   }
   if (!secretToolOK) {
     console.error(
-      "[gavriel-mcp] warning: 'secret-tool' no está disponible, los secretos caen al fallback menos seguro " +
-        "(env / archivo plano). Instalá libsecret-tools para usar el keyring del sistema.",
+      "[gavriel-mcp] warning: no hay almacén seguro disponible (secret-tool). " +
+        "Instalá libsecret-tools; el fallback en texto plano requiere GAVRIEL_ALLOW_PLAINTEXT=1.",
     );
   }
   return secretToolOK;
 }
 
 export function keyringLookup(account: string): string | null {
+  if (IS_WIN) {
+    try {
+      const blob = readFileSync(dpapiFile(account), "utf8");
+      const v = powershell(PS_UNPROTECT, blob);
+      return v ? v : null;
+    } catch {
+      return null;
+    }
+  }
   if (!hasSecretTool()) return null;
   try {
     const r = spawnSync("secret-tool", ["lookup", "service", SERVICE, "account", account], {
@@ -44,6 +92,18 @@ export function keyringLookup(account: string): string | null {
 }
 
 export function keyringStore(account: string, value: string): boolean {
+  if (IS_WIN) {
+    try {
+      const blob = powershell(PS_PROTECT, value);
+      if (!blob) return false;
+      const file = dpapiFile(account);
+      mkdirSync(join(file, ".."), { recursive: true });
+      writeFileSync(file, blob, { encoding: "utf8", mode: 0o600 });
+      return true;
+    } catch {
+      return false;
+    }
+  }
   if (!hasSecretTool()) return false;
   try {
     const r = spawnSync(
@@ -58,6 +118,14 @@ export function keyringStore(account: string, value: string): boolean {
 }
 
 export function keyringClear(account: string): void {
+  if (IS_WIN) {
+    try {
+      if (existsSync(dpapiFile(account))) rmSync(dpapiFile(account));
+    } catch {
+      // best effort
+    }
+    return;
+  }
   if (!hasSecretTool()) return;
   try {
     spawnSync("secret-tool", ["clear", "service", SERVICE, "account", account], {
@@ -72,12 +140,13 @@ export function resolvePassword(): string | null {
   const fromKeyring = keyringLookup("password");
   if (fromKeyring) return fromKeyring;
   if (process.env.GAVRIEL_PASSWORD) return process.env.GAVRIEL_PASSWORD;
+  if (!plaintextAllowed()) return null;
   try {
     const fromLegacy = readFileSync(LEGACY_PASSWORD_FILE, "utf8");
     if (fromLegacy) {
       console.error(
         "[gavriel-mcp] warning: usando password del archivo legacy (~/.secrets/gavriel-password, modo menos seguro). " +
-          "Movelo al keyring con: secret-tool store --label='Gavriel MCP - password' service gavriel-mcp account password",
+          "Movelo al almacén seguro (ver SECURITY.md).",
       );
     }
     return fromLegacy;
@@ -87,6 +156,7 @@ export function resolvePassword(): string | null {
 }
 
 function readLegacyTokens(): Record<string, string> {
+  if (!plaintextAllowed()) return {};
   try {
     return JSON.parse(readFileSync(LEGACY_TOKENS_FILE, "utf8")) as Record<string, string>;
   } catch {
@@ -95,8 +165,9 @@ function readLegacyTokens(): Record<string, string> {
 }
 
 function writeLegacyTokens(all: Record<string, string>): void {
+  if (!plaintextAllowed()) return;
   try {
-    mkdirSync(join(process.env.HOME || ".", ".local/share/gavriel-mcp"), { recursive: true });
+    mkdirSync(LEGACY_TOKENS_DIR, { recursive: true });
     writeFileSync(LEGACY_TOKENS_FILE, JSON.stringify(all), { encoding: "utf8", mode: 0o600 });
     try {
       chmodSync(LEGACY_TOKENS_FILE, 0o600); // por si el archivo ya existía con permisos amplios
@@ -126,7 +197,7 @@ export function readTrustedToken(email: string): string | null {
   if (legacy) {
     console.error(
       "[gavriel-mcp] warning: usando trusted_device_token del archivo legacy (modo menos seguro). " +
-        "Movelo al keyring con: secret-tool store --label='Gavriel MCP - trusted device token' service gavriel-mcp account trusted_device_token",
+        "Movelo al almacén seguro (ver SECURITY.md).",
     );
   }
   return legacy ?? null;
@@ -134,6 +205,10 @@ export function readTrustedToken(email: string): string | null {
 
 export function saveTrustedToken(email: string, token: string): void {
   if (keyringStore(tokenKeyringAccount(email), token)) return;
+  if (!plaintextAllowed()) {
+    console.error("[gavriel-mcp] no hay almacén seguro: el trusted device token no se persistió (GAVRIEL_ALLOW_PLAINTEXT=1 para forzar texto plano).");
+    return;
+  }
   const all = readLegacyTokens();
   all[email.toLowerCase().trim()] = token;
   writeLegacyTokens(all);

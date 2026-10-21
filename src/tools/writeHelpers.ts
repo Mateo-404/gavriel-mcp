@@ -1,5 +1,15 @@
 import { z } from "zod";
-import type { ElicitRequestFormParams, ElicitResult } from "@modelcontextprotocol/server";
+import {
+  inputRequired,
+  inputResponse,
+  isInputRequiredResult,
+  type CallToolResult,
+  type ElicitRequestFormParams,
+  type ElicitResult,
+  type InputRequiredResult,
+  type ServerContext,
+} from "@modelcontextprotocol/server";
+import { ok } from "./shared.js";
 import type { GavrielClient } from "../gavrielClient.js";
 import { logWrite } from "../auditLog.js";
 
@@ -9,6 +19,9 @@ const ACTION_SEGMENTS = new Set([
   "read", "claim", "release", "close", "schedule",
   "mark-as-read", "mark-as-unread", "open", "range", "non-working-days",
 ]);
+
+// Segmento de path seguro: los ids vienen de input del modelo, nunca se interpolan crudos.
+export const seg = (id: string): string => encodeURIComponent(id);
 
 export const confirmSchema = z
   .boolean()
@@ -23,59 +36,75 @@ export interface WriteExecution {
 }
 
 // ── Aprobación destructiva (defensa extra sobre confirm) ───────────
-// Tools que borran datos o escriben en masa. Con
-// GAVRIEL_MCP_DESTRUCTIVE_APPROVAL=elicitation, además del confirm la tool
-// le pregunta al usuario humano vía elicitation antes de ejecutar.
-const DESTRUCTIVE_TOOLS = new Set([
-  "delete_account_note",
-  "bulk_mark_events_by_filter",
-  "bulk_add_account_note",
-]);
+// Todo delete_*, todo bulk_* y send_conversation_message piden además
+// aprobación humana vía elicitation (default). Opt-out explícito:
+// GAVRIEL_MCP_DESTRUCTIVE_APPROVAL=off. Sin cliente con elicitation falla cerrado.
+export function isDestructive(tool: string): boolean {
+  return /^(delete_|bulk_|restart_|toggle_|cleanup_|cancel_notification_|retry_failed_notification_|archive_notification_)/.test(tool)
+    || /^(send_conversation_message|create_notification_campaign|reset_user_otp|create_user|update_user|notify_barrio|set_technician_slot_config|deactivate_intervention_category)$/.test(tool);
+}
 
 type ApprovalMode = "off" | "elicitation";
 // ponytail: estado de módulo — el server es un proceso único y el modo se
 // setea una vez al arrancar desde config; no hace falta inyectarlo por DI.
-let approvalMode: ApprovalMode = "off";
+let approvalMode: ApprovalMode = "elicitation";
 
 export function setDestructiveApproval(mode: ApprovalMode): void {
   approvalMode = mode;
 }
 
 export type ElicitFn = (params: ElicitRequestFormParams) => Promise<ElicitResult>;
+type Guard = { confirmWithUser: () => Promise<boolean | InputRequiredResult> };
+
+const APPROVAL_KEY = "approve";
+
+/** Convierte el resultado de requireConfirm en respuesta MCP (pasa input_required tal cual). */
+export function okOrInput(r: unknown): CallToolResult {
+  return isInputRequiredResult(r) ? (r as unknown as CallToolResult) : ok(r);
+}
 
 // Devuelve un guard para requireConfirm si corresponde preguntarle al humano.
-// Si el cliente no soporta elicitation (o falla), NO ejecuta (falla cerrado).
-// Nota: ctx.mcpReq.elicitInput está deprecado en la spec 2026-07-28 (usa
-// inputRequired) pero sigue funcional en clientes 2025-era; en un cliente
-// 2026-07-28 lanza → el catch lo trata como "no aprobado".
+// 3er parámetro:
+//  - ServerContext (preferido): usa inputRequired.elicit (spec 2026-07-28; el SDK
+//    lo adapta a clientes 2025 con su legacy shim). Al reintento lee inputResponses.
+//  - ElicitFn (legacy, ctx.mcpReq.elicitInput): fallback deprecado, lanza en clientes 2026.
+// Si no hay forma de preguntar o falla, NO ejecuta (falla cerrado).
 export function destructiveGuard(
   tool: string,
   exec: WriteExecution,
-  elicit?: ElicitFn,
-): { confirmWithUser: () => Promise<boolean> } | undefined {
-  if (approvalMode !== "elicitation" || !DESTRUCTIVE_TOOLS.has(tool) || !elicit) return undefined;
+  via?: ServerContext | ElicitFn,
+): Guard | undefined {
+  if (approvalMode !== "elicitation" || !isDestructive(tool)) return undefined;
+  const params: ElicitRequestFormParams = {
+    mode: "form",
+    message:
+      `Operación destructiva: ${exec.tool}
+${exec.method} ${exec.path}
+` +
+      `¿Ejecutar? (el agente ya mostró el preview y pidió confirm)`,
+    requestedSchema: {
+      type: "object",
+      properties: {
+        aprobar: {
+          type: "boolean",
+          title: "¿Ejecutar?",
+          description: "Marcá true solo si aprobás explícitamente esta operación.",
+        },
+      },
+      required: ["aprobar"],
+    },
+  };
   return {
     confirmWithUser: async () => {
       try {
-        const res = await elicit({
-          mode: "form",
-          message:
-            `Operación destructiva: ${exec.tool}\n${exec.method} ${exec.path}\n` +
-            `¿Ejecutar? (el agente ya mostró el preview y pediste confirm)`,
-          requestedSchema: {
-            type: "object",
-            properties: {
-              aprobar: {
-                type: "boolean",
-                title: "¿Ejecutar?",
-                description: "Marcá true solo si aprobás explícitamente esta operación.",
-              },
-            },
-            required: ["aprobar"],
-          },
-        });
-        const aprobar = (res.content as { aprobar?: unknown } | undefined)?.aprobar;
-        return res.action === "accept" && aprobar === true;
+        if (typeof via === "function") {
+          const res = await via(params);
+          return res.action === "accept" && (res.content as { aprobar?: unknown } | undefined)?.aprobar === true;
+        }
+        if (!via) return false;
+        const v = inputResponse(via.mcpReq.inputResponses, APPROVAL_KEY);
+        if (v.kind === "elicit") return v.action === "accept" && v.content?.aprobar === true;
+        return inputRequired({ inputRequests: { [APPROVAL_KEY]: inputRequired.elicit(params) } });
       } catch (e) {
         console.error(`[writeHelpers] elicitation no disponible/falló: ${(e as Error).message}`);
         return false;
@@ -104,13 +133,15 @@ export async function requireConfirm(
   exec: WriteExecution,
   client: GavrielClient,
   run: () => Promise<{ status: number; data: unknown }>,
-  guard?: { confirmWithUser: () => Promise<boolean> },
+  guard?: Guard,
 ): Promise<unknown> {
   if (confirm !== true) {
     return buildPreview(exec);
   }
 
-  if (guard && !(await guard.confirmWithUser())) {
+  const approval = guard ? await guard.confirmWithUser() : true;
+  if (typeof approval === "object") return approval; // input_required: el cliente pregunta y reintenta
+  if (!approval) {
     return {
       ok: false,
       writeStatus: "rejected_by_user",
@@ -228,7 +259,7 @@ function summarize(data: unknown, maxLen = 1000): unknown {
 // no corta el lote: cada entrada reporta ok/status/error.
 export interface BatchOp {
   id: string;
-  run: () => Promise<{ status: number }>;
+  run: (signal?: AbortSignal) => Promise<{ status: number }>;
 }
 
 export interface BatchReport {
@@ -236,16 +267,30 @@ export interface BatchReport {
   results: Array<{ id: string; ok: boolean; status?: number; error?: string }>;
 }
 
-export async function runBatch(ops: BatchOp[]): Promise<BatchReport> {
-  const results = await Promise.all(
+// ctx (opcional): emite progress si el request trae progressToken y propaga su abort signal a cada op.
+export async function runBatch(ops: BatchOp[], ctx?: ServerContext): Promise<BatchReport> {
+  const token = ctx?.mcpReq._meta?.progressToken;
+  const signal = ctx?.mcpReq.signal;
+  let done = 0;
+  const settled = await Promise.allSettled(
     ops.map(async (op) => {
       try {
-        const r = await op.run();
-        return { id: op.id, ok: r.status >= 200 && r.status < 300, status: r.status };
-      } catch (e) {
-        return { id: op.id, ok: false, error: (e as Error).message };
+        return await op.run(signal);
+      } finally {
+        done++;
+        if (token !== undefined) {
+          // best-effort: un fallo al notificar no debe romper el lote
+          void ctx!.mcpReq
+            .notify({ method: "notifications/progress", params: { progressToken: token, progress: done, total: ops.length } })
+            .catch(() => {});
+        }
       }
     }),
+  );
+  const results = settled.map((r, i) =>
+    r.status === "fulfilled"
+      ? { id: ops[i].id, ok: r.value.status >= 200 && r.value.status < 300, status: r.value.status }
+      : { id: ops[i].id, ok: false, error: (r.reason as Error)?.message ?? String(r.reason) },
   );
   const failed = results.filter((r) => !r.ok).length;
   return { summary: { total: ops.length, ok: ops.length - failed, failed }, results };

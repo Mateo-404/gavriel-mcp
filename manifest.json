@@ -1,0 +1,31 @@
+{
+  "manifest_version": "0.3",
+  "name": "gavriel-mcp",
+  "display_name": "Gavriel MCP",
+  "version": "1.2.0",
+  "description": "MCP server local que expone la API de Gavriel (alarmas) como herramientas para agentes de IA",
+  "author": { "name": "Marinozzi" },
+  "license": "SEE LICENSE IN LICENSE.md",
+  "server": {
+    "type": "node",
+    "entry_point": "dist/index.js",
+    "mcp_config": {
+      "command": "node",
+      "args": ["${__dirname}/dist/index.js"],
+      "env": {
+        "GAVRIEL_EMAIL": "${user_config.GAVRIEL_EMAIL}",
+        "GAVRIEL_PASSWORD": "${user_config.GAVRIEL_PASSWORD}",
+        "GAVRIEL_API_BASE": "${user_config.GAVRIEL_API_BASE}",
+        "GAVRIEL_MCP_ROLE": "${user_config.GAVRIEL_MCP_ROLE}",
+        "GAVRIEL_MCP_TOOLSETS": "${user_config.GAVRIEL_MCP_TOOLSETS}"
+      }
+    }
+  },
+  "user_config": {
+    "GAVRIEL_EMAIL": { "type": "string", "title": "Email de Gavriel", "description": "Usuario con el que se loguea el servidor", "required": true },
+    "GAVRIEL_PASSWORD": { "type": "string", "title": "Contraseña de Gavriel", "description": "Se guarda cifrada por el cliente", "sensitive": true, "required": true },
+    "GAVRIEL_API_BASE": { "type": "string", "title": "API base", "description": "URL https de la API", "default": "https://app.gavriel.com.ar/api" },
+    "GAVRIEL_MCP_ROLE": { "type": "string", "title": "Rol", "description": "readonly | lite | full", "default": "readonly" },
+    "GAVRIEL_MCP_TOOLSETS": { "type": "string", "title": "Toolsets", "description": "Lista separada por comas, o all", "default": "all" }
+  }
+}

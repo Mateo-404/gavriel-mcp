@@ -20,11 +20,16 @@
     "selfcheck": "node scripts/selfcheck.mjs",
     "regression": "node scripts/regression.mjs",
     "build:bin": "node scripts/build-bin.mjs",
-    "test:fast": "bun run selfcheck"
+    "test:fast": "node scripts/selfcheck.mjs",
+    "test": "tsc -p tsconfig.json && node --test \"test/*.test.mjs\"",
+    "test:snapshot": "tsc -p tsconfig.json && UPDATE_SNAPSHOT=1 node --test test/contract.test.mjs",
+    "lint": "npx --yes @biomejs/biome@2.2.0 lint src test scripts",
+    "format": "npx --yes @biomejs/biome@2.2.0 format src test",
+    "mcpb:pack": "npx --yes @anthropic-ai/mcpb pack"
   },
   "dependencies": {
-    "@modelcontextprotocol/client": "^2.0.0",
-    "@modelcontextprotocol/server": "^2.0.0",
+    "@modelcontextprotocol/client": "^2.3.1",
+    "@modelcontextprotocol/server": "^2.3.1",
     "zod": "^4.4.3"
   },
   "devDependencies": {
@@ -33,5 +38,12 @@
     "postject": "1.0.0-alpha.6",
     "tsx": "^4.23.12",
     "typescript": "^7.0.2"
-  }
+  },
+  "files": [
+    "dist",
+    "manifest.json",
+    "README.md",
+    "LICENSE.md",
+    "CHANGELOG.md"
+  ]
 }

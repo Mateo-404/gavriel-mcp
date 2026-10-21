@@ -1,0 +1,7606 @@
+[
+  {
+    "name": "account_360",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "ID interno o número de cuenta"
+        },
+        "include": {
+          "description": "Secciones (default: devices, interventions, tickets, events)",
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "devices",
+              "partitions",
+              "zones",
+              "users",
+              "contacts",
+              "notes",
+              "interventions",
+              "tickets",
+              "events"
+            ]
+          }
+        },
+        "itemLimit": {
+          "default": 10,
+          "description": "Máximo de ítems por sección",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 50
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "add_account_contact",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "accountId": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "phone": {
+          "type": "string"
+        },
+        "email": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "order": {
+          "type": "integer",
+          "minimum": -9007199254740991,
+          "maximum": 9007199254740991
+        },
+        "confirm": {
+          "default": false,
+          "type": "boolean",
+          "description": "true = ejecutar. false/omitido = preview."
+        }
+      },
+      "required": [
+        "accountId",
+        "name"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "add_account_note",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "accountId": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "bitacora",
+            "temporal",
+            "fija"
+          ],
+          "description": "Tipo de nota"
+        },
+        "content": {
+          "type": "string",
+          "minLength": 1
+        },
+        "validFrom": {
+          "description": "ISO datetime, solo para tipo temporal",
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+        },
+        "validUntil": {
+          "description": "ISO datetime, solo para tipo temporal",
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+        },
+        "confirm": {
+          "default": false,
+          "type": "boolean",
+          "description": "true = ejecutar. false/omitido = preview."
+        }
+      },
+      "required": [
+        "accountId",
+        "type",
+        "content"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "add_account_quick_contact",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "accountId": {
+          "type": "string",
+          "pattern": "^[\\w-]+$",
+          "description": "ID de la cuenta"
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "phone",
+            "email"
+          ],
+          "description": "Tipo de contacto"
+        },
+        "contactName": {
+          "description": "Nombre del contacto",
+          "type": "string"
+        },
+        "phoneNumber": {
+          "description": "Teléfono (kind=phone)",
+          "type": "string"
+        },
+        "contactType": {
+          "description": "Tipo de contacto, ej. el que usa la UI (kind=phone)",
+          "type": "string"
+        },
+        "email": {
+          "description": "Email (kind=email)",
+          "type": "string",
+          "format": "email",
+          "pattern": "^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
+        },
+        "confirm": {
+          "default": false,
+          "type": "boolean",
+          "description": "true = ejecutar. false/omitido = preview."
+        }
+      },
+      "required": [
+        "accountId",
+        "kind"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "add_company_non_working_day",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "companyId": {
+          "type": "string"
+        },
+        "date": {
+          "type": "string",
+          "format": "date",
+          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$",
+          "description": "Fecha (YYYY-MM-DD)"
+        },
+        "label": {
+          "description": "Etiqueta/razón opcional",
+          "type": "string"
+        },
+        "confirm": {
+          "default": false,
+          "type": "boolean",
+          "description": "true = ejecutar. false/omitido = preview."
+        }
+      },
+      "required": [
+        "companyId",
+        "date"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "add_notification_group_members",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[\\w-]+$",
+          "description": "Id (uuid/slug)"
+        },
+        "userIds": {
+          "minItems": 1,
+          "maxItems": 200,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[\\w-]+$",
+            "description": "Id (uuid/slug)"
+          },
+          "description": "Ids de usuarios a agregar"
+        },
+        "confirm": {
+          "default": false,
+          "type": "boolean",
+          "description": "true = ejecutar. false/omitido = preview."
+        }
+      },
+      "required": [
+        "id",
+        "userIds"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "add_partition_member",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "partitionId": {
+          "type": "string",
+          "pattern": "^[\\w-]+$",
+          "description": "ID de la partición"
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "zones",
+            "users",
+            "contacts"
+          ],
+          "description": "Tipo de miembro"
+        },
+        "memberId": {
+          "type": "string",
+          "pattern": "^[\\w-]+$",
+          "description": "ID de la zona/usuario/contacto"
+        },
+        "confirm": {
+          "default": false,
+          "type": "boolean",
+          "description": "true = ejecutar. false/omitido = preview."
+        }
+      },
+      "required": [
+        "partitionId",
+        "kind",
+        "memberId"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "add_technician_non_working_days",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string"
+        },
+        "from": {
+          "type": "string",
+          "format": "date",
+          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$",
+          "description": "Fecha de inicio (YYYY-MM-DD)"
+        },
+        "to": {
+          "type": "string",
+          "format": "date",
+          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$",
+          "description": "Fecha de fin (YYYY-MM-DD)"
+        },
+        "label": {
+          "description": "Etiqueta/razón opcional",
+          "type": "string"
+        },
+        "confirm": {
+          "default": false,
+          "type": "boolean",
+          "description": "true = ejecutar. false/omitido = preview."
+        }
+      },
+      "required": [
+        "userId",
+        "from",
+        "to"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "add_ticket_activity",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "ticketId": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string",
+          "description": "Título de la actividad (requerido por la API)"
+        },
+        "description": {
+          "type": "string"
+        },
+        "type": {
+          "default": "MESSAGE",
+          "type": "string",
+          "enum": [
+            "MESSAGE",
+            "TASK",
+            "NOTIFICATION",
+            "REMINDER",
+            "ALERT",
+            "UPDATE"
+          ]
+        },
+        "assignedUserId": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "confirm": {
+          "default": false,
+          "type": "boolean",
+          "description": "true = ejecutar. false/omitido = preview."
+        }
+      },
+      "required": [
+        "ticketId",
+        "title"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "archive_notification_group",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[\\w-]+$",
+          "description": "Id (uuid/slug)"
+        },
+        "confirm": {
+          "default": false,
+          "type": "boolean",
+          "description": "true = ejecutar. false/omitido = preview."
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "attach_sip_call_recording",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "callId": {
+          "type": "string",
+          "pattern": "^[\\w-]+$",
+          "description": "ID de la llamada SIP"
+        },
+        "fileId": {
+          "type": "string",
+          "pattern": "^[\\w-]+$",
+          "description": "ID del archivo ya subido"
+        },
+        "confirm": {
+          "default": false,
+          "type": "boolean",
+          "description": "true = ejecutar. false/omitido = preview."
+        }
+      },
+      "required": [
+        "callId",
+        "fileId"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "audit_logs",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "page": {
+          "default": 1,
+          "description": "Página (1-based)",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "limit": {
+          "default": 25,
+          "description": "Por página (default 25, máx 200)",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 200
+        },
+        "entityType": {
+          "type": "string",
+          "enum": [
+            "ACCOUNT",
+            "TICKET",
+            "INTERVENTION",
+            "EVENT",
+            "USER",
+            "ZONE",
+            "CONNECTION",
+            "COMPANY",
+            "AUTHENTICATION",
+            "SYSTEM"
+          ]
+        },
+        "action": {
+          "type": "string"
+        },
+        "userId": {
+          "type": "string"
+        },
+        "accountId": {
+          "type": "string"
+        },
+        "entityId": {
+          "type": "string"
+        },
+        "search": {
+          "type": "string"
+        },
+        "startDate": {
+          "description": "ISO datetime",
+          "type": "string"
+        },
+        "endDate": {
+          "description": "ISO datetime",
+          "type": "string"
+        },
+        "truncate": {
+          "description": "Trunca la respuesta a N chars",
+          "type": "integer",
+          "minimum": 1000,
+          "maximum": 9007199254740991
+        }
+      },
+      "required": [
+        "entityType"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "bulk_add_account_note",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "accountIds": {
+          "minItems": 1,
+          "maxItems": 100,
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "IDs de las cuentas destino"
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "bitacora",
+            "temporal",
+            "fija"
+          ],
+          "description": "Tipo de nota"
+        },
+        "content": {
+          "type": "string",
+          "minLength": 1
+        },
+        "validFrom": {
+          "description": "ISO datetime, solo para tipo temporal",
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+        },
+        "validUntil": {
+          "description": "ISO datetime, solo para tipo temporal",
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+        },
+        "confirm": {
+          "default": false,
+          "type": "boolean",
+          "description": "true = ejecutar. false/omitido = preview."
+        }
+      },
+      "required": [
+        "accountIds",
+        "type",
+        "content"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "bulk_close_tickets",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "ticketIds": {
+          "minItems": 1,
+          "maxItems": 50,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[\\w-]+$"
+          },
+          "description": "IDs de los tickets a cerrar"
+        },
+        "resolution": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Resolución / comentario de cierre"
+        },
+        "confirm": {
+          "default": false,
+          "type": "boolean",
+          "description": "true = ejecutar. false/omitido = preview."
+        }
+      },
+      "required": [
+        "ticketIds",
+        "resolution"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "bulk_create_event_codes",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "codes": {
+          "minItems": 1,
+          "maxItems": 50,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string",
+                "minLength": 1
+              },
+              "name": {
+                "type": "string",
+                "minLength": 1
+              },
+              "title": {
+                "type": "string"
+              },
+              "description": {
+                "type": "string"
+              },
+              "dataType": {
+                "type": "string"
+              },
+              "eventsTypeId": {
+                "type": "string"
+              },
+              "eventsFormatId": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "code",
+              "name",
+              "eventsTypeId",
+              "eventsFormatId"
+            ]
+          },
+          "description": "Array de códigos a crear"
+        },
+        "confirm": {
+          "default": false,
+          "type": "boolean",
+          "description": "true = ejecutar. false/omitido = preview."
+        }
+      },
+      "required": [
+        "codes"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "bulk_mark_events_by_filter",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "accountId": {
+          "type": "string",
+          "description": "ID de la cuenta"
+        },
+        "port": {
+          "type": "string"
+        },
+        "eventCode": {
+          "type": "string"
+        },
+        "dateFrom": {
+          "description": "ISO datetime",
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+        },
+        "dateTo": {
+          "description": "ISO datetime",
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+        },
+        "targetStatus": {
+          "default": "processed",
+          "description": "Estado a asignar",
+          "type": "string",
+          "enum": [
+            "pending",
+            "attending",
+            "processed",
+            "self-processed",
+            "cancelled",
+            "hidden"
+          ]
+        },
+        "maxEvents": {
+          "default": 50,
+          "description": "Tope de eventos por ejecución",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 200
+        },
+        "confirm": {
+          "default": false,
+          "type": "boolean",
+          "description": "true = ejecutar. false/omitido = preview."
+        }
+      },
+      "required": [
+        "accountId"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "bulk_process_events",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "eventIds": {
+          "minItems": 1,
+          "maxItems": 50,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[\\w-]+$"
+          },
+          "description": "IDs de los eventos a procesar"
+        },
+        "status": {
+          "default": "processed",
+          "description": "Estado a asignar",
+          "type": "string",
+          "enum": [
+            "processed",
+            "self-processed"
+          ]
+        },
+        "confirm": {
+          "default": false,
+          "type": "boolean",
+          "description": "true = ejecutar. false/omitido = preview."
+        }
+      },
+      "required": [
+        "eventIds"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "bulk_transition_interventions",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "accountIds": {
+          "minItems": 1,
+          "maxItems": 100,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[\\w-]+$",
+            "description": "ID de cuenta"
+          },
+          "description": "Cuentas a transicionar"
+        },
+        "targetStatus": {
+          "type": "string",
+          "enum": [
+            "in_progress",
+            "waiting",
+            "transferred",
+            "closed",
+            "observation"
+          ],
+          "description": "Estado destino"
+        },
+        "observationComment": {
+          "description": "Comentario de observación",
+          "type": "string"
+        },
+        "confirm": {
+          "default": false,
+          "type": "boolean",
+          "description": "true = ejecutar. false/omitido = preview."
+        }
+      },
+      "required": [
+        "accountIds",
+        "targetStatus"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "cancel_notification_campaign",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[\\w-]+$",
+          "description": "Id (uuid/slug)"
+        },
+        "confirm": {
+          "default": false,
+          "type": "boolean",
+          "description": "true = ejecutar. false/omitido = preview."
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "cleanup_bridge",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "bridgeId": {
+          "type": "string",
+          "pattern": "^[\\w-]+$",
+          "description": "ID del bridge"
+        },
+        "confirm": {
+          "default": false,
+          "type": "boolean",
+          "description": "true = ejecutar. false/omitido = preview."
+        }
+      },
+      "required": [
+        "bridgeId"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "close_intervention",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "interventionId": {
+          "type": "string"
+        },
+        "categoryId": {
+          "description": "Categoría de cierre",
+          "type": "string"
+        },
+        "resolution": {
+          "description": "Resolución / motivo del cierre",
+          "type": "string"
+        },
+        "confirm": {
+          "default": false,
+          "type": "boolean",
+          "description": "true = ejecutar. false/omitido = preview."
+        }
+      },
+      "required": [
+        "interventionId"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "close_ticket",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "ticketId": {
+          "type": "string"
+        },
+        "resolution": {
+          "type": "string",
+          "description": "Resolución / comentario de cierre"
+        },
+        "confirm": {
+          "default": false,
+          "type": "boolean",
+          "description": "true = ejecutar. false/omitido = preview."
+        }
+      },
+      "required": [
+        "ticketId",
+        "resolution"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "conversation_claim",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "conversationId": {
+          "type": "string"
+        },
+        "confirm": {
+          "default": false,
+          "type": "boolean",
+          "description": "true = ejecutar. false/omitido = preview."
+        }
+      },
+      "required": [
+        "conversationId"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "conversation_mark_read",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "conversationId": {
+          "type": "string"
+        },
+        "confirm": {
+          "default": false,
+          "type": "boolean",
+          "description": "true = ejecutar. false/omitido = preview."
+        }
+      },
+      "required": [
+        "conversationId"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "conversation_release",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "conversationId": {
+          "type": "string"
+        },
+        "confirm": {
+          "default": false,
+          "type": "boolean",
+          "description": "true = ejecutar. false/omitido = preview."
+        }
+      },
+      "required": [
+        "conversationId"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "conversation_set_status",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "conversationId": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string",
+          "description": "Nuevo estado (consultar catálogo si aplica)"
+        },
+        "confirm": {
+          "default": false,
+          "type": "boolean",
+          "description": "true = ejecutar. false/omitido = preview."
+        }
+      },
+      "required": [
+        "conversationId",
+        "status"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "create_account",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "accountNumber": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Número de cuenta"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Nombre"
+        },
+        "description": {
+          "description": "description",
+          "type": "string"
+        },
+        "note": {
+          "description": "note",
+          "type": "string"
+        },
+        "address": {
+          "description": "address",
+          "type": "string"
+        },
+        "city": {
+          "description": "city",
+          "type": "string"
+        },
+        "state": {
+          "description": "state",
+          "type": "string"
+        },
+        "phone": {
+          "description": "phone",
+          "type": "string"
+        },
+        "email": {
+          "description": "email",
+          "type": "string"
+        },
+        "latitude": {
+          "description": "latitude",
+          "type": "string"
+        },
+        "longitude": {
+          "description": "longitude",
+          "type": "string"
+        },
+        "serviceDate": {
+          "description": "serviceDate",
+          "type": "string"
+        },
+        "companyTechnicalId": {
+          "description": "companyTechnicalId",
+          "type": "string"
+        },
+        "companyMonitoringId": {
+          "description": "companyMonitoringId",
+          "type": "string"
+        },
+        "jurisdictionId": {
+          "description": "jurisdictionId",
+          "type": "string"
+        },
+        "confirm": {
+          "default": false,
+          "type": "boolean",
+          "description": "true = ejecutar. false/omitido = preview."
+        }
+      },
+      "required": [
+        "accountNumber",
+        "name"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "create_account_user",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "accountId": {
+          "type": "string"
+        },
+        "code": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Número/código del usuario en el panel"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "description": {
+          "type": "string"
+        },
+        "confirm": {
+          "default": false,
+          "type": "boolean",
+          "description": "true = ejecutar. false/omitido = preview."
+        }
+      },
+      "required": [
+        "accountId",
+        "code",
+        "name"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "create_bridge",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Nombre"
+        },
+        "code": {
+          "type": "string",
+          "description": "Código"
+        },
+        "ip": {
+          "type": "string",
+          "description": "IP"
+        },
+        "httpPort": {
+          "description": "Puerto HTTP (null = ninguno)",
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "activated": {
+          "description": "Bridge activo",
+          "type": "boolean"
+        },
+        "confirm": {
+          "default": false,
+          "type": "boolean",
+          "description": "true = ejecutar. false/omitido = preview."
+        }
+      },
+      "required": [
+        "name",
+        "code",
+        "ip"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "create_bulk_interventions",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "accountIds": {
+          "minItems": 1,
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "IDs de cuentas"
+        },
+        "assignedUserId": {
+          "type": "string",
+          "description": "Usuario asignado"
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Motivo de la intervención"
+        },
+        "eventTypeId": {
+          "description": "ID del tipo de evento a procesar",
+          "type": "string"
+        },
+        "confirm": {
+          "default": false,
+          "type": "boolean",
+          "description": "true = ejecutar. false/omitido = preview."
+        }
+      },
+      "required": [
+        "accountIds",
+        "assignedUserId",
+        "reason"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "create_company",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Nombre"
+        },
+        "code": {
+          "type": "string",
+          "description": "Código"
+        },
+        "isTechnical": {
+          "description": "Empresa técnica",
+          "type": "boolean"
+        },
+        "isMonitoring": {
+          "description": "Empresa de monitoreo",
+          "type": "boolean"
+        },
+        "currentStatus": {
+          "description": "Estado actual",
+          "type": "string"
+        },
+        "logoId": {
+          "description": "ID de archivo del logo (null = quitar)",
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^[\\w-]+$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "confirm": {
+          "default": false,
+          "type": "boolean",
+          "description": "true = ejecutar. false/omitido = preview."
+        }
+      },
+      "required": [
+        "name",
+        "code"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "create_connection",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "description": "Nombre de la conexión",
+          "type": "string"
+        },
+        "code": {
+          "description": "Código",
+          "type": "string"
+        },
+        "bridgeId": {
+          "description": "ID del bridge",
+          "type": "string",
+          "pattern": "^[\\w-]+$"
+        },
+        "protocolId": {
+          "description": "ID del protocolo",
+          "type": "string",
+          "pattern": "^[\\w-]+$"
+        },
+        "eventsFormatId": {
+          "description": "ID del formato de eventos",
+          "type": "string",
+          "pattern": "^[\\w-]+$"
+        },
+        "customEventsFormatId": {
+          "description": "ID del formato de eventos custom",
+          "type": "string",
+          "pattern": "^[\\w-]+$"
+        },
+        "secondaryEventsFormatId": {
+          "description": "ID del formato de eventos secundario",
+          "type": "string",
+          "pattern": "^[\\w-]+$"
+        },
+        "companies": {
+          "description": "IDs de empresas asociadas (reemplaza la lista)",
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[\\w-]+$"
+          }
+        },
+        "unknownAccountCompanyId": {
+          "description": "ID de empresa para cuentas desconocidas",
+          "type": "string",
+          "pattern": "^[\\w-]+$"
+        },
+        "activated": {
+          "description": "Conexión activa",
+          "type": "boolean"
+        },
+        "heartbeatIntervalMinutes": {
+          "description": "Intervalo de heartbeat en minutos",
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "maxMinutesWithoutEvents": {
+          "description": "Máx. minutos sin eventos antes de alertar",
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "confirm": {
+          "default": false,
+          "type": "boolean",
+          "description": "true = ejecutar. false/omitido = preview."
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "create_device",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "accountId": {
+          "type": "string"
+        },
+        "serialNumber": {
+          "description": "Omitir si el equipo no tiene serie",
+          "type": "string",
+          "minLength": 1
+        },
+        "deviceBrandId": {
+          "type": "string"
+        },
+        "deviceModelId": {
+          "description": "Omitir si el modelo no existe en el catálogo",
+          "type": "string"
+        },
+        "chip1": {
+          "type": "string"
+        },
+        "deviceConnectionTypeId": {
+          "type": "string"
+        },
+        "alertType": {
+          "description": "Sonora | Silenciosa",
+          "type": "string"
+        },
+        "ownershipType": {
+          "type": "string",
+          "enum": [
+            "alquiler",
+            "comodato"
+          ]
+        },
+        "chip2": {
+          "type": "string"
+        },
+        "imei": {
+          "type": "string"
+        },
+        "zoneId": {
+          "type": "string"
+        },
+        "deviceKindId": {
+          "type": "string"
+        },
+        "deviceTaxonomyId": {
+          "type": "string"
+        },
+        "cloudDeviceId": {
+          "type": "string"
+        },
+        "cloudChannelNo": {
+          "type": "integer",
+          "minimum": -9007199254740991,
+          "maximum": 9007199254740991
+        },
+        "hppDeviceCategory": {
+          "type": "string"
+        },
+        "hppDeviceSubCategory": {
+          "type": "string"
+        },
+        "cloudLiveViewVerification": {
+          "description": "Código de verificación live view (se guarda cifrado en Gavriel)",
+          "type": "string"
+        },
+        "clearCloudLiveViewSecret": {
+          "type": "boolean"
+        },
+        "confirm": {
+          "default": false,
+          "type": "boolean",
+          "description": "true = ejecutar. false/omitido = preview."
+        }
+      },
+      "required": [
+        "accountId",
+        "deviceBrandId"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "create_device_brand",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "description": {
+          "type": "string"
+        },
+        "confirm": {
+          "default": false,
+          "type": "boolean",
+          "description": "true = ejecutar. false/omitido = preview."
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "create_device_model",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "description": {
+          "type": "string"
+        },
+        "isActive": {
+          "description": "Default: true",
+          "type": "boolean"
+        },
+        "deviceBrandId": {
+          "type": "string",
+          "description": "ID de la marca"
+        },
+        "confirm": {
+          "default": false,
+          "type": "boolean",
+          "description": "true = ejecutar. false/omitido = preview."
+        }
+      },
+      "required": [
+        "name",
+        "deviceBrandId"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "create_event_code",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Código del evento (ej: GTGEO)"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Nombre descriptivo"
+        },
+        "title": {
+          "description": "Título alternativo",
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "dataType": {
+          "description": "Tipo de dato (Zone, Alarm, etc.)",
+          "type": "string"
+        },
+        "eventsTypeId": {
+          "type": "string",
+          "description": "ID del tipo de evento asociado"
+        },
+        "eventsFormatId": {
+          "type": "string",
+          "description": "ID del formato/protocolo"
+        },
+        "confirm": {
+          "default": false,
+          "type": "boolean",
+          "description": "true = ejecutar. false/omitido = preview."
+        }
+      },
+      "required": [
+        "code",
+        "name",
+        "eventsTypeId",
+        "eventsFormatId"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "create_event_format",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Nombre del formato"
+        },
+        "code": {
+          "type": "string",
+          "description": "Código del formato"
+        },
+        "description": {
+          "description": "Descripción",
+          "type": "string"
+        },
+        "confirm": {
+          "default": false,
+          "type": "boolean",
+          "description": "true = ejecutar. false/omitido = preview."
+        }
+      },
+      "required": [
+        "name",
+        "code"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "create_event_type",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Nombre corto del tipo (ej: JDS)"
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Título descriptivo"
+        },
+        "description": {
+          "type": "string"
+        },
+        "icon": {
+          "description": "FontAwesome icon class",
+          "type": "string"
+        },
+        "color": {
+          "description": "Hex color, ej #d9342f",
+          "type": "string"
+        },
+        "sound": {
+          "type": "string"
+        },
+        "requiresIntervention": {
+          "type": "boolean"
+        },
+        "priority": {
+          "type": "integer",
+          "minimum": -9007199254740991,
+          "maximum": 9007199254740991
+        },
+        "confirm": {
+          "default": false,
+          "type": "boolean",
+          "description": "true = ejecutar. false/omitido = preview."
+        }
+      },
+      "required": [
+        "name",
+        "title"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "create_intervention",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "accountId": {
+          "type": "string",
+          "description": "ID de la cuenta a intervenir"
+        },
+        "assignedUserId": {
+          "description": "Usuario asignado. Si se omite, la API puede requerirlo — el frontend siempre lo envía.",
+          "type": "string"
+        },
+        "currentStatus": {
+          "default": "in_progress",
+          "description": "Estado inicial de la intervención",
+          "type": "string",
+          "enum": [
+            "in_progress",
+            "waiting",
+            "transferred",
+            "closed",
+            "observation"
+          ]
+        },
+        "confirm": {
+          "default": false,
+          "type": "boolean",
+          "description": "true = ejecutar. false/omitido = preview."
+        }
+      },
+      "required": [
+        "accountId"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "create_notification_campaign",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Título del aviso"
+        },
+        "body": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Cuerpo del aviso"
+        },
+        "category": {
+          "type": "string",
+          "description": "Categoría del aviso"
+        },
+        "channels": {
+          "minItems": 1,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "in_app",
+              "push",
+              "whatsapp",
+              "sms",
+              "email"
+            ]
+          },
+          "description": "Canales de envío"
+        },
+        "userIds": {
+          "default": [],
+          "description": "Ids de usuarios destinatarios",
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[\\w-]+$",
+            "description": "Id (uuid/slug)"
+          }
+        },
+        "accountContactIds": {
+          "default": [],
+          "description": "Ids de contactos de cuenta destinatarios",
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[\\w-]+$",
+            "description": "Id (uuid/slug)"
+          }
+        },
+        "groups": {
+          "default": [],
+          "description": "Referencias de grupo ({type, accountId})",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "description": "Ej: account_neighbors, account_contacts"
+              },
+              "accountId": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "type"
+            ],
+            "additionalProperties": {}
+          }
+        },
+        "priority": {
+          "default": "normal",
+          "description": "Prioridad",
+          "type": "string",
+          "enum": [
+            "normal",
+            "urgent"
+          ]
+        },
+        "link": {
+          "description": "Enlace opcional (http(s):// o \"/\")",
+          "type": "string"
+        },
+        "emailSubject": {
+          "description": "Asunto del email (si hay canal email)",
+          "type": "string"
+        },
+        "scheduledAt": {
+          "description": "Programar (ISO futuro); omitido = envío inmediato",
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+        },
+        "confirm": {
+          "default": false,
+          "type": "boolean",
+          "description": "true = ejecutar. false/omitido = preview."
+        }
+      },
+      "required": [
+        "title",
+        "body",
+        "category",
+        "channels"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "create_notification_group",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Nombre del canal/grupo"
+        },
+        "description": {
+          "type": "string",
+          "description": "Descripción"
+        },
+        "isOptional": {
+          "type": "boolean",
+          "description": "true = los usuarios pueden salir por su cuenta"
+        },
+        "audience": {
+          "description": "A quién se ofrece (solo si isOptional)",
+          "type": "string",
+          "enum": [
+            "neighbors",
+            "panel",
+            "all"
+          ]
+        },
+        "confirm": {
+          "default": false,
+          "type": "boolean",
+          "description": "true = ejecutar. false/omitido = preview."
+        }
+      },
+      "required": [
+        "name",
+        "description",
+        "isOptional"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "create_partition",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "accountId": {
+          "type": "string",
+          "pattern": "^[\\w-]+$",
+          "description": "ID de la cuenta"
+        },
+        "code": {
+          "type": "string",
+          "description": "Código de la partición"
+        },
+        "name": {
+          "type": "string",
+          "description": "Nombre"
+        },
+        "confirm": {
+          "default": false,
+          "type": "boolean",
+          "description": "true = ejecutar. false/omitido = preview."
+        }
+      },
+      "required": [
+        "accountId",
+        "code",
+        "name"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "create_service",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "accountId": {
+          "type": "string",
+          "pattern": "^[\\w-]+$",
+          "description": "ID de la cuenta"
+        },
+        "type": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Tipo de servicio (ver get_service_panel / servicios existentes)"
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Título"
+        },
+        "description": {
+          "description": "Descripción",
+          "type": "string"
+        },
+        "priority": {
+          "description": "Prioridad",
+          "type": "string"
+        },
+        "assignedUserId": {
+          "type": "string",
+          "pattern": "^[\\w-]+$",
+          "description": "Técnico asignado"
+        },
+        "categoryId": {
+          "type": "string",
+          "pattern": "^[\\w-]+$",
+          "description": "Categoría"
+        },
+        "confirm": {
+          "default": false,
+          "type": "boolean",
+          "description": "true = ejecutar. false/omitido = preview."
+        }
+      },
+      "required": [
+        "accountId",
+        "type",
+        "title"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "create_sip_call",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "companyId": {
+          "type": "string",
+          "pattern": "^[\\w-]+$",
+          "description": "ID de la empresa"
+        },
+        "accountId": {
+          "description": "ID interno de la cuenta asociada",
+          "type": "string",
+          "pattern": "^[\\w-]+$"
+        },
+        "direction": {
+          "type": "string",
+          "enum": [
+            "inbound",
+            "outbound"
+          ],
+          "description": "Dirección de la llamada"
+        },
+        "remoteNumber": {
+          "type": "string",
+          "description": "Número remoto"
+        },
+        "sipExtension": {
+          "type": "string",
+          "description": "Extensión SIP usada"
+        },
+        "startedAt": {
+          "type": "string",
+          "description": "ISO 8601 de inicio"
+        },
+        "endedAt": {
+          "type": "string",
+          "description": "ISO 8601 de fin"
+        },
+        "durationSeconds": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991,
+          "description": "Duración en segundos"
+        },
+        "confirm": {
+          "default": false,
+          "type": "boolean",
+          "description": "true = ejecutar. false/omitido = preview."
+        }
+      },
+      "required": [
+        "companyId",
+        "direction",
+        "remoteNumber",
+        "sipExtension",
+        "startedAt",
+        "endedAt",
+        "durationSeconds"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "create_ticket",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "title": {
+          "type": "string",
+          "minLength": 1
+        },
+        "description": {
+          "type": "string"
+        },
+        "priority": {
+          "default": "medium",
+          "type": "string",
+          "enum": [
+            "low",
+            "medium",
+            "high",
+            "critical"
+          ]
+        },
+        "status": {
+          "default": "open",
+          "type": "string",
+          "enum": [
+            "open",
+            "in_progress",
+            "pending_customer",
+            "closed"
+          ]
+        },
+        "accountId": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "categoryId": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "assignedUserId": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "confirm": {
+          "default": false,
+          "type": "boolean",
+          "description": "true = ejecutar. false/omitido = preview."
+        }
+      },
+      "required": [
+        "title"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "create_useful_contact",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "jurisdictionId": {
+          "type": "string",
+          "pattern": "^[\\w-]+$",
+          "description": "ID de la jurisdicción"
+        },
+        "name": {
+          "type": "string",
+          "description": "Nombre"
+        },
+        "phone": {
+          "type": "string",
+          "description": "Teléfono"
+        },
+        "web": {
+          "description": "Sitio web",
+          "type": "string"
+        },
+        "description": {
+          "description": "Descripción",
+          "type": "string"
+        },
+        "confirm": {
+          "default": false,
+          "type": "boolean",
+          "description": "true = ejecutar. false/omitido = preview."
+        }
+      },
+      "required": [
+        "jurisdictionId",
+        "name",
+        "phone"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "create_user",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "email": {
+          "type": "string",
+          "format": "email",
+          "pattern": "^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$",
+          "description": "Email"
+        },
+        "username": {
+          "type": "string",
+          "minLength": 1
+        },
+        "password": {
+          "type": "string",
+          "minLength": 8,
+          "description": "Contraseña (se redacta en logs)"
+        },
+        "roleId": {
+          "type": "string",
+          "pattern": "^[\\w-]+$",
+          "description": "ID de rol (ver list_roles)"
+        },
+        "phone": {
+          "description": "Teléfono",
+          "type": "string"
+        },
+        "companies": {
+          "description": "Empresas asignadas",
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[\\w-]+$",
+            "description": "ID de empresa"
+          }
+        },
+        "confirmed": {
+          "description": "Cuenta confirmada",
+          "type": "boolean"
+        },
+        "blocked": {
+          "description": "Usuario bloqueado",
+          "type": "boolean"
+        },
+        "confirm": {
+          "default": false,
+          "type": "boolean",
+          "description": "true = ejecutar. false/omitido = preview."
+        }
+      },
+      "required": [
+        "email",
+        "username",
+        "password"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "create_video_wall",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "nombre": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Nombre del mosaico"
+        },
+        "compartido": {
+          "default": false,
+          "description": "true = visible para otros usuarios",
+          "type": "boolean"
+        },
+        "layout": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {},
+          "description": "Campos de distribución del mosaico, mismos que devuelve list_video_walls"
+        },
+        "confirm": {
+          "default": false,
+          "type": "boolean",
+          "description": "true = ejecutar. false/omitido = preview."
+        }
+      },
+      "required": [
+        "nombre",
+        "layout"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "create_zone",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "accountId": {
+          "type": "string"
+        },
+        "code": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Número de zona"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sensorType": {
+          "type": "string"
+        },
+        "zoneType": {
+          "type": "string"
+        },
+        "connectionType": {
+          "type": "string"
+        },
+        "serialNumber": {
+          "type": "string"
+        },
+        "alertType": {
+          "description": "Sonora | Silenciosa",
+          "type": "string"
+        },
+        "deviceBrandId": {
+          "type": "string"
+        },
+        "deviceModelId": {
+          "type": "string"
+        },
+        "confirm": {
+          "default": false,
+          "type": "boolean",
+          "description": "true = ejecutar. false/omitido = preview."
+        }
+      },
+      "required": [
+        "accountId",
+        "code",
+        "name"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "deactivate_intervention_category",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "categoryId": {
+          "type": "string",
+          "pattern": "^[\\w-]+$",
+          "description": "ID de la categoría"
+        },
+        "confirm": {
+          "default": false,
+          "type": "boolean",
+          "description": "true = ejecutar. false/omitido = preview."
+        }
+      },
+      "required": [
+        "categoryId"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "delete_account_contact",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "contactId": {
+          "type": "string",
+          "pattern": "^[\\w-]+$",
+          "description": "ID del contacto"
+        },
+        "confirm": {
+          "default": false,
+          "type": "boolean",
+          "description": "true = ejecutar. false/omitido = preview."
+        }
+      },
+      "required": [
+        "contactId"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "delete_account_note",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "accountId": {
+          "type": "string"
+        },
+        "noteId": {
+          "type": "string"
+        },
+        "confirm": {
+          "default": false,
+          "type": "boolean",
+          "description": "true = ejecutar. false/omitido = preview."
+        }
+      },
+      "required": [
+        "accountId",
+        "noteId"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "delete_account_user",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "accountUserId": {
+          "type": "string",
+          "pattern": "^[\\w-]+$",
+          "description": "ID del usuario de cuenta"
+        },
+        "confirm": {
+          "default": false,
+          "type": "boolean",
+          "description": "true = ejecutar. false/omitido = preview."
+        }
+      },
+      "required": [
+        "accountUserId"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "delete_activity",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "activityId": {
+          "type": "string",
+          "pattern": "^[\\w-]+$",
+          "description": "ID de la actividad"
+        },
+        "confirm": {
+          "default": false,
+          "type": "boolean",
+          "description": "true = ejecutar. false/omitido = preview."
+        }
+      },
+      "required": [
+        "activityId"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "delete_bridge",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "bridgeId": {
+          "type": "string",
+          "pattern": "^[\\w-]+$",
+          "description": "ID del bridge"
+        },
+        "confirm": {
+          "default": false,
+          "type": "boolean",
+          "description": "true = ejecutar. false/omitido = preview."
+        }
+      },
+      "required": [
+        "bridgeId"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "delete_catalog_item",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "catalog": {
+          "type": "string",
+          "enum": [
+            "protocols",
+            "jurisdictions",
+            "intervention-categories",
+            "device-connection-types"
+          ],
+          "description": "Catálogo"
+        },
+        "itemId": {
+          "type": "string",
+          "pattern": "^[\\w-]+$",
+          "description": "ID del ítem"
+        },
+        "confirm": {
+          "default": false,
+          "type": "boolean",
+          "description": "true = ejecutar. false/omitido = preview."
+        }
+      },
+      "required": [
+        "catalog",
+        "itemId"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "delete_company",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "companyId": {
+          "type": "string",
+          "pattern": "^[\\w-]+$",
+          "description": "ID de la empresa"
+        },
+        "confirm": {
+          "default": false,
+          "type": "boolean",
+          "description": "true = ejecutar. false/omitido = preview."
+        }
+      },
+      "required": [
+        "companyId"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "delete_company_non_working_day",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "companyId": {
+          "type": "string",
+          "pattern": "^[\\w-]+$",
+          "description": "ID de la empresa"
+        },
+        "dayId": {
+          "type": "string",
+          "pattern": "^[\\w-]+$",
+          "description": "ID del día no laborable"
+        },
+        "confirm": {
+          "default": false,
+          "type": "boolean",
+          "description": "true = ejecutar. false/omitido = preview."
+        }
+      },
+      "required": [
+        "companyId",
+        "dayId"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "delete_connection",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "connectionId": {
+          "type": "string",
+          "pattern": "^[\\w-]+$",
+          "description": "ID de la conexión"
+        },
+        "confirm": {
+          "default": false,
+          "type": "boolean",
+          "description": "true = ejecutar. false/omitido = preview."
+        }
+      },
+      "required": [
+        "connectionId"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "delete_device",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "accountId": {
+          "type": "string"
+        },
+        "deviceId": {
+          "type": "string"
+        },
+        "confirm": {
+          "default": false,
+          "type": "boolean",
+          "description": "true = ejecutar. false/omitido = preview."
+        }
+      },
+      "required": [
+        "accountId",
+        "deviceId"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "delete_device_brand",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "brandId": {
+          "type": "string"
+        },
+        "confirm": {
+          "default": false,
+          "type": "boolean",
+          "description": "true = ejecutar. false/omitido = preview."
+        }
+      },
+      "required": [
+        "brandId"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "delete_device_model",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "modelId": {
+          "type": "string"
+        },
+        "confirm": {
+          "default": false,
+          "type": "boolean",
+          "description": "true = ejecutar. false/omitido = preview."
+        }
+      },
+      "required": [
+        "modelId"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "delete_event_code",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "eventCodeId": {
+          "type": "string"
+        },
+        "confirm": {
+          "default": false,
+          "type": "boolean",
+          "description": "true = ejecutar. false/omitido = preview."
+        }
+      },
+      "required": [
+        "eventCodeId"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "delete_event_format",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[\\w-]+$",
+          "description": "ID del formato"
+        },
+        "confirm": {
+          "default": false,
+          "type": "boolean",
+          "description": "true = ejecutar. false/omitido = preview."
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "delete_event_type",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "eventTypeId": {
+          "type": "string"
+        },
+        "confirm": {
+          "default": false,
+          "type": "boolean",
+          "description": "true = ejecutar. false/omitido = preview."
+        }
+      },
+      "required": [
+        "eventTypeId"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "delete_file",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "fileId": {
+          "type": "string",
+          "pattern": "^[\\w-]+$",
+          "description": "ID del archivo"
+        },
+        "confirm": {
+          "default": false,
+          "type": "boolean",
+          "description": "true = ejecutar. false/omitido = preview."
+        }
+      },
+      "required": [
+        "fileId"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "delete_my_notification_group",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[\\w-]+$",
+          "description": "Id (uuid/slug)"
+        },
+        "confirm": {
+          "default": false,
+          "type": "boolean",
+          "description": "true = ejecutar. false/omitido = preview."
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "delete_notification_group_member",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[\\w-]+$",
+          "description": "Id (uuid/slug)"
+        },
+        "userId": {
+          "type": "string",
+          "pattern": "^[\\w-]+$",
+          "description": "Id (uuid/slug)"
+        },
+        "confirm": {
+          "default": false,
+          "type": "boolean",
+          "description": "true = ejecutar. false/omitido = preview."
+        }
+      },
+      "required": [
+        "id",
+        "userId"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "delete_notification_inbox_item",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[\\w-]+$",
+          "description": "Id (uuid/slug)"
+        },
+        "confirm": {
+          "default": false,
+          "type": "boolean",
+          "description": "true = ejecutar. false/omitido = preview."
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "delete_partition",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "partitionId": {
+          "type": "string",
+          "pattern": "^[\\w-]+$",
+          "description": "ID de la partición"
+        },
+        "confirm": {
+          "default": false,
+          "type": "boolean",
+          "description": "true = ejecutar. false/omitido = preview."
+        }
+      },
+      "required": [
+        "partitionId"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "delete_partition_member",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "partitionId": {
+          "type": "string",
+          "pattern": "^[\\w-]+$",
+          "description": "ID de la partición"
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "zones",
+            "users",
+            "contacts"
+          ],
+          "description": "Tipo de miembro"
+        },
+        "memberId": {
+          "type": "string",
+          "pattern": "^[\\w-]+$",
+          "description": "ID de la zona/usuario/contacto"
+        },
+        "confirm": {
+          "default": false,
+          "type": "boolean",
+          "description": "true = ejecutar. false/omitido = preview."
+        }
+      },
+      "required": [
+        "partitionId",
+        "kind",
+        "memberId"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "delete_ticket",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "ticketId": {
+          "type": "string",
+          "pattern": "^[\\w-]+$",
+          "description": "ID del ticket"
+        },
+        "confirm": {
+          "default": false,
+          "type": "boolean",
+          "description": "true = ejecutar. false/omitido = preview."
+        }
+      },
+      "required": [
+        "ticketId"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "delete_useful_contact",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[\\w-]+$",
+          "description": "ID del contacto útil"
+        },
+        "confirm": {
+          "default": false,
+          "type": "boolean",
+          "description": "true = ejecutar. false/omitido = preview."
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "delete_user",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "pattern": "^[\\w-]+$",
+          "description": "ID del usuario"
+        },
+        "confirm": {
+          "default": false,
+          "type": "boolean",
+          "description": "true = ejecutar. false/omitido = preview."
+        }
+      },
+      "required": [
+        "userId"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "delete_user_non_working_day",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "pattern": "^[\\w-]+$",
+          "description": "ID del usuario"
+        },
+        "nonWorkingDayId": {
+          "type": "string",
+          "pattern": "^[\\w-]+$",
+          "description": "ID del día no laborable"
+        },
+        "confirm": {
+          "default": false,
+          "type": "boolean",
+          "description": "true = ejecutar. false/omitido = preview."
+        }
+      },
+      "required": [
+        "userId",
+        "nonWorkingDayId"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "delete_video_wall",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[\\w-]+$",
+          "description": "Id del mosaico"
+        },
+        "confirm": {
+          "default": false,
+          "type": "boolean",
+          "description": "true = ejecutar. false/omitido = preview."
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "delete_zone",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "zoneId": {
+          "type": "string",
+          "pattern": "^[\\w-]+$",
+          "description": "ID de la zona"
+        },
+        "confirm": {
+          "default": false,
+          "type": "boolean",
+          "description": "true = ejecutar. false/omitido = preview."
+        }
+      },
+      "required": [
+        "zoneId"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "delete_zone_maintenance",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "zoneId": {
+          "type": "string",
+          "pattern": "^[\\w-]+$",
+          "description": "ID de la zona"
+        },
+        "confirm": {
+          "default": false,
+          "type": "boolean",
+          "description": "true = ejecutar. false/omitido = preview."
+        }
+      },
+      "required": [
+        "zoneId"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "dispatch_candidates",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "ticketId": {
+          "type": "string"
+        },
+        "serviceId": {
+          "type": "string"
+        },
+        "companyId": {
+          "description": "Fuerza la empresa si no se infiere",
+          "type": "string"
+        },
+        "date": {
+          "description": "Fecha YYYY-MM-DD (default: la del servicio o hoy)",
+          "type": "string",
+          "format": "date",
+          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "find_duplicate_event_codes",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "eventsFormatId": {
+          "type": "string",
+          "description": "ID del formato a analizar"
+        },
+        "truncate": {
+          "type": "integer",
+          "minimum": 1000,
+          "maximum": 9007199254740991
+        }
+      },
+      "required": [
+        "eventsFormatId"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "find_duplicate_event_types",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "truncate": {
+          "type": "integer",
+          "minimum": 1000,
+          "maximum": 9007199254740991
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "get",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "path": {
+          "type": "string",
+          "description": "Ruta de la API, ej /tickets/{id} o /connections"
+        },
+        "query": {
+          "description": "Query params (ej { page: 1, limit: 25 })",
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        },
+        "truncate": {
+          "description": "Máx chars del JSON compacto (default: completo)",
+          "type": "integer",
+          "minimum": 1000,
+          "maximum": 9007199254740991
+        }
+      },
+      "required": [
+        "path"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "get_account",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "ID interno de la cuenta, o número de cuenta (hasta 10 dígitos; se resuelve al ID interno)"
+        },
+        "include": {
+          "description": "Secciones a incluir. Default: ninguna (resumen compacto). \"all\" = todas.",
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "all",
+              "zones",
+              "contacts",
+              "users",
+              "interventions",
+              "devices"
+            ]
+          }
+        },
+        "fields": {
+          "description": "Campos a devolver",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "get_account_dashboard",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "ID de la cuenta"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "get_activity_stats",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "truncate": {
+          "description": "Trunca la respuesta a N chars",
+          "type": "integer",
+          "minimum": 1000,
+          "maximum": 9007199254740991
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "get_bridge_disk_space",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "truncate": {
+          "description": "Trunca la respuesta a N chars",
+          "type": "integer",
+          "minimum": 1000,
+          "maximum": 9007199254740991
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "get_cloud_devices_inventory",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "fresh": {
+          "description": "true = refrescar desde los proveedores",
+          "type": "boolean"
+        },
+        "truncate": {
+          "description": "Trunca la respuesta a N chars",
+          "type": "integer",
+          "minimum": 1000,
+          "maximum": 9007199254740991
+        },
+        "fields": {
+          "description": "Campos a devolver",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "get_connection_diagnostics",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "connectionId": {
+          "type": "string",
+          "pattern": "^[\\w-]+$",
+          "description": "ID de la conexión"
+        },
+        "section": {
+          "type": "string",
+          "enum": [
+            "raw-frames",
+            "account-number-overlaps"
+          ],
+          "description": "Qué diagnóstico leer"
+        },
+        "truncate": {
+          "description": "Trunca la respuesta a N chars",
+          "type": "integer",
+          "minimum": 1000,
+          "maximum": 9007199254740991
+        }
+      },
+      "required": [
+        "connectionId",
+        "section"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "get_connection_report",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "truncate": {
+          "description": "Trunca la respuesta a N chars",
+          "type": "integer",
+          "minimum": 1000,
+          "maximum": 9007199254740991
+        },
+        "fields": {
+          "description": "Campos a devolver",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "get_conversation_stats",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "truncate": {
+          "description": "Trunca la respuesta a N chars",
+          "type": "integer",
+          "minimum": 1000,
+          "maximum": 9007199254740991
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "get_event",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "ID del evento"
+        },
+        "truncate": {
+          "description": "Trunca la respuesta a N chars",
+          "type": "integer",
+          "minimum": 1000,
+          "maximum": 9007199254740991
+        },
+        "fields": {
+          "description": "Campos a devolver",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "get_event_cameras",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "eventId": {
+          "type": "string",
+          "pattern": "^[\\w-]+$",
+          "description": "Id del evento"
+        },
+        "accountId": {
+          "type": "string",
+          "pattern": "^[\\w-]+$",
+          "description": "Id de la cuenta"
+        },
+        "truncate": {
+          "description": "Trunca la respuesta a N chars",
+          "type": "integer",
+          "minimum": 1000,
+          "maximum": 9007199254740991
+        },
+        "fields": {
+          "description": "Campos a devolver",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "get_event_clips",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "eventId": {
+          "type": "string",
+          "pattern": "^[\\w-]+$",
+          "description": "Id de un evento (detalle)"
+        },
+        "eventIds": {
+          "description": "Ids de eventos (máx 100); se envían como CSV",
+          "maxItems": 100,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[\\w-]+$"
+          }
+        },
+        "truncate": {
+          "description": "Trunca la respuesta a N chars",
+          "type": "integer",
+          "minimum": 1000,
+          "maximum": 9007199254740991
+        },
+        "fields": {
+          "description": "Campos a devolver",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "get_event_context",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "ID del evento"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "get_event_extras",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "eventId": {
+          "type": "string",
+          "pattern": "^[\\w-]+$",
+          "description": "ID del evento"
+        },
+        "section": {
+          "type": "string",
+          "enum": [
+            "emergency-notices",
+            "safe-walk",
+            "notify-barrio-preview",
+            "ip-receiver-pro"
+          ],
+          "description": "Sección a leer"
+        },
+        "companyId": {
+          "type": "string",
+          "pattern": "^[\\w-]+$",
+          "description": "Empresa (solo ip-receiver-pro)"
+        },
+        "size": {
+          "default": 50,
+          "description": "Tamaño (solo ip-receiver-pro)",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100
+        }
+      },
+      "required": [
+        "eventId",
+        "section"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "get_file",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[\\w-]+$",
+          "description": "ID del archivo; omitir para estadísticas globales"
+        },
+        "downloadUrl": {
+          "default": false,
+          "description": "Devolver también la URL de descarga temporal",
+          "type": "boolean"
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "get_monitoring_events_chart",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "connectionId": {
+          "type": "string"
+        },
+        "truncate": {
+          "description": "Trunca la respuesta a N chars",
+          "type": "integer",
+          "minimum": 1000,
+          "maximum": 9007199254740991
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "get_my_profile",
+    "inputSchema": {
+      "type": "object",
+      "properties": {},
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "get_notification_preferences",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "truncate": {
+          "description": "Trunca la respuesta a N chars",
+          "type": "integer",
+          "minimum": 1000,
+          "maximum": 9007199254740991
+        },
+        "fields": {
+          "description": "Campos a devolver",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "get_notification_unread_count",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "truncate": {
+          "description": "Trunca la respuesta a N chars",
+          "type": "integer",
+          "minimum": 1000,
+          "maximum": 9007199254740991
+        },
+        "fields": {
+          "description": "Campos a devolver",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "get_notifications_status",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "truncate": {
+          "description": "Trunca la respuesta a N chars",
+          "type": "integer",
+          "minimum": 1000,
+          "maximum": 9007199254740991
+        },
+        "fields": {
+          "description": "Campos a devolver",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "get_open_technical_tickets_count",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "accountId": {
+          "type": "string"
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "get_operator_account",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "accountNumber": {
+          "type": "string",
+          "pattern": "^[\\w-]+$",
+          "description": "Número de cuenta (ej '0231'), NO el id interno"
+        },
+        "truncate": {
+          "description": "Trunca la respuesta a N chars",
+          "type": "integer",
+          "minimum": 1000,
+          "maximum": 9007199254740991
+        },
+        "fields": {
+          "description": "Campos a devolver",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "accountNumber"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "get_operator_attending",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "mine": {
+          "default": false,
+          "description": "true = solo las cuentas que atiende el usuario actual",
+          "type": "boolean"
+        },
+        "truncate": {
+          "description": "Trunca la respuesta a N chars",
+          "type": "integer",
+          "minimum": 1000,
+          "maximum": 9007199254740991
+        },
+        "fields": {
+          "description": "Campos a devolver",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "get_pending_events_dashboard",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "limit": {
+          "default": 10,
+          "description": "Máximo de cuentas a mostrar",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 50
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "get_service",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "fields": {
+          "description": "Campos a devolver",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "get_service_panel",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "truncate": {
+          "description": "Trunca la respuesta a N chars",
+          "type": "integer",
+          "minimum": 1000,
+          "maximum": 9007199254740991
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "get_service_panel_summary",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "truncate": {
+          "description": "Trunca la respuesta a N chars",
+          "type": "integer",
+          "minimum": 1000,
+          "maximum": 9007199254740991
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "get_sip_profile",
+    "inputSchema": {
+      "type": "object",
+      "properties": {},
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "get_technician_locations",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "truncate": {
+          "description": "Trunca la respuesta a N chars",
+          "type": "integer",
+          "minimum": 1000,
+          "maximum": 9007199254740991
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "get_technician_slot_configs",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "companyId": {
+          "type": "string",
+          "pattern": "^[\\w-]+$",
+          "description": "Empresa técnica"
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "get_ticket",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "ID del ticket"
+        },
+        "include": {
+          "description": "Secciones extra (default: activities)",
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "activities"
+            ]
+          }
+        },
+        "truncate": {
+          "description": "Trunca la respuesta a N chars",
+          "type": "integer",
+          "minimum": 1000,
+          "maximum": 9007199254740991
+        },
+        "fields": {
+          "description": "Campos a devolver",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "get_ticket_context",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "ID del ticket"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "get_user",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[\\w-]+$",
+          "description": "ID del usuario"
+        },
+        "email": {
+          "description": "Alternativa a id: lookup por email exacto",
+          "type": "string",
+          "format": "email",
+          "pattern": "^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
+        },
+        "nonWorkingDays": {
+          "default": false,
+          "description": "Incluir días no laborables (requiere id)",
+          "type": "boolean"
+        },
+        "truncate": {
+          "description": "Trunca la respuesta a N chars",
+          "type": "integer",
+          "minimum": 1000,
+          "maximum": 9007199254740991
+        },
+        "fields": {
+          "description": "Campos a devolver",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "get_video_playback",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": [
+            "rail",
+            "segments",
+            "usage"
+          ],
+          "description": "Tipo de consulta"
+        },
+        "accountId": {
+          "type": "string",
+          "pattern": "^[\\w-]+$",
+          "description": "Id de la cuenta"
+        },
+        "deviceId": {
+          "type": "string",
+          "pattern": "^[\\w-]+$",
+          "description": "Id del dispositivo"
+        },
+        "channelNo": {
+          "description": "Canal (segments)",
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "from": {
+          "description": "Inicio del rango, ISO 8601 o epoch ms (segments)",
+          "type": "string"
+        },
+        "to": {
+          "description": "Fin del rango, ISO 8601 o epoch ms (segments)",
+          "type": "string"
+        },
+        "clouds": {
+          "description": "Nubes/proveedores a consultar (ej: hpp, imou, ezviz). Se envía como CSV",
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[\\w-]+$"
+          }
+        },
+        "truncate": {
+          "description": "Trunca la respuesta a N chars",
+          "type": "integer",
+          "minimum": 1000,
+          "maximum": 9007199254740991
+        },
+        "fields": {
+          "description": "Campos a devolver",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "kind",
+        "accountId",
+        "deviceId"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "health",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "bridgeId": {
+          "description": "Filtra los logs de salud del bridge",
+          "type": "string"
+        },
+        "connectionId": {
+          "type": "string"
+        },
+        "limit": {
+          "default": 25,
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 200
+        },
+        "include": {
+          "description": "Secciones (default: ambas)",
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "connections",
+              "bridges"
+            ]
+          }
+        },
+        "truncate": {
+          "description": "Trunca la respuesta a N chars",
+          "type": "integer",
+          "minimum": 1000,
+          "maximum": 9007199254740991
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "hik_cloud_lookup",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "accountId": {
+          "type": "string"
+        },
+        "deviceBrandId": {
+          "type": "string"
+        },
+        "serialNumber": {
+          "type": "string",
+          "minLength": 1
+        },
+        "confirm": {
+          "default": false,
+          "type": "boolean",
+          "description": "true = ejecutar. false/omitido = preview."
+        }
+      },
+      "required": [
+        "accountId",
+        "deviceBrandId",
+        "serialNumber"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "join_my_notification_group",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[\\w-]+$",
+          "description": "Id (uuid/slug)"
+        },
+        "confirm": {
+          "default": false,
+          "type": "boolean",
+          "description": "true = ejecutar. false/omitido = preview."
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "link_file_to_ticket",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "fileId": {
+          "type": "string",
+          "pattern": "^[\\w-]+$",
+          "description": "ID del archivo"
+        },
+        "ticketId": {
+          "type": "string",
+          "pattern": "^[\\w-]+$",
+          "description": "ID del ticket"
+        },
+        "confirm": {
+          "default": false,
+          "type": "boolean",
+          "description": "true = ejecutar. false/omitido = preview."
+        }
+      },
+      "required": [
+        "fileId",
+        "ticketId"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "list_account_companies",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": [
+            "technical",
+            "monitoring",
+            "technical-detail"
+          ],
+          "description": "Tipo de empresa"
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "list_account_contacts",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "accountId": {
+          "type": "string"
+        },
+        "truncate": {
+          "description": "Trunca la respuesta a N chars",
+          "type": "integer",
+          "minimum": 1000,
+          "maximum": 9007199254740991
+        },
+        "fields": {
+          "description": "Campos a devolver",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "accountId"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "list_account_devices",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "brandId": {
+          "description": "Filtrar por marca",
+          "type": "string"
+        },
+        "modelId": {
+          "description": "Filtrar por modelo",
+          "type": "string"
+        },
+        "status": {
+          "description": "Filtrar por estado",
+          "type": "string"
+        },
+        "truncate": {
+          "description": "Trunca la respuesta a N chars",
+          "type": "integer",
+          "minimum": 1000,
+          "maximum": 9007199254740991
+        },
+        "fields": {
+          "description": "Campos a devolver",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "list_account_map_markers",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "hasPlayableCloudDevices": {
+          "description": "Solo cuentas con dispositivos cloud reproducibles",
+          "type": "boolean"
+        },
+        "limit": {
+          "default": 100,
+          "description": "Máx marcadores a devolver",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 500
+        },
+        "offset": {
+          "default": 0,
+          "description": "Desde qué marcador",
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "search": {
+          "description": "Filtro local por nombre/número de cuenta",
+          "type": "string"
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "list_account_notes",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "accountId": {
+          "type": "string",
+          "pattern": "^[\\w-]+$",
+          "description": "ID de la cuenta"
+        },
+        "truncate": {
+          "description": "Trunca la respuesta a N chars",
+          "type": "integer",
+          "minimum": 1000,
+          "maximum": 9007199254740991
+        },
+        "fields": {
+          "description": "Campos a devolver",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "accountId"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "list_account_partitions",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "truncate": {
+          "description": "Trunca la respuesta a N chars",
+          "type": "integer",
+          "minimum": 1000,
+          "maximum": 9007199254740991
+        },
+        "fields": {
+          "description": "Campos a devolver",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "list_account_users",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "truncate": {
+          "description": "Trunca la respuesta a N chars",
+          "type": "integer",
+          "minimum": 1000,
+          "maximum": 9007199254740991
+        },
+        "fields": {
+          "description": "Campos a devolver",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "list_account_zones",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "truncate": {
+          "description": "Trunca la respuesta a N chars",
+          "type": "integer",
+          "minimum": 1000,
+          "maximum": 9007199254740991
+        },
+        "fields": {
+          "description": "Campos a devolver",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "list_accounts",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "page": {
+          "default": 1,
+          "description": "Página (1-based)",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "limit": {
+          "default": 25,
+          "description": "Por página (default 25, máx 200)",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 200
+        },
+        "search": {
+          "description": "Búsqueda libre (nombre/código)",
+          "type": "string"
+        },
+        "name": {
+          "description": "Filtro por nombre de cuenta",
+          "type": "string"
+        },
+        "code": {
+          "description": "Filtro por código de cuenta",
+          "type": "string"
+        },
+        "truncate": {
+          "description": "Trunca la respuesta a N chars",
+          "type": "integer",
+          "minimum": 1000,
+          "maximum": 9007199254740991
+        },
+        "fields": {
+          "description": "Campos a devolver",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "list_accounts_pending_events",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "truncate": {
+          "description": "Trunca la respuesta a N chars",
+          "type": "integer",
+          "minimum": 1000,
+          "maximum": 9007199254740991
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "list_activities_by_ticket",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "truncate": {
+          "description": "Trunca la respuesta a N chars",
+          "type": "integer",
+          "minimum": 1000,
+          "maximum": 9007199254740991
+        },
+        "fields": {
+          "description": "Campos a devolver",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "list_bridge_logs",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "port": {
+          "type": "string",
+          "description": "Puerto (obligatorio)"
+        },
+        "nextToken": {
+          "description": "Token de continuación",
+          "type": "string"
+        },
+        "limit": {
+          "description": "Cantidad por página (máximo 200)",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 200
+        },
+        "truncate": {
+          "description": "Trunca la respuesta a N chars",
+          "type": "integer",
+          "minimum": 1000,
+          "maximum": 9007199254740991
+        },
+        "fields": {
+          "description": "Campos a devolver",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "id",
+        "port"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "list_catalog",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "page": {
+          "default": 1,
+          "description": "Página (1-based)",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "limit": {
+          "default": 25,
+          "description": "Por página (default 25, máx 200)",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 200
+        },
+        "catalog": {
+          "type": "string",
+          "enum": [
+            "protocols",
+            "jurisdictions",
+            "intervention-categories",
+            "device-connection-types",
+            "device-brands",
+            "device-models",
+            "device-kinds",
+            "device-taxonomies",
+            "events-formats",
+            "states",
+            "cities",
+            "ticket-categories",
+            "ticket-priority-options",
+            "ticket-status-options",
+            "activity-type-options"
+          ],
+          "description": "Catálogo a listar"
+        },
+        "search": {
+          "description": "Filtro por nombre (solo catálogos paginados)",
+          "type": "string"
+        },
+        "active": {
+          "description": "Solo activos (intervention-categories, device-connection-types, device-brands, device-kinds)",
+          "type": "boolean"
+        },
+        "stateId": {
+          "description": "Requerido para cities",
+          "type": "string"
+        },
+        "brandId": {
+          "type": "string",
+          "pattern": "^[\\w-]+$",
+          "description": "Marca (solo device-models)"
+        },
+        "truncate": {
+          "description": "Trunca la respuesta a N chars",
+          "type": "integer",
+          "minimum": 1000,
+          "maximum": 9007199254740991
+        },
+        "fields": {
+          "description": "Campos a devolver",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "catalog"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "list_citizen_reports",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "page": {
+          "default": 1,
+          "description": "Página (1-based)",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "limit": {
+          "default": 25,
+          "description": "Por página (default 25, máx 200)",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 200
+        },
+        "id": {
+          "description": "ID del reporte; si se omite lista",
+          "type": "string",
+          "pattern": "^[\\w-]+$"
+        },
+        "status": {
+          "description": "Filtro de estado (si el backend lo soporta)",
+          "type": "string",
+          "enum": [
+            "new",
+            "reviewed"
+          ]
+        },
+        "truncate": {
+          "description": "Trunca la respuesta a N chars",
+          "type": "integer",
+          "minimum": 1000,
+          "maximum": 9007199254740991
+        },
+        "fields": {
+          "description": "Campos a devolver",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "list_companies",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "page": {
+          "default": 1,
+          "description": "Página (1-based)",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "limit": {
+          "default": 25,
+          "description": "Por página (default 25, máx 200)",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 200
+        },
+        "search": {
+          "description": "Búsqueda libre (nombre/código)",
+          "type": "string"
+        },
+        "truncate": {
+          "description": "Trunca la respuesta a N chars",
+          "type": "integer",
+          "minimum": 1000,
+          "maximum": 9007199254740991
+        },
+        "fields": {
+          "description": "Campos a devolver",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "list_company_technicians",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "truncate": {
+          "description": "Trunca la respuesta a N chars",
+          "type": "integer",
+          "minimum": 1000,
+          "maximum": 9007199254740991
+        },
+        "fields": {
+          "description": "Campos a devolver",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "list_connections",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "page": {
+          "default": 1,
+          "description": "Página (1-based)",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "limit": {
+          "default": 25,
+          "description": "Por página (default 25, máx 200)",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 200
+        },
+        "bridgeId": {
+          "description": "ID del bridge",
+          "type": "string"
+        },
+        "type": {
+          "description": "Tipo de conexión",
+          "type": "string"
+        },
+        "activated": {
+          "description": "Solo conexiones activadas",
+          "type": "boolean"
+        },
+        "search": {
+          "description": "Búsqueda libre",
+          "type": "string"
+        },
+        "truncate": {
+          "description": "Trunca la respuesta a N chars",
+          "type": "integer",
+          "minimum": 1000,
+          "maximum": 9007199254740991
+        },
+        "fields": {
+          "description": "Campos a devolver",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "list_conversation_messages",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "page": {
+          "default": 1,
+          "description": "Página (1-based)",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "limit": {
+          "default": 25,
+          "description": "Por página (default 25, máx 200)",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 200
+        },
+        "truncate": {
+          "description": "Trunca la respuesta a N chars",
+          "type": "integer",
+          "minimum": 1000,
+          "maximum": 9007199254740991
+        },
+        "fields": {
+          "description": "Campos a devolver",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "list_conversations",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "page": {
+          "default": 1,
+          "description": "Página (1-based)",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "limit": {
+          "default": 25,
+          "description": "Por página (default 25, máx 200)",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 200
+        },
+        "truncate": {
+          "description": "Trunca la respuesta a N chars",
+          "type": "integer",
+          "minimum": 1000,
+          "maximum": 9007199254740991
+        },
+        "fields": {
+          "description": "Campos a devolver",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "list_event_formats",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "page": {
+          "default": 1,
+          "description": "Página (1-based)",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "limit": {
+          "default": 25,
+          "description": "Por página (default 25, máx 200)",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 200
+        },
+        "search": {
+          "description": "Texto a buscar en nombre/código/descripción",
+          "type": "string"
+        },
+        "truncate": {
+          "description": "Trunca la respuesta a N chars",
+          "type": "integer",
+          "minimum": 1000,
+          "maximum": 9007199254740991
+        },
+        "fields": {
+          "description": "Campos a devolver",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "list_events",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "page": {
+          "default": 1,
+          "description": "Página (1-based)",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "limit": {
+          "default": 25,
+          "description": "Por página (default 25, máx 200)",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 200
+        },
+        "accountId": {
+          "type": "string"
+        },
+        "accountNumber": {
+          "type": "string"
+        },
+        "port": {
+          "description": "Puerto/zona del evento",
+          "type": "string"
+        },
+        "eventCode": {
+          "description": "Código de evento (ver gavriel://catalog/events-codes)",
+          "type": "string"
+        },
+        "eventTypeName": {
+          "type": "string"
+        },
+        "search": {
+          "description": "Búsqueda libre",
+          "type": "string"
+        },
+        "requiresIntervention": {
+          "type": "boolean"
+        },
+        "pending": {
+          "description": "Solo eventos pendientes",
+          "type": "boolean"
+        },
+        "inProgress": {
+          "description": "Solo eventos en curso",
+          "type": "boolean"
+        },
+        "bridgeId": {
+          "description": "ID del bridge (ver list_connections)",
+          "type": "string"
+        },
+        "connectionId": {
+          "description": "ID de la conexión",
+          "type": "string"
+        },
+        "dateFrom": {
+          "description": "ISO datetime, ej 2026-08-01T00:00:00.000Z",
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+        },
+        "dateTo": {
+          "description": "ISO datetime",
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+        },
+        "fields": {
+          "description": "Campos a devolver",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "accountId"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "list_interventions",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "ID de la cuenta"
+        },
+        "openOnly": {
+          "default": false,
+          "description": "Solo intervenciones abiertas",
+          "type": "boolean"
+        },
+        "truncate": {
+          "description": "Trunca la respuesta a N chars",
+          "type": "integer",
+          "minimum": 1000,
+          "maximum": 9007199254740991
+        },
+        "fields": {
+          "description": "Campos a devolver",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "list_ip_receiver_events",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "accountNumber": {
+          "type": "string",
+          "pattern": "^[\\w-]+$",
+          "description": "Número de cuenta (ej '0231'), NO el id interno"
+        },
+        "companyId": {
+          "type": "string",
+          "pattern": "^[\\w-]+$",
+          "description": "ID de la empresa dueña de la credencial IP Receiver Pro"
+        },
+        "position": {
+          "default": 0,
+          "description": "Offset (default 0)",
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "size": {
+          "default": 50,
+          "description": "Cantidad (default 50, máx 200)",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 200
+        },
+        "truncate": {
+          "description": "Trunca la respuesta a N chars",
+          "type": "integer",
+          "minimum": 1000,
+          "maximum": 9007199254740991
+        },
+        "fields": {
+          "description": "Campos a devolver",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "accountNumber",
+        "companyId"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "list_my_notification_groups",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "truncate": {
+          "description": "Trunca la respuesta a N chars",
+          "type": "integer",
+          "minimum": 1000,
+          "maximum": 9007199254740991
+        },
+        "fields": {
+          "description": "Campos a devolver",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "list_non_working_days",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "pattern": "^[\\w-]+$",
+          "description": "Usuario"
+        },
+        "companyId": {
+          "type": "string",
+          "pattern": "^[\\w-]+$",
+          "description": "Empresa"
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "list_notification_campaigns",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "description": "Id de campaña: devuelve el detalle (ignora filtros)",
+          "type": "string",
+          "pattern": "^[\\w-]+$"
+        },
+        "page": {
+          "default": 1,
+          "description": "Página (1-based)",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "pageSize": {
+          "default": 20,
+          "description": "Resultados por página (máx 100)",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100
+        },
+        "status": {
+          "description": "Estado de la campaña",
+          "type": "string",
+          "enum": [
+            "processing",
+            "completed",
+            "cancelled"
+          ]
+        },
+        "category": {
+          "description": "Categoría del aviso",
+          "type": "string"
+        },
+        "source": {
+          "description": "Origen del aviso",
+          "type": "string"
+        },
+        "from": {
+          "description": "Desde (ISO)",
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+        },
+        "to": {
+          "description": "Hasta (ISO)",
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+        },
+        "truncate": {
+          "description": "Trunca la respuesta a N chars",
+          "type": "integer",
+          "minimum": 1000,
+          "maximum": 9007199254740991
+        },
+        "fields": {
+          "description": "Campos a devolver",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "list_notification_deliveries",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "campaignId": {
+          "type": "string",
+          "pattern": "^[\\w-]+$",
+          "description": "Id de la campaña"
+        },
+        "page": {
+          "default": 1,
+          "description": "Página (1-based)",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "pageSize": {
+          "default": 20,
+          "description": "Resultados por página (máx 100)",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100
+        },
+        "channel": {
+          "description": "Filtrar por canal",
+          "type": "string",
+          "enum": [
+            "in_app",
+            "push",
+            "whatsapp",
+            "sms",
+            "email"
+          ]
+        },
+        "status": {
+          "description": "Filtrar por estado de entrega",
+          "type": "string",
+          "enum": [
+            "pending",
+            "sent",
+            "delivered",
+            "read",
+            "failed",
+            "skipped",
+            "cancelled",
+            "expired"
+          ]
+        },
+        "truncate": {
+          "description": "Trunca la respuesta a N chars",
+          "type": "integer",
+          "minimum": 1000,
+          "maximum": 9007199254740991
+        },
+        "fields": {
+          "description": "Campos a devolver",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "campaignId"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "list_notification_groups",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "description": "Id del grupo; sin id lista todos",
+          "type": "string",
+          "pattern": "^[\\w-]+$"
+        },
+        "view": {
+          "default": "detail",
+          "description": "Con id: detail, members o history",
+          "type": "string",
+          "enum": [
+            "detail",
+            "members",
+            "history"
+          ]
+        },
+        "page": {
+          "default": 1,
+          "description": "Página (1-based)",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "pageSize": {
+          "default": 20,
+          "description": "Resultados por página (máx 100)",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100
+        },
+        "search": {
+          "description": "Búsqueda por nombre (solo listado)",
+          "type": "string"
+        },
+        "truncate": {
+          "description": "Trunca la respuesta a N chars",
+          "type": "integer",
+          "minimum": 1000,
+          "maximum": 9007199254740991
+        },
+        "fields": {
+          "description": "Campos a devolver",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "list_notification_inbox",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "page": {
+          "default": 1,
+          "description": "Página (1-based)",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "pageSize": {
+          "default": 20,
+          "description": "Resultados por página (máx 100)",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100
+        },
+        "unread": {
+          "description": "true = solo no leídos",
+          "type": "boolean"
+        },
+        "category": {
+          "description": "Categoría",
+          "type": "string"
+        },
+        "truncate": {
+          "description": "Trunca la respuesta a N chars",
+          "type": "integer",
+          "minimum": 1000,
+          "maximum": 9007199254740991
+        },
+        "fields": {
+          "description": "Campos a devolver",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "list_roles",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "truncate": {
+          "description": "Trunca la respuesta a N chars",
+          "type": "integer",
+          "minimum": 1000,
+          "maximum": 9007199254740991
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "list_sip_calls",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "page": {
+          "default": 1,
+          "description": "Página (1-based)",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "limit": {
+          "default": 25,
+          "description": "Por página (default 25, máx 200)",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 200
+        },
+        "id": {
+          "description": "ID de llamada; si se omite lista",
+          "type": "string",
+          "pattern": "^[\\w-]+$"
+        },
+        "truncate": {
+          "description": "Trunca la respuesta a N chars",
+          "type": "integer",
+          "minimum": 1000,
+          "maximum": 9007199254740991
+        },
+        "fields": {
+          "description": "Campos a devolver",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "list_technician_agenda",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string"
+        },
+        "date": {
+          "type": "string",
+          "format": "date",
+          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$",
+          "description": "Fecha (YYYY-MM-DD)"
+        },
+        "truncate": {
+          "description": "Trunca la respuesta a N chars",
+          "type": "integer",
+          "minimum": 1000,
+          "maximum": 9007199254740991
+        },
+        "fields": {
+          "description": "Campos a devolver",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "userId",
+        "date"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "list_tickets",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "page": {
+          "default": 1,
+          "description": "Página (1-based)",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "limit": {
+          "default": 25,
+          "description": "Por página (default 25, máx 200)",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 200
+        },
+        "search": {
+          "description": "Búsqueda libre (título/descripción)",
+          "type": "string"
+        },
+        "status": {
+          "description": "Estado(s). Ver gavriel://catalog/tickets/status-options para valores válidos.",
+          "anyOf": [
+            {
+              "type": "string",
+              "enum": [
+                "open",
+                "in_progress",
+                "pending_customer",
+                "closed"
+              ]
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "open",
+                  "in_progress",
+                  "pending_customer",
+                  "closed"
+                ]
+              }
+            }
+          ]
+        },
+        "priority": {
+          "description": "Prioridad(es). Ver gavriel://catalog/tickets/priority-options para valores válidos.",
+          "anyOf": [
+            {
+              "type": "string",
+              "enum": [
+                "low",
+                "medium",
+                "high",
+                "critical"
+              ]
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "low",
+                  "medium",
+                  "high",
+                  "critical"
+                ]
+              }
+            }
+          ]
+        },
+        "accountSearch": {
+          "description": "Busca tickets de una cuenta por nombre/número",
+          "type": "string"
+        },
+        "accountId": {
+          "description": "ID de la cuenta",
+          "type": "string"
+        },
+        "categoryId": {
+          "description": "ID de la categoría (ver gavriel://catalog/ticket-categories)",
+          "type": "string"
+        },
+        "assignedUserId": {
+          "description": "ID del usuario asignado",
+          "type": "string"
+        },
+        "truncate": {
+          "description": "Trunca la respuesta a N chars",
+          "type": "integer",
+          "minimum": 1000,
+          "maximum": 9007199254740991
+        },
+        "fields": {
+          "description": "Campos a devolver",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "list_useful_contacts",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "jurisdictionId": {
+          "description": "Filtra por jurisdicción si viene",
+          "type": "string"
+        },
+        "truncate": {
+          "description": "Trunca la respuesta a N chars",
+          "type": "integer",
+          "minimum": 1000,
+          "maximum": 9007199254740991
+        },
+        "fields": {
+          "description": "Campos a devolver",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "list_users",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "page": {
+          "default": 1,
+          "description": "Página (1-based)",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "limit": {
+          "default": 25,
+          "description": "Por página (default 25, máx 200)",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 200
+        },
+        "search": {
+          "description": "Búsqueda libre (nombre/email)",
+          "type": "string"
+        },
+        "truncate": {
+          "description": "Trunca la respuesta a N chars",
+          "type": "integer",
+          "minimum": 1000,
+          "maximum": 9007199254740991
+        },
+        "fields": {
+          "description": "Campos a devolver",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "list_video_cameras",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "fresh": {
+          "description": "true = refrescar desde los proveedores (lento)",
+          "type": "boolean"
+        },
+        "truncate": {
+          "description": "Trunca la respuesta a N chars",
+          "type": "integer",
+          "minimum": 1000,
+          "maximum": 9007199254740991
+        },
+        "fields": {
+          "description": "Campos a devolver",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "list_video_walls",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[\\w-]+$",
+          "description": "Id del mosaico (omitir para listar)"
+        },
+        "truncate": {
+          "description": "Trunca la respuesta a N chars",
+          "type": "integer",
+          "minimum": 1000,
+          "maximum": 9007199254740991
+        },
+        "fields": {
+          "description": "Campos a devolver",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "list_zone_events",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "zoneId": {
+          "type": "string",
+          "pattern": "^[\\w-]+$",
+          "description": "ID de la zona"
+        },
+        "page": {
+          "default": 1,
+          "description": "Página (1-based)",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "limit": {
+          "default": 25,
+          "description": "Por página (default 25, máx 200)",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 200
+        },
+        "truncate": {
+          "description": "Trunca la respuesta a N chars",
+          "type": "integer",
+          "minimum": 1000,
+          "maximum": 9007199254740991
+        }
+      },
+      "required": [
+        "zoneId"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "mark_activity_read",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "activityId": {
+          "type": "string"
+        },
+        "readAt": {
+          "description": "ISO datetime de lectura (si no viene, usa la fecha actual)",
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+        },
+        "confirm": {
+          "default": false,
+          "type": "boolean",
+          "description": "true = ejecutar. false/omitido = preview."
+        }
+      },
+      "required": [
+        "activityId"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "mark_activity_unread",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "activityId": {
+          "type": "string"
+        },
+        "confirm": {
+          "default": false,
+          "type": "boolean",
+          "description": "true = ejecutar. false/omitido = preview."
+        }
+      },
+      "required": [
+        "activityId"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "mark_event_app_updates_seen",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "eventId": {
+          "type": "string",
+          "pattern": "^[\\w-]+$",
+          "description": "ID del evento"
+        },
+        "confirm": {
+          "default": false,
+          "type": "boolean",
+          "description": "true = ejecutar. false/omitido = preview."
+        }
+      },
+      "required": [
+        "eventId"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "mark_events_processed",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "eventIds": {
+          "minItems": 1,
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "IDs de los eventos a marcar"
+        },
+        "status": {
+          "default": "processed",
+          "description": "Estado a asignar (por defecto processed)",
+          "type": "string",
+          "enum": [
+            "pending",
+            "attending",
+            "processed",
+            "self-processed",
+            "cancelled",
+            "hidden"
+          ]
+        },
+        "confirm": {
+          "default": false,
+          "type": "boolean",
+          "description": "true = ejecutar. false/omitido = preview."
+        }
+      },
+      "required": [
+        "eventIds"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "mark_notification_read",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "description": "Id del aviso",
+          "type": "string",
+          "pattern": "^[\\w-]+$"
+        },
+        "all": {
+          "default": false,
+          "description": "true = marcar toda la bandeja (ignora id)",
+          "type": "boolean"
+        },
+        "confirm": {
+          "default": false,
+          "type": "boolean",
+          "description": "true = ejecutar. false/omitido = preview."
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "notify_barrio",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "eventId": {
+          "type": "string",
+          "pattern": "^[\\w-]+$",
+          "description": "ID del evento"
+        },
+        "confirm": {
+          "default": false,
+          "type": "boolean",
+          "description": "true = ejecutar. false/omitido = preview."
+        }
+      },
+      "required": [
+        "eventId"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "offline_devices_report",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "staleMinutes": {
+          "default": 60,
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "limit": {
+          "default": 50,
+          "description": "Máximo de conexiones desactualizadas a listar",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 200
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "preview_notification_campaign",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Título del aviso"
+        },
+        "body": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Cuerpo del aviso"
+        },
+        "category": {
+          "type": "string",
+          "description": "Categoría del aviso"
+        },
+        "channels": {
+          "minItems": 1,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "in_app",
+              "push",
+              "whatsapp",
+              "sms",
+              "email"
+            ]
+          },
+          "description": "Canales de envío"
+        },
+        "userIds": {
+          "default": [],
+          "description": "Ids de usuarios destinatarios",
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[\\w-]+$",
+            "description": "Id (uuid/slug)"
+          }
+        },
+        "accountContactIds": {
+          "default": [],
+          "description": "Ids de contactos de cuenta destinatarios",
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[\\w-]+$",
+            "description": "Id (uuid/slug)"
+          }
+        },
+        "groups": {
+          "default": [],
+          "description": "Referencias de grupo ({type, accountId})",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "description": "Ej: account_neighbors, account_contacts"
+              },
+              "accountId": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "type"
+            ],
+            "additionalProperties": {}
+          }
+        },
+        "priority": {
+          "default": "normal",
+          "description": "Prioridad",
+          "type": "string",
+          "enum": [
+            "normal",
+            "urgent"
+          ]
+        },
+        "link": {
+          "description": "Enlace opcional (http(s):// o \"/\")",
+          "type": "string"
+        },
+        "emailSubject": {
+          "description": "Asunto del email (si hay canal email)",
+          "type": "string"
+        },
+        "truncate": {
+          "description": "Trunca la respuesta a N chars",
+          "type": "integer",
+          "minimum": 1000,
+          "maximum": 9007199254740991
+        }
+      },
+      "required": [
+        "title",
+        "body",
+        "category",
+        "channels"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "reorder_account_contacts",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "accountId": {
+          "type": "string"
+        },
+        "orderedContactIds": {
+          "minItems": 1,
+          "maxItems": 200,
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "IDs de contactos en el orden final deseado (índice 0 = posición 1). Debe incluir TODOS los contactos actuales."
+        },
+        "confirm": {
+          "default": false,
+          "type": "boolean",
+          "description": "true = ejecutar. false/omitido = preview."
+        }
+      },
+      "required": [
+        "accountId",
+        "orderedContactIds"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "reset_user_otp",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "pattern": "^[\\w-]+$",
+          "description": "ID del usuario"
+        },
+        "confirm": {
+          "default": false,
+          "type": "boolean",
+          "description": "true = ejecutar. false/omitido = preview."
+        }
+      },
+      "required": [
+        "userId"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "resolve_video_cameras",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "accountIds": {
+          "description": "Ids de cuentas",
+          "maxItems": 200,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[\\w-]+$",
+            "description": "Id de cuenta"
+          }
+        },
+        "deviceIds": {
+          "description": "Ids de dispositivos",
+          "maxItems": 200,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[\\w-]+$",
+            "description": "Id de dispositivo"
+          }
+        },
+        "truncate": {
+          "description": "Trunca la respuesta a N chars",
+          "type": "integer",
+          "minimum": 1000,
+          "maximum": 9007199254740991
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "restart_bridge",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "bridgeId": {
+          "type": "string",
+          "pattern": "^[\\w-]+$",
+          "description": "ID del bridge"
+        },
+        "confirm": {
+          "default": false,
+          "type": "boolean",
+          "description": "true = ejecutar. false/omitido = preview."
+        }
+      },
+      "required": [
+        "bridgeId"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "retry_failed_notification_campaign",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[\\w-]+$",
+          "description": "Id (uuid/slug)"
+        },
+        "confirm": {
+          "default": false,
+          "type": "boolean",
+          "description": "true = ejecutar. false/omitido = preview."
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "review_citizen_report",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[\\w-]+$",
+          "description": "ID del reporte"
+        },
+        "comment": {
+          "description": "Comentario de revisión (opcional)",
+          "type": "string"
+        },
+        "confirm": {
+          "default": false,
+          "type": "boolean",
+          "description": "true = ejecutar. false/omitido = preview."
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "schedule_service",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "serviceId": {
+          "type": "string"
+        },
+        "scheduledDate": {
+          "type": "string",
+          "description": "Fecha de agendado (ISO datetime)"
+        },
+        "slotCount": {
+          "description": "Cantidad de slots",
+          "type": "integer",
+          "minimum": -9007199254740991,
+          "maximum": 9007199254740991
+        },
+        "assignedUserId": {
+          "description": "Técnico asignado",
+          "type": "string"
+        },
+        "confirm": {
+          "default": false,
+          "type": "boolean",
+          "description": "true = ejecutar. false/omitido = preview."
+        }
+      },
+      "required": [
+        "serviceId",
+        "scheduledDate"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "search_accounts",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "query": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Texto de búsqueda (nombre o código de cuenta)"
+        },
+        "limit": {
+          "default": 10,
+          "description": "Máximo de resultados (default 10, máx 25)",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 25
+        }
+      },
+      "required": [
+        "query"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "search_events",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "accountId": {
+          "type": "string",
+          "description": "ID de cuenta (requerido para evitar queries lentas)"
+        },
+        "status": {
+          "description": "Estado del evento",
+          "type": "string",
+          "enum": [
+            "pending",
+            "attending",
+            "processed",
+            "self-processed",
+            "cancelled",
+            "hidden"
+          ]
+        },
+        "dateFrom": {
+          "description": "Fecha inicio ISO datetime",
+          "type": "string"
+        },
+        "dateTo": {
+          "description": "Fecha fin ISO datetime",
+          "type": "string"
+        },
+        "limit": {
+          "default": 15,
+          "description": "Máximo de resultados (default 15, máx 50)",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 50
+        }
+      },
+      "required": [
+        "accountId"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "search_tickets",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "status": {
+          "description": "Filtrar por estado",
+          "type": "string",
+          "enum": [
+            "open",
+            "in_progress",
+            "pending_customer",
+            "closed"
+          ]
+        },
+        "priority": {
+          "description": "Filtrar por prioridad",
+          "type": "string",
+          "enum": [
+            "low",
+            "medium",
+            "high",
+            "critical"
+          ]
+        },
+        "accountId": {
+          "description": "Filtrar por ID de cuenta",
+          "type": "string"
+        },
+        "accountSearch": {
+          "description": "Buscar tickets de una cuenta por nombre/número",
+          "type": "string"
+        },
+        "limit": {
+          "default": 15,
+          "description": "Máximo de resultados (default 15, máx 50)",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 50
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "search_users",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "query": {
+          "description": "Texto de búsqueda (nombre o email)",
+          "type": "string"
+        },
+        "limit": {
+          "default": 10,
+          "description": "Máximo de resultados (default 10, máx 25)",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 25
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "send_conversation_message",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "conversationId": {
+          "type": "string"
+        },
+        "body": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Contenido del mensaje"
+        },
+        "confirm": {
+          "default": false,
+          "type": "boolean",
+          "description": "true = ejecutar. false/omitido = preview."
+        }
+      },
+      "required": [
+        "conversationId",
+        "body"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "set_activity_deleted",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "activityId": {
+          "type": "string",
+          "pattern": "^[\\w-]+$",
+          "description": "ID de la actividad"
+        },
+        "action": {
+          "type": "string",
+          "enum": [
+            "soft-delete",
+            "restore"
+          ],
+          "description": "Acción"
+        },
+        "confirm": {
+          "default": false,
+          "type": "boolean",
+          "description": "true = ejecutar. false/omitido = preview."
+        }
+      },
+      "required": [
+        "activityId",
+        "action"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "set_company_sip_config",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "companyId": {
+          "type": "string",
+          "pattern": "^[\\w-]+$",
+          "description": "ID de la empresa"
+        },
+        "enabled": {
+          "type": "boolean",
+          "description": "Telefonía habilitada"
+        },
+        "wssUrl": {
+          "type": "string",
+          "description": "URL WSS del servidor SIP"
+        },
+        "domain": {
+          "type": "string",
+          "description": "Dominio SIP"
+        },
+        "outboundPrefix": {
+          "description": "Prefijo de salida (null = ninguno)",
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "confirm": {
+          "default": false,
+          "type": "boolean",
+          "description": "true = ejecutar. false/omitido = preview."
+        }
+      },
+      "required": [
+        "companyId",
+        "enabled",
+        "wssUrl",
+        "domain"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "set_intervention_observation",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "interventionId": {
+          "type": "string"
+        },
+        "observationComment": {
+          "type": "string"
+        },
+        "confirm": {
+          "default": false,
+          "type": "boolean",
+          "description": "true = ejecutar. false/omitido = preview."
+        }
+      },
+      "required": [
+        "interventionId"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "set_technician_slot_config",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "pattern": "^[\\w-]+$",
+          "description": "Técnico"
+        },
+        "companyId": {
+          "type": "string",
+          "pattern": "^[\\w-]+$",
+          "description": "Empresa técnica"
+        },
+        "slotDurationMinutes": {
+          "type": "integer",
+          "minimum": 5,
+          "maximum": 480,
+          "description": "Duración de cada slot en minutos"
+        },
+        "workingSlots": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "dayOfWeek": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 6
+              },
+              "startMinute": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 1439
+              }
+            },
+            "required": [
+              "dayOfWeek",
+              "startMinute"
+            ]
+          },
+          "description": "Slots semanales completos"
+        },
+        "confirm": {
+          "default": false,
+          "type": "boolean",
+          "description": "true = ejecutar. false/omitido = preview."
+        }
+      },
+      "required": [
+        "userId",
+        "slotDurationMinutes",
+        "workingSlots"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "set_zone_maintenance",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "zoneId": {
+          "type": "string",
+          "pattern": "^[\\w-]+$",
+          "description": "ID de la zona"
+        },
+        "durationHours": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Duración del mantenimiento en horas"
+        },
+        "confirm": {
+          "default": false,
+          "type": "boolean",
+          "description": "true = ejecutar. false/omitido = preview."
+        }
+      },
+      "required": [
+        "zoneId",
+        "durationHours"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "shift_handover",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "sinceHours": {
+          "default": 8,
+          "type": "number",
+          "minimum": 1,
+          "maximum": 72
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "sla_overdue_tickets",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "olderThanHours": {
+          "default": 48,
+          "type": "number",
+          "minimum": 0
+        },
+        "priority": {
+          "description": "Prioridad (valores en gavriel://catalog/)",
+          "type": "string"
+        },
+        "limit": {
+          "default": 20,
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 50
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "sync_video_camera",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "serial": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Número de serie de la cámara/equipo"
+        },
+        "accountId": {
+          "type": "string",
+          "pattern": "^[\\w-]+$",
+          "description": "Id de cuenta a vincular (opcional)"
+        },
+        "confirm": {
+          "default": false,
+          "type": "boolean",
+          "description": "true = ejecutar. false/omitido = preview."
+        }
+      },
+      "required": [
+        "serial"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "ticket_stats",
+    "inputSchema": {
+      "type": "object",
+      "properties": {},
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "toggle_bridge_activation",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "bridgeId": {
+          "type": "string",
+          "pattern": "^[\\w-]+$",
+          "description": "ID del bridge"
+        },
+        "confirm": {
+          "default": false,
+          "type": "boolean",
+          "description": "true = ejecutar. false/omitido = preview."
+        }
+      },
+      "required": [
+        "bridgeId"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "triage_events",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "limit": {
+          "default": 15,
+          "description": "Máximo de cuentas a analizar/devolver",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 50
+        },
+        "accountId": {
+          "description": "Limita a una cuenta",
+          "type": "string"
+        },
+        "sinceHours": {
+          "description": "Solo eventos de las últimas N horas",
+          "type": "number",
+          "minimum": 0.1,
+          "maximum": 720
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "update_account",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "accountNumber": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "description": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "note": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "address": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "city": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "state": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "phone": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "email": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "latitude": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "longitude": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "serviceDate": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "companyTechnicalId": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "companyMonitoringId": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "jurisdictionId": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "confirm": {
+          "default": false,
+          "type": "boolean",
+          "description": "true = ejecutar. false/omitido = preview."
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "update_account_contact",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "contactId": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "phone": {
+          "type": "string"
+        },
+        "email": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "order": {
+          "description": "Posición del contacto (menor = primero)",
+          "type": "integer",
+          "minimum": -9007199254740991,
+          "maximum": 9007199254740991
+        },
+        "confirm": {
+          "default": false,
+          "type": "boolean",
+          "description": "true = ejecutar. false/omitido = preview."
+        }
+      },
+      "required": [
+        "contactId"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "update_account_note",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "accountId": {
+          "type": "string"
+        },
+        "noteId": {
+          "type": "string"
+        },
+        "content": {
+          "type": "string"
+        },
+        "validFrom": {
+          "type": "string"
+        },
+        "validUntil": {
+          "type": "string"
+        },
+        "confirm": {
+          "default": false,
+          "type": "boolean",
+          "description": "true = ejecutar. false/omitido = preview."
+        }
+      },
+      "required": [
+        "accountId",
+        "noteId"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "update_account_user",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "accountUserId": {
+          "type": "string",
+          "pattern": "^[\\w-]+$",
+          "description": "ID del usuario de cuenta"
+        },
+        "fields": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {},
+          "description": "Campos a modificar (no incluir id/account)"
+        },
+        "confirm": {
+          "default": false,
+          "type": "boolean",
+          "description": "true = ejecutar. false/omitido = preview."
+        }
+      },
+      "required": [
+        "accountUserId",
+        "fields"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "update_activity",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "activityId": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "MESSAGE",
+            "TASK",
+            "NOTIFICATION",
+            "REMINDER",
+            "ALERT",
+            "UPDATE"
+          ]
+        },
+        "assignedUserId": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "ticketId": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "confirm": {
+          "default": false,
+          "type": "boolean",
+          "description": "true = ejecutar. false/omitido = preview."
+        }
+      },
+      "required": [
+        "activityId"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "update_bridge",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "bridgeId": {
+          "type": "string",
+          "pattern": "^[\\w-]+$",
+          "description": "ID del bridge"
+        },
+        "name": {
+          "description": "Nombre del bridge",
+          "type": "string"
+        },
+        "code": {
+          "description": "Código del bridge",
+          "type": "string"
+        },
+        "ip": {
+          "description": "IP del bridge",
+          "type": "string"
+        },
+        "httpPort": {
+          "description": "Puerto HTTP (null = ninguno)",
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "activated": {
+          "description": "Bridge activo",
+          "type": "boolean"
+        },
+        "confirm": {
+          "default": false,
+          "type": "boolean",
+          "description": "true = ejecutar. false/omitido = preview."
+        }
+      },
+      "required": [
+        "bridgeId"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "update_company",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "companyId": {
+          "type": "string",
+          "pattern": "^[\\w-]+$",
+          "description": "ID de la empresa"
+        },
+        "name": {
+          "description": "Nombre",
+          "type": "string"
+        },
+        "code": {
+          "description": "Código",
+          "type": "string"
+        },
+        "isTechnical": {
+          "description": "Empresa técnica",
+          "type": "boolean"
+        },
+        "isMonitoring": {
+          "description": "Empresa de monitoreo",
+          "type": "boolean"
+        },
+        "currentStatus": {
+          "description": "Estado actual",
+          "type": "string"
+        },
+        "logoId": {
+          "description": "ID de archivo del logo (null = quitar)",
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^[\\w-]+$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "confirm": {
+          "default": false,
+          "type": "boolean",
+          "description": "true = ejecutar. false/omitido = preview."
+        }
+      },
+      "required": [
+        "companyId"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "update_connection",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "connectionId": {
+          "type": "string",
+          "pattern": "^[\\w-]+$",
+          "description": "ID de la conexión"
+        },
+        "name": {
+          "description": "Nombre de la conexión",
+          "type": "string"
+        },
+        "code": {
+          "description": "Código",
+          "type": "string"
+        },
+        "bridgeId": {
+          "description": "ID del bridge",
+          "type": "string",
+          "pattern": "^[\\w-]+$"
+        },
+        "protocolId": {
+          "description": "ID del protocolo",
+          "type": "string",
+          "pattern": "^[\\w-]+$"
+        },
+        "eventsFormatId": {
+          "description": "ID del formato de eventos",
+          "type": "string",
+          "pattern": "^[\\w-]+$"
+        },
+        "customEventsFormatId": {
+          "description": "ID del formato de eventos custom",
+          "type": "string",
+          "pattern": "^[\\w-]+$"
+        },
+        "secondaryEventsFormatId": {
+          "description": "ID del formato de eventos secundario",
+          "type": "string",
+          "pattern": "^[\\w-]+$"
+        },
+        "companies": {
+          "description": "IDs de empresas asociadas (reemplaza la lista)",
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[\\w-]+$"
+          }
+        },
+        "unknownAccountCompanyId": {
+          "description": "ID de empresa para cuentas desconocidas",
+          "type": "string",
+          "pattern": "^[\\w-]+$"
+        },
+        "activated": {
+          "description": "Conexión activa",
+          "type": "boolean"
+        },
+        "heartbeatIntervalMinutes": {
+          "description": "Intervalo de heartbeat en minutos",
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "maxMinutesWithoutEvents": {
+          "description": "Máx. minutos sin eventos antes de alertar",
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "confirm": {
+          "default": false,
+          "type": "boolean",
+          "description": "true = ejecutar. false/omitido = preview."
+        }
+      },
+      "required": [
+        "connectionId"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "update_device",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "accountId": {
+          "type": "string"
+        },
+        "deviceId": {
+          "type": "string"
+        },
+        "serialNumber": {
+          "type": "string"
+        },
+        "chip1": {
+          "type": "string"
+        },
+        "deviceConnectionTypeId": {
+          "type": "string"
+        },
+        "deviceModelId": {
+          "type": "string"
+        },
+        "clearChip1": {
+          "description": "true = enviar chip1: null",
+          "type": "boolean"
+        },
+        "clearChip2": {
+          "description": "true = enviar chip2: null",
+          "type": "boolean"
+        },
+        "alertType": {
+          "description": "Sonora | Silenciosa",
+          "type": "string"
+        },
+        "ownershipType": {
+          "type": "string",
+          "enum": [
+            "alquiler",
+            "comodato"
+          ]
+        },
+        "chip2": {
+          "type": "string"
+        },
+        "imei": {
+          "type": "string"
+        },
+        "zoneId": {
+          "type": "string"
+        },
+        "deviceKindId": {
+          "type": "string"
+        },
+        "deviceTaxonomyId": {
+          "type": "string"
+        },
+        "cloudDeviceId": {
+          "type": "string"
+        },
+        "cloudChannelNo": {
+          "type": "integer",
+          "minimum": -9007199254740991,
+          "maximum": 9007199254740991
+        },
+        "hppDeviceCategory": {
+          "type": "string"
+        },
+        "hppDeviceSubCategory": {
+          "type": "string"
+        },
+        "cloudLiveViewVerification": {
+          "description": "Código de verificación live view (se guarda cifrado en Gavriel)",
+          "type": "string"
+        },
+        "clearCloudLiveViewSecret": {
+          "type": "boolean"
+        },
+        "confirm": {
+          "default": false,
+          "type": "boolean",
+          "description": "true = ejecutar. false/omitido = preview."
+        }
+      },
+      "required": [
+        "accountId",
+        "deviceId"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "update_device_brand",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "brandId": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "confirm": {
+          "default": false,
+          "type": "boolean",
+          "description": "true = ejecutar. false/omitido = preview."
+        }
+      },
+      "required": [
+        "brandId"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "update_device_model",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "modelId": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "isActive": {
+          "type": "boolean"
+        },
+        "confirm": {
+          "default": false,
+          "type": "boolean",
+          "description": "true = ejecutar. false/omitido = preview."
+        }
+      },
+      "required": [
+        "modelId"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "update_event_code",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "eventCodeId": {
+          "type": "string"
+        },
+        "code": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "dataType": {
+          "type": "string"
+        },
+        "eventsTypeId": {
+          "type": "string"
+        },
+        "confirm": {
+          "default": false,
+          "type": "boolean",
+          "description": "true = ejecutar. false/omitido = preview."
+        }
+      },
+      "required": [
+        "eventCodeId"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "update_event_format",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[\\w-]+$",
+          "description": "ID del formato"
+        },
+        "name": {
+          "type": "string",
+          "description": "Nombre del formato"
+        },
+        "code": {
+          "type": "string",
+          "description": "Código del formato"
+        },
+        "description": {
+          "description": "Descripción",
+          "type": "string"
+        },
+        "confirm": {
+          "default": false,
+          "type": "boolean",
+          "description": "true = ejecutar. false/omitido = preview."
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "update_event_type",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "eventTypeId": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "icon": {
+          "type": "string"
+        },
+        "color": {
+          "type": "string"
+        },
+        "sound": {
+          "type": "string"
+        },
+        "requiresIntervention": {
+          "type": "boolean"
+        },
+        "priority": {
+          "type": "integer",
+          "minimum": -9007199254740991,
+          "maximum": 9007199254740991
+        },
+        "confirm": {
+          "default": false,
+          "type": "boolean",
+          "description": "true = ejecutar. false/omitido = preview."
+        }
+      },
+      "required": [
+        "eventTypeId"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "update_notification_group",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[\\w-]+$",
+          "description": "Id (uuid/slug)"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Nombre del canal/grupo"
+        },
+        "description": {
+          "type": "string",
+          "description": "Descripción"
+        },
+        "isOptional": {
+          "type": "boolean",
+          "description": "true = los usuarios pueden salir por su cuenta"
+        },
+        "audience": {
+          "description": "A quién se ofrece (solo si isOptional)",
+          "type": "string",
+          "enum": [
+            "neighbors",
+            "panel",
+            "all"
+          ]
+        },
+        "confirm": {
+          "default": false,
+          "type": "boolean",
+          "description": "true = ejecutar. false/omitido = preview."
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "update_notification_preferences",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "preferences": {
+          "minItems": 1,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {}
+          },
+          "description": "Lista de preferencias con la misma forma que devuelve get_notification_preferences"
+        },
+        "confirm": {
+          "default": false,
+          "type": "boolean",
+          "description": "true = ejecutar. false/omitido = preview."
+        }
+      },
+      "required": [
+        "preferences"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "update_partition",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "partitionId": {
+          "type": "string",
+          "pattern": "^[\\w-]+$",
+          "description": "ID de la partición"
+        },
+        "code": {
+          "description": "Código",
+          "type": "string"
+        },
+        "name": {
+          "description": "Nombre",
+          "type": "string"
+        },
+        "confirm": {
+          "default": false,
+          "type": "boolean",
+          "description": "true = ejecutar. false/omitido = preview."
+        }
+      },
+      "required": [
+        "partitionId"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "update_service",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "serviceId": {
+          "type": "string"
+        },
+        "accountId": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "priority": {
+          "type": "string"
+        },
+        "assignedUserId": {
+          "type": "string"
+        },
+        "categoryId": {
+          "type": "string"
+        },
+        "confirm": {
+          "default": false,
+          "type": "boolean",
+          "description": "true = ejecutar. false/omitido = preview."
+        }
+      },
+      "required": [
+        "serviceId"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "update_ticket",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "ticketId": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "priority": {
+          "type": "string",
+          "enum": [
+            "low",
+            "medium",
+            "high",
+            "critical"
+          ]
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "open",
+            "in_progress",
+            "pending_customer",
+            "closed"
+          ]
+        },
+        "accountId": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "categoryId": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "assignedUserId": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "resolution": {
+          "type": "string"
+        },
+        "confirm": {
+          "default": false,
+          "type": "boolean",
+          "description": "true = ejecutar. false/omitido = preview."
+        }
+      },
+      "required": [
+        "ticketId"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "update_useful_contact",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[\\w-]+$",
+          "description": "ID del contacto útil"
+        },
+        "jurisdictionId": {
+          "type": "string",
+          "pattern": "^[\\w-]+$"
+        },
+        "name": {
+          "type": "string",
+          "description": "Nombre"
+        },
+        "phone": {
+          "type": "string",
+          "description": "Teléfono"
+        },
+        "web": {
+          "description": "Sitio web",
+          "type": "string"
+        },
+        "description": {
+          "description": "Descripción",
+          "type": "string"
+        },
+        "confirm": {
+          "default": false,
+          "type": "boolean",
+          "description": "true = ejecutar. false/omitido = preview."
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "update_user",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "pattern": "^[\\w-]+$",
+          "description": "ID del usuario"
+        },
+        "email": {
+          "description": "Email",
+          "type": "string",
+          "format": "email",
+          "pattern": "^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
+        },
+        "username": {
+          "description": "Nombre de usuario",
+          "type": "string"
+        },
+        "password": {
+          "description": "Contraseña (se redacta en logs)",
+          "type": "string",
+          "minLength": 8
+        },
+        "roleId": {
+          "type": "string",
+          "pattern": "^[\\w-]+$",
+          "description": "ID de rol (ver list_roles)"
+        },
+        "phone": {
+          "description": "Teléfono",
+          "type": "string"
+        },
+        "companies": {
+          "description": "Empresas asignadas",
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[\\w-]+$",
+            "description": "ID de empresa"
+          }
+        },
+        "confirmed": {
+          "description": "Cuenta confirmada",
+          "type": "boolean"
+        },
+        "blocked": {
+          "description": "Usuario bloqueado",
+          "type": "boolean"
+        },
+        "confirm": {
+          "default": false,
+          "type": "boolean",
+          "description": "true = ejecutar. false/omitido = preview."
+        }
+      },
+      "required": [
+        "userId"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "update_zone",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "zoneId": {
+          "type": "string"
+        },
+        "code": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "sensorType": {
+          "type": "string"
+        },
+        "zoneType": {
+          "type": "string"
+        },
+        "connectionType": {
+          "type": "string"
+        },
+        "serialNumber": {
+          "type": "string"
+        },
+        "alertType": {
+          "description": "Sonora | Silenciosa",
+          "type": "string"
+        },
+        "deviceBrandId": {
+          "type": "string"
+        },
+        "deviceModelId": {
+          "type": "string"
+        },
+        "confirm": {
+          "default": false,
+          "type": "boolean",
+          "description": "true = ejecutar. false/omitido = preview."
+        }
+      },
+      "required": [
+        "zoneId"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "upsert_catalog_item",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "catalog": {
+          "type": "string",
+          "enum": [
+            "protocols",
+            "jurisdictions",
+            "intervention-categories",
+            "device-connection-types"
+          ],
+          "description": "Catálogo"
+        },
+        "name": {
+          "description": "Nombre (todos)",
+          "type": "string",
+          "minLength": 1
+        },
+        "code": {
+          "description": "Código (protocols, device-connection-types)",
+          "type": "string"
+        },
+        "description": {
+          "description": "Descripción (protocols, intervention-categories, device-connection-types)",
+          "type": "string"
+        },
+        "state": {
+          "description": "Provincia (jurisdictions)",
+          "type": "string"
+        },
+        "color": {
+          "description": "Color (intervention-categories)",
+          "type": "string"
+        },
+        "isActive": {
+          "description": "Activo (intervention-categories, device-connection-types)",
+          "type": "boolean"
+        },
+        "itemId": {
+          "type": "string",
+          "pattern": "^[\\w-]+$",
+          "description": "ID del ítem a modificar; omitir para crear"
+        },
+        "confirm": {
+          "default": false,
+          "type": "boolean",
+          "description": "true = ejecutar. false/omitido = preview."
+        }
+      },
+      "required": [
+        "catalog"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "validate_event_mapping",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "eventsFormatId": {
+          "type": "string",
+          "description": "ID del formato a validar"
+        },
+        "truncate": {
+          "type": "integer",
+          "minimum": 1000,
+          "maximum": 9007199254740991
+        }
+      },
+      "required": [
+        "eventsFormatId"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "verify_cloud_live_view",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "accountId": {
+          "type": "string",
+          "pattern": "^[\\w-]+$",
+          "description": "Id de la cuenta"
+        },
+        "deviceId": {
+          "type": "string",
+          "pattern": "^[\\w-]+$",
+          "description": "Id del dispositivo"
+        },
+        "provider": {
+          "type": "string",
+          "enum": [
+            "ezviz",
+            "team"
+          ],
+          "description": "Proveedor a verificar"
+        },
+        "confirm": {
+          "default": false,
+          "type": "boolean",
+          "description": "true = ejecutar. false/omitido = preview."
+        }
+      },
+      "required": [
+        "accountId",
+        "deviceId",
+        "provider"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  }
+]

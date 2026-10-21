@@ -2,7 +2,7 @@ import type { GavrielClient } from "../gavrielClient.js";
 import { ok, err, paginationSchema, okStructured, okTruncated, truncateSchema, selectFields, normalizeAccountNumber, buildBody, wrapReadOnly, forwardParams, fieldsSchema } from "./shared.js";
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/server";
-import { requireConfirm, confirmSchema, runBatch, destructiveGuard } from "./writeHelpers.js";
+import { requireConfirm, confirmSchema, runBatch, destructiveGuard, okOrInput, seg } from "./writeHelpers.js";
 import { registerTool, type Role } from "./roles.js";
 
 const ACCOUNT_FIELDS = [
@@ -16,45 +16,47 @@ export function registerAccountTools(server: McpServer, client: GavrielClient, r
     "get_account",
     {
       title: "Obtener cuenta",
-      description: "Devuelve una cuenta con sus zonas, contactos, usuarios e intervenciones.",
+      description:
+        "Usar cuando ya tenés una cuenta puntual y querés su ficha: por defecto devuelve un resumen compacto " +
+        "(sin zonas/contactos/usuarios/intervenciones/dispositivos); pedí secciones con include o include:[\"all\"]. " +
+        "Acepta ID interno o número de cuenta (se resuelve solo). " +
+        "No usar para buscar por nombre (ver search_accounts / list_accounts) ni para el panorama operativo completo (ver get_account_dashboard).",
       inputSchema: z.object({
-              id: z.string(),
-              include: z.array(z.enum(["zones", "contacts", "users", "interventions", "devices"]))
+              id: z.string().describe("ID interno de la cuenta, o número de cuenta (hasta 10 dígitos; se resuelve al ID interno)"),
+              include: z.array(z.enum(["all", "zones", "contacts", "users", "interventions", "devices"]))
                 .optional()
-                .describe("Secciones a incluir (default: todas)"),
+                .describe("Secciones a incluir. Default: ninguna (resumen compacto). \"all\" = todas."),
               fields: fieldsSchema,
             }),
-      outputSchema: z.object({}).passthrough(),
       annotations: { readOnlyHint: true },
     },
-    async (args) => {
+    async (args, ctx) => {
       const looksLikeAccountNumber = /^\d{1,10}$/.test(args.id);
       let id = args.id;
       if (looksLikeAccountNumber) {
         try {
-          const res = await client.get("/accounts", { search: id, limit: 5 });
+          const res = await client.get("/accounts", { search: id, limit: 5 }, { signal: ctx.mcpReq.signal });
           const list = Array.isArray(res.data) ? res.data : (res.data as { data?: unknown[] } | null)?.data ?? [];
           const exact = list.find((a) => String((a as { accountNumber?: unknown }).accountNumber) === args.id);
           if (exact) id = (exact as { id: string }).id;
         } catch { /* fallthrough */ }
       }
       try {
-        const res = await client.get(`/accounts/${id}`);
+        const res = await client.get(`/accounts/${seg(id)}`, undefined, { signal: ctx.mcpReq.signal });
         if (res.status >= 400) {
           const detail = (res.data as { message?: unknown })?.message ?? JSON.stringify(res.data);
           if (looksLikeAccountNumber) {
             return err(
-              `La cuenta "${args.id}" parece un NÚMERO de cuenta, no un ID interno ` +
-                `(ej "xxxxxxxxxxxxxxx"). Buscala primero con list_accounts ` +
-                `(search: "${args.id}") y usá el id resultante. Detalle: ${String(detail).slice(0, 200)}`,
+              `No se encontró la cuenta "${args.id}" (se intentó como número y como ID interno). ` +
+                `Verificá con search_accounts o list_accounts (search: "${args.id}"). Detalle: ${String(detail).slice(0, 200)}`,
             );
           }
-          return err(`GET /accounts/${id} -> ${res.status}: ${String(detail).slice(0, 200)}`);
+          return err(`GET /accounts/${seg(id)} -> ${res.status}: ${String(detail).slice(0, 200)}`);
         }
         // Filtrar secciones si se pidió `include`
         const include = args.include as string[] | undefined;
         let data: unknown;
-        if (include && Array.isArray(include) && include.length > 0) {
+        {
           const d = res.data as Record<string, unknown>;
           const SECTION_KEYS: Record<string, string[]> = {
             zones: ["accountZones", "zones"],
@@ -65,22 +67,19 @@ export function registerAccountTools(server: McpServer, client: GavrielClient, r
           };
           const filtered = { ...d };
           for (const [section, keys] of Object.entries(SECTION_KEYS)) {
-            if (!include.includes(section)) {
+            if (!include?.includes("all") && !include?.includes(section)) {
               for (const k of keys) delete filtered[k];
             }
           }
           data = filtered;
-        } else {
-          data = res.data;
         }
         if (args.fields) data = selectFields(data as Record<string, unknown>, args.fields as string[]);
         return okStructured(data);
       } catch (e) {
         if (looksLikeAccountNumber) {
           return err(
-            `La cuenta "${args.id}" parece un NÚMERO de cuenta, no un ID interno ` +
-              `(ej "xxxxxxxxxxxxxxx"). Buscala primero con list_accounts ` +
-              `(search: "${args.id}") y usá el id resultante. Detalle: ${(e as Error).message}`,
+            `No se pudo resolver la cuenta "${args.id}" (se intentó como número y como ID interno). ` +
+              `Verificá con search_accounts o list_accounts (search: "${args.id}"). Detalle: ${(e as Error).message}`,
           );
         }
         return err((e as Error).message);
@@ -92,20 +91,22 @@ export function registerAccountTools(server: McpServer, client: GavrielClient, r
     "list_accounts",
     {
       title: "Listar cuentas",
-      description: "Lista cuentas para ubicar un ID por nombre/código/número.",
+      description:
+        "Usar cuando necesitás una página de cuentas con filtros (search/name/code) y paginación. " +
+        "No usar para una búsqueda rápida y liviana de ID por texto (ver search_accounts) ni para el detalle de una cuenta (ver get_account).",
       inputSchema: z.object({
               ...paginationSchema,
               search: z.string().optional().describe("Búsqueda libre (nombre/código)"),
-              name: z.string().optional(),
-              code: z.string().optional(),
+              name: z.string().optional().describe("Filtro por nombre de cuenta"),
+              code: z.string().optional().describe("Filtro por código de cuenta"),
               truncate: truncateSchema,
               fields: fieldsSchema,
             }),
       annotations: { readOnlyHint: true },
     },
-    async (args) => {
+    async (args, ctx) => {
       const params: Record<string, unknown> = { page: args.page, limit: args.limit, ...forwardParams(args as Record<string, unknown>, ["search", "name", "code"]) };
-      const res = await client.get("/accounts", params);
+      const res = await client.get("/accounts", params, { signal: ctx.mcpReq.signal });
       let data = res.data;
       if (args.fields && Array.isArray(data)) {
         data = data.map((item) => selectFields(item as Record<string, unknown>, args.fields as string[]));
@@ -119,11 +120,11 @@ export function registerAccountTools(server: McpServer, client: GavrielClient, r
     {
       title: "Actualizar cuenta (ESCRITURA)",
       description:
-        "PATCH /accounts/{id} (solo envía los provistos). Campos confirmados en el bundle. Requiere confirm: true.",
+        "PATCH /accounts/{id} (solo envía los provistos). Campos confirmados. Requiere confirm: true.",
       inputSchema: {
         id: z.string(),
         ...Object.fromEntries(
-          ACCOUNT_FIELDS.map((f) => [f, z.string().optional().nullish()]),
+          ACCOUNT_FIELDS.map((f) => [f, z.string().nullish()]),
         ),
         confirm: confirmSchema,
       },
@@ -132,9 +133,9 @@ export function registerAccountTools(server: McpServer, client: GavrielClient, r
       const body = buildBody(args as Record<string, unknown>, { optional: ACCOUNT_FIELDS });
       return requireConfirm(
         args.confirm,
-        { tool: "update_account", method: "PATCH", path: `/accounts/${args.id}`, params: body },
+        { tool: "update_account", method: "PATCH", path: `/accounts/${seg(args.id)}`, params: body },
         client,
-        () => client.patch(`/accounts/${args.id}`, body),
+        () => client.patch(`/accounts/${seg(args.id)}`, body),
       ).then(ok);
     },
   );
@@ -161,9 +162,9 @@ export function registerAccountTools(server: McpServer, client: GavrielClient, r
       });
       return requireConfirm(
         args.confirm,
-        { tool: "add_account_note", method: "POST", path: `/accounts/${args.accountId}/notes`, params: body },
+        { tool: "add_account_note", method: "POST", path: `/accounts/${seg(args.accountId)}/notes`, params: body },
         client,
-        () => client.post(`/accounts/${args.accountId}/notes`, body),
+        () => client.post(`/accounts/${seg(args.accountId)}/notes`, body),
       ).then(ok);
     },
   );
@@ -198,10 +199,11 @@ export function registerAccountTools(server: McpServer, client: GavrielClient, r
       };
       return requireConfirm(args.confirm, exec, client, async () => {
         const report = await runBatch(
-          ids.map((id) => ({ id, run: () => client.post(`/accounts/${id}/notes`, body) })),
+          ids.map((id) => ({ id, run: (signal) => client.post(`/accounts/${seg(id)}/notes`, body, signal) })),
+          ctx,
         );
         return { status: 200, data: report };
-      }, destructiveGuard("bulk_add_account_note", exec, ctx.mcpReq.elicitInput)).then(ok);
+      }, destructiveGuard("bulk_add_account_note", exec, ctx)).then(okOrInput);
     },
   );
 
@@ -223,9 +225,9 @@ export function registerAccountTools(server: McpServer, client: GavrielClient, r
       const body = buildBody(args as Record<string, unknown>, { optional: ["content", "validFrom", "validUntil"] });
       return requireConfirm(
         args.confirm,
-        { tool: "update_account_note", method: "PATCH", path: `/accounts/${args.accountId}/notes/${args.noteId}`, params: body },
+        { tool: "update_account_note", method: "PATCH", path: `/accounts/${seg(args.accountId)}/notes/${seg(args.noteId)}`, params: body },
         client,
-        () => client.patch(`/accounts/${args.accountId}/notes/${args.noteId}`, body),
+        () => client.patch(`/accounts/${seg(args.accountId)}/notes/${seg(args.noteId)}`, body),
       ).then(ok);
     },
   );
@@ -243,14 +245,14 @@ export function registerAccountTools(server: McpServer, client: GavrielClient, r
       annotations: { destructiveHint: true },
     },
     async (args, ctx) => {
-      const exec = { tool: "delete_account_note", method: "DELETE", path: `/accounts/${args.accountId}/notes/${args.noteId}`, params: {} };
+      const exec = { tool: "delete_account_note", method: "DELETE", path: `/accounts/${seg(args.accountId)}/notes/${seg(args.noteId)}`, params: {} };
       return requireConfirm(
         args.confirm,
         exec,
         client,
-        () => client.delete(`/accounts/${args.accountId}/notes/${args.noteId}`),
-        destructiveGuard("delete_account_note", exec, ctx.mcpReq.elicitInput),
-      ).then(ok);
+        () => client.delete(`/accounts/${seg(args.accountId)}/notes/${seg(args.noteId)}`),
+        destructiveGuard("delete_account_note", exec, ctx),
+      ).then(okOrInput);
     },
   );
 
@@ -269,12 +271,12 @@ export function registerAccountTools(server: McpServer, client: GavrielClient, r
             }),
       annotations: { readOnlyHint: true },
     },
-    wrapReadOnly(async (args) => {
+    wrapReadOnly(async (args, ctx) => {
       const params: Record<string, unknown> = {};
       if (args.brandId) params.brandId = args.brandId;
       if (args.modelId) params.modelId = args.modelId;
       if (args.status) params.status = args.status;
-      const res = await client.get(`/accounts/${args.id}/devices`, Object.keys(params).length ? params : undefined);
+      const res = await client.get(`/accounts/${seg(args.id)}/devices`, Object.keys(params).length ? params : undefined, { signal: ctx.mcpReq.signal });
       let data = res.data;
       if (args.fields && Array.isArray(data)) {
         data = data.map((item) => selectFields(item as Record<string, unknown>, args.fields as string[]));
@@ -295,8 +297,8 @@ export function registerAccountTools(server: McpServer, client: GavrielClient, r
             }),
       annotations: { readOnlyHint: true },
     },
-    wrapReadOnly(async (args) => {
-      const res = await client.get(`/accounts/${args.id}/partitions`);
+    wrapReadOnly(async (args, ctx) => {
+      const res = await client.get(`/accounts/${seg(args.id)}/partitions`, undefined, { signal: ctx.mcpReq.signal });
       let data = res.data;
       if (args.fields && Array.isArray(data)) {
         data = data.map((item) => selectFields(item as Record<string, unknown>, args.fields as string[]));
@@ -317,8 +319,8 @@ export function registerAccountTools(server: McpServer, client: GavrielClient, r
             }),
       annotations: { readOnlyHint: true },
     },
-    wrapReadOnly(async (args) => {
-      const res = await client.get(`/account-users/account/${args.id}`);
+    wrapReadOnly(async (args, ctx) => {
+      const res = await client.get(`/account-users/account/${seg(args.id)}`, undefined, { signal: ctx.mcpReq.signal });
       let data = res.data;
       if (args.fields && Array.isArray(data)) {
         data = data.map((item) => selectFields(item as Record<string, unknown>, args.fields as string[]));
@@ -339,9 +341,9 @@ export function registerAccountTools(server: McpServer, client: GavrielClient, r
             }),
       annotations: { readOnlyHint: true },
     },
-    wrapReadOnly(async (args) => {
+    wrapReadOnly(async (args, ctx) => {
       const accountId = normalizeAccountNumber(args.accountId);
-      const res = await client.get("/account-contacts", { accountId });
+      const res = await client.get("/account-contacts", { accountId }, { signal: ctx.mcpReq.signal });
       let data = res.data;
       if (args.fields && Array.isArray(data)) {
         data = data.map((item) => selectFields(item as Record<string, unknown>, args.fields as string[]));
@@ -362,11 +364,11 @@ export function registerAccountTools(server: McpServer, client: GavrielClient, r
             }),
       annotations: { readOnlyHint: true },
     },
-    wrapReadOnly(async (args) => {
+    wrapReadOnly(async (args, ctx) => {
       const path = args.jurisdictionId
-        ? `/useful-contacts/jurisdiction/${args.jurisdictionId}`
+        ? `/useful-contacts/jurisdiction/${seg(args.jurisdictionId)}`
         : "/useful-contacts";
-      const res = await client.get(path);
+      const res = await client.get(path, undefined, { signal: ctx.mcpReq.signal });
       let data = res.data;
       if (args.fields && Array.isArray(data)) {
         data = data.map((item) => selectFields(item as Record<string, unknown>, args.fields as string[]));
@@ -387,8 +389,8 @@ export function registerAccountTools(server: McpServer, client: GavrielClient, r
             }),
       annotations: { readOnlyHint: true },
     },
-    wrapReadOnly(async (args) => {
-      const res = await client.get(`/zones/account/${args.id}`);
+    wrapReadOnly(async (args, ctx) => {
+      const res = await client.get(`/zones/account/${seg(args.id)}`, undefined, { signal: ctx.mcpReq.signal });
       let data = res.data;
       if (args.fields && Array.isArray(data)) {
         data = data.map((item) => selectFields(item as Record<string, unknown>, args.fields as string[]));
@@ -450,9 +452,9 @@ export function registerAccountTools(server: McpServer, client: GavrielClient, r
       const body = buildBody(args as Record<string, unknown>, { optional: ["name", "phone", "email", "description", "order"] });
       return requireConfirm(
         args.confirm,
-        { tool: "update_account_contact", method: "PATCH", path: `/account-contacts/${args.contactId}`, params: body },
+        { tool: "update_account_contact", method: "PATCH", path: `/account-contacts/${seg(args.contactId)}`, params: body },
         client,
-        () => client.patch(`/account-contacts/${args.contactId}`, body),
+        () => client.patch(`/account-contacts/${seg(args.contactId)}`, body),
       ).then(ok);
     },
   );

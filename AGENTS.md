@@ -171,6 +171,7 @@ antes de crear codes para un formato nuevo.
 La tabla completa de variables vive en `README.md · Configuración`. Nota
 operativa:
 
+- `GAVRIEL_MCP_TOOLSETS`: lista separada por comas (default `all`) de grupos de módulos: core, notifications, video, telephony, infrastructure, coreGaps, composites. Nombre desconocido = error al arrancar.
 - `GAVRIEL_MCP_DESTRUCTIVE_APPROVAL`: `off` (default) | `elicitation`. Con
   `elicitation`, las tools destructivas (`delete_account_note`,
   `bulk_mark_events_by_filter`, `bulk_add_account_note`) piden **aprobación

@@ -5,6 +5,8 @@ import type { McpServer } from "@modelcontextprotocol/server";
 import { requireConfirm, confirmSchema } from "./writeHelpers.js";
 import { registerTool, type Role } from "./roles.js";
 
+const CACHE_TTL = 5 * 60_000;
+
 export function registerOrgTools(server: McpServer, client: GavrielClient, role: Role): void {
   server.registerTool(
     "list_companies",
@@ -21,7 +23,7 @@ export function registerOrgTools(server: McpServer, client: GavrielClient, role:
     },
     wrapReadOnly(async (args) => {
       const params: Record<string, unknown> = { page: args.page, limit: args.limit, ...forwardParams(args as Record<string, unknown>, ["search"]) };
-      const res = await client.get("/companies", params);
+      const res = await client.get("/companies", params, { ttl: CACHE_TTL });
       return okTruncated(selectFields(res.data as Record<string, unknown>, args.fields), args.truncate);
     }),
   );
@@ -75,7 +77,7 @@ export function registerOrgTools(server: McpServer, client: GavrielClient, role:
       annotations: { readOnlyHint: true },
     },
     wrapReadOnly(async (args) => {
-      const res = await client.get("/roles");
+      const res = await client.get("/roles", undefined, { ttl: CACHE_TTL });
       return okTruncated(res.data, args.truncate);
     }),
   );

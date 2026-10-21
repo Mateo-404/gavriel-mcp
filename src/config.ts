@@ -1,5 +1,17 @@
+import { fileURLToPath } from "node:url";
+import { homedir } from "node:os";
+import { join } from "node:path";
 import { z } from "zod";
 import { resolvePassword } from "./secrets.js";
+
+function isSecureBase(v: string): boolean {
+  try {
+    const u = new URL(v);
+    return u.protocol === "https:" || (u.protocol === "http:" && (u.hostname === "localhost" || u.hostname === "127.0.0.1"));
+  } catch {
+    return false;
+  }
+}
 
 const envSchema = z.object({
   GAVRIEL_EMAIL: z.string().min(1, "GAVRIEL_EMAIL es requerido"),
@@ -18,14 +30,15 @@ const envSchema = z.object({
   GAVRIEL_API_BASE: z
     .string()
     .url("GAVRIEL_API_BASE debe ser una URL válida")
+    .refine(isSecureBase, "GAVRIEL_API_BASE debe usar https (http solo para localhost/127.0.0.1)")
     .default("https://app.gavriel.com.ar/api"),
   GAVRIEL_MCP_LOG_DIR: z.string().optional(),
   // Roles: readonly (solo lectura) < lite (lectura + core writes) < full (todo).
   GAVRIEL_MCP_ROLE: z.enum(["readonly", "lite", "full"]).default("full"),
   // Escrituras en vuelo simultáneas por recurso (cola por path, ver gavrielClient).
   GAVRIEL_MCP_WRITE_CONCURRENCY: z.coerce.number().int().min(1).max(20).default(5),
-  // Aprobación humana extra para tools destructivas: "off" (default) | "elicitation".
-  GAVRIEL_MCP_DESTRUCTIVE_APPROVAL: z.enum(["off", "elicitation"]).default("off"),
+  // Aprobación humana extra para tools destructivas: "elicitation" (default) | "off".
+  GAVRIEL_MCP_DESTRUCTIVE_APPROVAL: z.enum(["off", "elicitation"]).default("elicitation"),
 });
 
 export type Config = Omit<z.infer<typeof envSchema>, "GAVRIEL_PASSWORD"> & {
@@ -40,8 +53,8 @@ function loadDotEnv(): void {
     // no .env in cwd, try alongside the built dist/
   }
   try {
-    const root = new URL("../", import.meta.url).pathname; // raíz del proyecto (src/ o dist/)
-    process.loadEnvFile?.(`${root}.env`);
+    // raíz del proyecto (src/ o dist/); fileURLToPath maneja espacios y rutas de Windows
+    process.loadEnvFile?.(fileURLToPath(new URL("../.env", import.meta.url)));
   } catch {
     // no .env found anywhere, env vars del sistema alcanzan
   }
@@ -70,16 +83,12 @@ export function loadConfig(): Config {
   const password = resolvePassword();
   if (!password) {
     throw new Error(
-      "No se encontró el password de Gavriel en el keyring, en GAVRIEL_PASSWORD ni en ~/.secrets/gavriel-password.\n" +
-        "Guardalo con: secret-tool store --label='Gavriel MCP - password' service gavriel-mcp account password",
+      "No se encontró el password de Gavriel en el almacén seguro ni en GAVRIEL_PASSWORD (ver SECURITY.md).",
     );
   }
   return { ...parsed.data, GAVRIEL_PASSWORD: password };
 }
 
 export function logDir(config: Config): string {
-  return (
-    config.GAVRIEL_MCP_LOG_DIR ||
-    `${process.env.HOME || process.env.USERPROFILE || "."}/.local/share/gavriel-mcp`
-  );
+  return config.GAVRIEL_MCP_LOG_DIR || join(homedir(), ".local", "share", "gavriel-mcp");
 }

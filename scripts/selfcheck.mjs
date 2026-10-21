@@ -9,11 +9,12 @@ import { spawnSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-import { setLogDir } from "../dist/auditLog.js";
+import { setLogDir, redact, flushLogs } from "../dist/auditLog.js";
 import { requireConfirm, runBatch } from "../dist/tools/writeHelpers.js";
-import { buildQueryString, GavrielClient } from "../dist/gavrielClient.js";
-import { isAllowed, READ_PREFIXES } from "../dist/tools/rawGet.js";
+import { buildQueryString, GavrielClient, retryDelayMs } from "../dist/gavrielClient.js";
+import { isAllowed, normalizePath, sanitizeQuery, READ_PREFIXES } from "../dist/tools/rawGet.js";
 import { hasRole, registerTool } from "../dist/tools/roles.js";
+import { ok, okTruncated } from "../dist/tools/shared.js";
 
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
 
@@ -32,6 +33,8 @@ const t = (label, fn) => {
   try { fn(); passed++; console.log(`  PASS ${label}`); }
   catch (e) { console.log(`  FAIL ${label}: ${e.message}`); process.exitCode = 1; }
 };
+// El keyring falso (secret-tool) es POSIX; en Windows el backend real es DPAPI y no se puede simular acá.
+const tKeyring = (label, fn) => (process.platform === "win32" ? console.log(`  SKIP ${label} (win32)`) : t(label, fn));
 const tAsync = async (label, fn) => {
   try { await fn(); passed++; console.log(`  PASS ${label}`); }
   catch (e) { console.log(`  FAIL ${label}: ${e.message}`); process.exitCode = 1; }
@@ -296,6 +299,56 @@ await tAsync("gavrielClient: error de red se envuelve en un mensaje en español 
   });
 });
 
+await tAsync("gavrielClient: cache opt-in, dedupe concurrente e invalidación por escritura", async () => {
+  const client = newClient();
+  const ok200 = () => ({ status: 200, body: JSON.stringify({ n: 1 }), headers: JSON_HEADERS });
+  await withFetchStub([ok200(), ok200(), ok200(), ok200()], async (stub) => {
+    // dedupe: dos GET idénticos concurrentes (params en distinto orden) = 1 fetch
+    await Promise.all([client.get("/roles", { a: 1, b: 2 }), client.get("/roles", { b: 2, a: 1 })]);
+    assert.equal(stub.calls.length, 1, "dedupe");
+    // sin ttl no hay cache
+    await client.get("/roles");
+    assert.equal(stub.calls.length, 2);
+    // con ttl: 2do GET es hit
+    await client.get("/roles/x", undefined, { ttl: 60_000 });
+    await client.get("/roles/x", undefined, { ttl: 60_000 });
+    assert.equal(stub.calls.length, 3, "cache hit");
+    // escritura exitosa con prefijo compartido invalida
+    stub.calls.length = 0;
+    await client.patch("/roles/x", {}).catch(() => {});
+  });
+  await withFetchStub([ok200(), ok200()], async (stub) => {
+    await client.get("/companies", undefined, { ttl: 60_000 });
+    await client.get("/companies", undefined, { ttl: 60_000 });
+    assert.equal(stub.calls.length, 1);
+    client.invalidate("/companies/5");
+    await client.get("/companies", undefined, { ttl: 60_000 });
+    assert.equal(stub.calls.length, 2, "invalidado tras escritura");
+  });
+});
+
+await tAsync("gavrielClient: retryDelayMs (Retry-After segundos/fecha, jitter, tope)", () => {
+  assert.equal(retryDelayMs(0, "2"), 2000);
+  const now = Date.parse("2030-01-01T00:00:00Z");
+  assert.equal(retryDelayMs(0, "Tue, 01 Jan 2030 00:00:03 GMT", 0.5, now), 3000);
+  assert.equal(retryDelayMs(1, null, 0), 500, "1000 * 0.5");
+  assert.equal(retryDelayMs(1, null, 1), 1500, "1000 * 1.5");
+  assert.equal(retryDelayMs(0, "999"), 8000, "tope MAX_BACKOFF_MS");
+});
+
+await tAsync("gavrielClient: GET reintenta una vez ante ECONNRESET", async () => {
+  const client = newClient();
+  const err = Object.assign(new Error("reset"), { code: "ECONNRESET" });
+  await withFetchStub(
+    [{ networkError: err }, { status: 200, body: "{}", headers: JSON_HEADERS }],
+    async (stub) => {
+      const res = await client.get("/tickets");
+      assert.equal(res.status, 200);
+      assert.equal(stub.calls.length, 2);
+    },
+  );
+});
+
 await tAsync("gavrielClient: x-new-token rota el token usado en el siguiente request", async () => {
   const client = newClient();
   await withFetchStub(
@@ -327,6 +380,7 @@ await tAsync("2xx con body no parseable => applied_response_unparseable + re-lec
   assert.equal(r.httpStatus, 200);
   assert.equal(r.verifiedState.reRead.path, "/tickets/clxyz");
   assert.deepEqual(r.verifiedState.reRead.data, { verified: true });
+  await flushLogs();
   const log = readFileSync(join(logDir, "writes.log"), "utf8");
   assert.ok(log.includes('"rawBody":"{\\"id\\":\\"clxyz\\",\\"status\\":\\"ope'),
     "el body crudo debe quedar en writes.log");
@@ -438,6 +492,8 @@ function runProbe(mode, email, { home, keyringAvailable, keyringState, extraEnv 
   const env = { ...process.env };
   env.PATH = `${FAKE_BIN}:${process.env.PATH}`;
   env.HOME = home;
+  env.USERPROFILE = home;
+  env.GAVRIEL_ALLOW_PLAINTEXT = "1"; // los casos legacy requieren opt-in
   env.FAKE_SECRET_TOOL_AVAILABLE = keyringAvailable ? "1" : "0";
   env.FAKE_KEYRING_STATE = keyringState;
   delete env.GAVRIEL_PASSWORD;
@@ -453,7 +509,7 @@ function runProbe(mode, email, { home, keyringAvailable, keyringState, extraEnv 
 
 const SECRETS_EMAIL = "test@example.com";
 
-t("secrets: password usa el keyring si está disponible, aunque haya env y archivo legacy", () => {
+tKeyring("secrets: password usa el keyring si está disponible, aunque haya env y archivo legacy", () => {
   const home = makeHome({ ".secrets/gavriel-password": "legacy-pass" });
   const state = join(secretsTmp, "state-1.json");
   writeFileSync(state, JSON.stringify({ "gavriel-mcp:password": "keyring-pass" }));
@@ -488,7 +544,7 @@ t("secrets: sin ninguna fuente, password resuelve null", () => {
   assert.equal(result, null);
 });
 
-t("secrets: trusted_device_token respeta el mismo orden (keyring > env > legacy)", () => {
+tKeyring("secrets: trusted_device_token respeta el mismo orden (keyring > env > legacy)", () => {
   const home = makeHome({
     ".local/share/gavriel-mcp/trusted-device.json": JSON.stringify({ [SECRETS_EMAIL]: "legacy-token" }),
   });
@@ -510,7 +566,7 @@ t("secrets: token legacy normaliza el email (case/espacios) al leer", () => {
   assert.equal(result, "legacy-token");
 });
 
-t("secrets: saveTrustedToken escribe al keyring cuando está disponible (no al legacy)", () => {
+tKeyring("secrets: saveTrustedToken escribe al keyring cuando está disponible (no al legacy)", () => {
   const home = makeHome({});
   const state = join(secretsTmp, "state-7.json");
   runProbe("save-token", SECRETS_EMAIL, {
@@ -538,6 +594,42 @@ t("secrets: saveTrustedToken cae al archivo legacy sin keyring, y clearTrustedTo
   runProbe("clear-token", SECRETS_EMAIL, { home, keyringAvailable: false, keyringState: state });
   const afterClear = runProbe("token", SECRETS_EMAIL, { home, keyringAvailable: false, keyringState: state });
   assert.equal(afterClear, null);
+});
+
+t("redact: claves sensibles anidadas se enmascaran", () => {
+  const r = redact({ a: 1, password: "x", nested: { accessToken: "t", list: [{ twoFA_code: "1" }, { ok: 2 }] } });
+  assert.deepEqual(r, { a: 1, password: "[REDACTED]", nested: { accessToken: "[REDACTED]", list: [{ twoFA_code: "[REDACTED]" }, { ok: 2 }] } });
+});
+t("rawGet: normalizePath rechaza traversal/encoding/query/fragment", () => {
+  for (const p of ["/tickets/../auth", "/tickets/%2e%2e", "/tickets?x=1", "/tickets#a", "/tickets\\x"]) {
+    assert.equal(normalizePath(p), null, p);
+    assert.equal(isAllowed(p), false, p);
+  }
+  assert.equal(normalizePath("/tickets//1/"), "/tickets/1");
+  assert.equal(normalizePath("tickets/1"), null);
+});
+t("rawGet: /auth ya no está abierto salvo /auth/me", () => {
+  assert.equal(isAllowed("/auth/login"), false);
+  assert.equal(isAllowed("/auth/me"), true);
+});
+t("rawGet: sanitizeQuery descarta claves sensibles y valores no primitivos", () => {
+  assert.deepEqual(sanitizeQuery({ page: 1, access_token: "x", o: { a: 1 }, "a b": 1, s: ["x"] }), { page: 1, s: ["x"] });
+});
+
+t("shared: ok() agrega structuredContent (array -> {data})", () => {
+  assert.deepEqual(ok({ a: 1 }).structuredContent, { a: 1 });
+  assert.deepEqual(ok([1, 2]).structuredContent, { data: [1, 2] });
+  assert.equal(ok("x").structuredContent, undefined);
+  assert.equal(ok([1, 2]).content[0].text, "[1,2]");
+});
+t("shared: okTruncated corta en ítems y devuelve JSON válido", () => {
+  const items = Array.from({ length: 50 }, (_, i) => ({ id: i, name: "x".repeat(20) }));
+  const r = okTruncated(items, 500);
+  const parsed = JSON.parse(r.content[0].text);
+  assert.ok(parsed.data.length > 0 && parsed.data.length < 50);
+  assert.match(parsed._truncado, /de 50 ítems/);
+  assert.ok(r.content[0].text.length <= 500 + 0 || parsed.data.length === 1);
+  JSON.parse(okTruncated({ big: "y".repeat(5000) }, 1000).content[0].text);
 });
 
 rmSync(secretsTmp, { recursive: true, force: true });

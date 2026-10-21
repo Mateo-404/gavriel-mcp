@@ -3,25 +3,28 @@ import { ok, ensureOk, wrapReadOnly } from "./shared.js";
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/server";
 
+const CACHE_TTL = 5 * 60_000;
+const CONCURRENCY = 5;
+
 export function registerDashboardTools(server: McpServer, client: GavrielClient): void {
   server.registerTool(
     "get_account_dashboard",
     {
       title: "Dashboard de cuenta (compuesto)",
       description:
-        "Combina info de cuenta + dispositivos + intervenciones + eventos pendientes en UNA sola llamada. " +
-        "Ahorra 4 llamadas vs hacer cada una por separado.",
+        "Usar para el panorama operativo de una cuenta en una sola llamada (cuenta + dispositivos + intervenciones abiertas + eventos pendientes). " +
+        "No usar si solo necesitás la ficha (ver get_account) ni listar eventos con filtros (ver list_events).",
       inputSchema: z.object({
               id: z.string().describe("ID de la cuenta"),
             }),
       annotations: { readOnlyHint: true },
     },
-    wrapReadOnly(async (args) => {
+    wrapReadOnly(async (args, ctx) => {
       const [accountRes, devicesRes, interventionsRes, eventsRes] = await Promise.allSettled([
-        client.get(`/accounts/${args.id}`),
-        client.get(`/accounts/${args.id}/devices`),
-        client.get(`/interventions/account/${args.id}/open`),
-        client.get("/events", { accountId: args.id, pending: true, limit: 50 }),
+        client.get(`/accounts/${args.id}`, undefined, { signal: ctx.mcpReq.signal }),
+        client.get(`/accounts/${args.id}/devices`, undefined, { ttl: CACHE_TTL, signal: ctx.mcpReq.signal }),
+        client.get(`/interventions/account/${args.id}/open`, undefined, { signal: ctx.mcpReq.signal }),
+        client.get("/events", { accountId: args.id, pending: true, limit: 50 }, { signal: ctx.mcpReq.signal }),
       ]);
 
       const account = accountRes.status === "fulfilled"
@@ -43,15 +46,17 @@ export function registerDashboardTools(server: McpServer, client: GavrielClient)
         ? (Array.isArray(interventionsRes.value.data) ? interventionsRes.value.data : [])
         : [];
 
-      const events = eventsRes.status === "fulfilled"
-        ? (Array.isArray(eventsRes.value.data) ? eventsRes.value.data : (eventsRes.value.data as { data?: unknown[] } | null)?.data ?? [])
-        : [];
+      const ev = eventsRes.status === "fulfilled" ? eventsRes.value.data : null;
+      const evTotal = (ev as { total?: number } | null)?.total;
+      const pendingEvents = typeof evTotal === "number"
+        ? evTotal
+        : (Array.isArray(ev) ? ev : (ev as { data?: unknown[] } | null)?.data ?? []).length;
 
       return ok({
         account,
         devices,
         openInterventions: interventions.length,
-        pendingEvents: events.length,
+        pendingEvents,
       });
     }),
   );
@@ -61,17 +66,17 @@ export function registerDashboardTools(server: McpServer, client: GavrielClient)
     {
       title: "Contexto de ticket (compuesto)",
       description:
-        "Combina ticket + cuenta + actividades en UNA sola llamada. " +
-        "Útil para entender un ticket sin hacer múltiples queries.",
+        "Usar para entender un ticket con su cuenta y actividades en una sola llamada. " +
+        "No usar si solo necesitás ticket + actividades (ver get_ticket) ni para listar/buscar (ver list_tickets / search_tickets).",
       inputSchema: z.object({
               id: z.string().describe("ID del ticket"),
             }),
       annotations: { readOnlyHint: true },
     },
-    wrapReadOnly(async (args) => {
+    wrapReadOnly(async (args, ctx) => {
       const [ticketRes, activitiesRes] = await Promise.allSettled([
-        client.get(`/tickets/${args.id}`),
-        client.get(`/activities/ticket/${args.id}`),
+        client.get(`/tickets/${args.id}`, undefined, { signal: ctx.mcpReq.signal }),
+        client.get(`/activities/ticket/${args.id}`, undefined, { signal: ctx.mcpReq.signal }),
       ]);
 
       const ticket = ticketRes.status === "fulfilled"
@@ -79,10 +84,13 @@ export function registerDashboardTools(server: McpServer, client: GavrielClient)
         : null;
       const accountId = (ticket as Record<string, unknown> | null)?.accountId as string | undefined;
 
+      const inline = (ticket as Record<string, unknown> | null)?.account as Record<string, unknown> | undefined;
       let account = null;
-      if (accountId) {
+      if (inline?.id) {
+        account = { id: inline.id, name: inline.name, phone: inline.phone, email: inline.email };
+      } else if (accountId) {
         try {
-          const accountRes = await client.get(`/accounts/${accountId}`);
+          const accountRes = await client.get(`/accounts/${accountId}`, undefined, { signal: ctx.mcpReq.signal });
           const a = accountRes.data as Record<string, unknown>;
           account = { id: a.id, name: a.name, phone: a.phone, email: a.email };
         } catch {
@@ -103,15 +111,15 @@ export function registerDashboardTools(server: McpServer, client: GavrielClient)
     {
       title: "Contexto de evento (compuesto)",
       description:
-        "Combina evento + cuenta + conexión en UNA sola llamada. " +
-        "Útil para entender un evento sin hacer múltiples queries.",
+        "Usar para entender un evento con su cuenta y conexión en una sola llamada. " +
+        "No usar si solo necesitás el evento (ver get_event) ni para listar/buscar (ver list_events / search_events).",
       inputSchema: z.object({
               id: z.string().describe("ID del evento"),
             }),
       annotations: { readOnlyHint: true },
     },
-    wrapReadOnly(async (args) => {
-      const eventRes = await client.get(`/events/${args.id}`);
+    wrapReadOnly(async (args, ctx) => {
+      const eventRes = await client.get(`/events/${args.id}`, undefined, { signal: ctx.mcpReq.signal });
       const event = ensureOk<Record<string, unknown>>(eventRes, `evento ${args.id}`);
       const account = event.account as Record<string, unknown> | undefined;
       const connection = event.connection as Record<string, unknown> | undefined;
@@ -119,7 +127,7 @@ export function registerDashboardTools(server: McpServer, client: GavrielClient)
       let accountDetail = null;
       if (account?.id) {
         try {
-          const accountRes = await client.get(`/accounts/${account.id}`);
+          const accountRes = await client.get(`/accounts/${account.id}`, undefined, { signal: ctx.mcpReq.signal });
           const a = accountRes.data as Record<string, unknown>;
           accountDetail = { id: a.id, name: a.name, phone: a.phone, email: a.email };
         } catch {
@@ -140,37 +148,43 @@ export function registerDashboardTools(server: McpServer, client: GavrielClient)
     {
       title: "Dashboard de eventos pendientes",
       description:
-        "Lista cuentas con eventos pendientes y sus detalles. " +
-        "Útil para procesamiento masivo de eventos.",
+        "Usar para ver qué cuentas tienen eventos pendientes (con detalle) antes de procesarlos en masa. " +
+        "No usar para eventos de una cuenta concreta con filtros (ver list_events) ni para su panorama (ver get_account_dashboard).",
       inputSchema: z.object({
               limit: z.number().int().min(1).max(50).default(10).describe("Máximo de cuentas a mostrar"),
             }),
       annotations: { readOnlyHint: true },
     },
-    wrapReadOnly(async (args) => {
-      const accountsRes = await client.get("/events/accounts-with-pending-events");
+    wrapReadOnly(async (args, ctx) => {
+      const accountsRes = await client.get("/events/accounts-with-pending-events", undefined, { signal: ctx.mcpReq.signal });
       const accounts = Array.isArray(accountsRes.data)
         ? accountsRes.data.slice(0, args.limit)
         : [];
 
-      const results = await Promise.allSettled(
-        accounts.map(async (a: Record<string, unknown>) => {
-          const eventsRes = await client.get("/events", { accountId: a.id, pending: true, limit: 50 });
-          const eventsData = eventsRes.data;
-          const events = Array.isArray(eventsData) ? eventsData : [];
-          return {
-            accountId: a.id,
-            accountName: a.name,
-            accountNumber: a.accountNumber,
-            pendingEvents: events.length,
-            events: events.map((e: Record<string, unknown>) => ({ id: e.id, port: e.port, createdAt: e.createdAt })).slice(0, 5),
-          };
-        }),
-      );
-
-      const dashboard = results
-        .filter((r) => r.status === "fulfilled")
-        .map((r) => (r as PromiseFulfilledResult<unknown>).value);
+      // Pool de CONCURRENCY workers; solo se piden los 5 eventos que se muestran.
+      const dashboard: unknown[] = [];
+      let next = 0;
+      const worker = async () => {
+        while (next < accounts.length) {
+          const a = accounts[next++] as Record<string, unknown>;
+          try {
+            const eventsRes = await client.get("/events", { accountId: a.id, pending: true, limit: 5 }, { signal: ctx.mcpReq.signal });
+            const d = eventsRes.data as unknown;
+            const events: Record<string, unknown>[] = Array.isArray(d) ? d : (d as { data?: Record<string, unknown>[] } | null)?.data ?? [];
+            const total = (d as { total?: number } | null)?.total;
+            dashboard.push({
+              accountId: a.id,
+              accountName: a.name,
+              accountNumber: a.accountNumber,
+              pendingEvents: typeof total === "number" ? total : events.length,
+              events: events.map((e) => ({ id: e.id, port: e.port, createdAt: e.createdAt })),
+            });
+          } catch {
+            // cuenta omitida (igual que antes con allSettled)
+          }
+        }
+      };
+      await Promise.all(Array.from({ length: Math.min(CONCURRENCY, accounts.length) }, worker));
 
       return ok(dashboard);
     }),

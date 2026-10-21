@@ -2,7 +2,7 @@ import type { GavrielClient } from "../gavrielClient.js";
 import { ok, buildBody, wrapReadOnly, okTruncated } from "./shared.js";
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/server";
-import { requireConfirm, confirmSchema } from "./writeHelpers.js";
+import { requireConfirm, confirmSchema, seg, destructiveGuard, okOrInput } from "./writeHelpers.js";
 import { registerTool, type Role } from "./roles.js";
 
 interface EventType { id: string; name: string; title?: string; eventsCodes?: Array<{ code: string; id: string; eventsTypeId?: string }> }
@@ -64,9 +64,9 @@ export function registerEventCatalogTools(server: McpServer, client: GavrielClie
       });
       return requireConfirm(
         args.confirm,
-        { tool: "update_event_type", method: "PATCH", path: `/events-types/${args.eventTypeId}`, params: body },
+        { tool: "update_event_type", method: "PATCH", path: `/events-types/${seg(args.eventTypeId)}`, params: body },
         client,
-        () => client.patch(`/events-types/${args.eventTypeId}`, body),
+        () => client.patch(`/events-types/${seg(args.eventTypeId)}`, body),
       ).then(ok);
     },
   );
@@ -79,13 +79,9 @@ export function registerEventCatalogTools(server: McpServer, client: GavrielClie
       inputSchema: { eventTypeId: z.string(), confirm: confirmSchema },
       annotations: { destructiveHint: true },
     },
-    async (args) => {
-      return requireConfirm(
-        args.confirm,
-        { tool: "delete_event_type", method: "DELETE", path: `/events-types/${args.eventTypeId}`, params: {} },
-        client,
-        () => client.delete(`/events-types/${args.eventTypeId}`),
-      ).then(ok);
+    async (args, ctx) => {
+      const exec = { tool: "delete_event_type", method: "DELETE", path: `/events-types/${seg(args.eventTypeId)}`, params: {} };
+      return requireConfirm(args.confirm, exec, client, () => client.delete(`/events-types/${seg(args.eventTypeId)}`), destructiveGuard("delete_event_type", exec, ctx)).then(okOrInput);
     },
   );
 
@@ -141,9 +137,9 @@ export function registerEventCatalogTools(server: McpServer, client: GavrielClie
       });
       return requireConfirm(
         args.confirm,
-        { tool: "update_event_code", method: "PATCH", path: `/events-codes/${args.eventCodeId}`, params: body },
+        { tool: "update_event_code", method: "PATCH", path: `/events-codes/${seg(args.eventCodeId)}`, params: body },
         client,
-        () => client.patch(`/events-codes/${args.eventCodeId}`, body),
+        () => client.patch(`/events-codes/${seg(args.eventCodeId)}`, body),
       ).then(ok);
     },
   );
@@ -156,13 +152,9 @@ export function registerEventCatalogTools(server: McpServer, client: GavrielClie
       inputSchema: { eventCodeId: z.string(), confirm: confirmSchema },
       annotations: { destructiveHint: true },
     },
-    async (args) => {
-      return requireConfirm(
-        args.confirm,
-        { tool: "delete_event_code", method: "DELETE", path: `/events-codes/${args.eventCodeId}`, params: {} },
-        client,
-        () => client.delete(`/events-codes/${args.eventCodeId}`),
-      ).then(ok);
+    async (args, ctx) => {
+      const exec = { tool: "delete_event_code", method: "DELETE", path: `/events-codes/${seg(args.eventCodeId)}`, params: {} };
+      return requireConfirm(args.confirm, exec, client, () => client.delete(`/events-codes/${seg(args.eventCodeId)}`), destructiveGuard("delete_event_code", exec, ctx)).then(okOrInput);
     },
   );
 
@@ -181,11 +173,11 @@ export function registerEventCatalogTools(server: McpServer, client: GavrielClie
           dataType: z.string().optional(),
           eventsTypeId: z.string(),
           eventsFormatId: z.string(),
-        })).min(1).describe("Array de códigos a crear"),
+        })).min(1).max(50).describe("Array de códigos a crear"),
         confirm: confirmSchema,
       },
     },
-    async (args) => {
+    async (args, ctx) => {
       const exec = {
         tool: "bulk_create_event_codes",
         method: "POST",
@@ -211,7 +203,7 @@ export function registerEventCatalogTools(server: McpServer, client: GavrielClie
           status: 200,
           data: { created, errors, summary: { total: args.codes.length, created: created.length, errors: errors.length } },
         };
-      }).then(ok);
+      }, destructiveGuard("bulk_create_event_codes", exec, ctx)).then(okOrInput);
     },
   );
 

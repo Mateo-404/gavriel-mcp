@@ -1,7 +1,11 @@
 import type { GavrielClient } from "../gavrielClient.js";
 import { ok, wrapReadOnly } from "./shared.js";
+import { TICKET_STATUSES, TICKET_PRIORITIES } from "./shared.js";
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/server";
+
+// Mismos estados que events.ts.
+const EVENT_STATUSES = ["pending", "attending", "processed", "self-processed", "cancelled", "hidden"] as const;
 
 export function registerSearchTools(server: McpServer, client: GavrielClient): void {
   server.registerTool(
@@ -9,16 +13,16 @@ export function registerSearchTools(server: McpServer, client: GavrielClient): v
     {
       title: "Buscar cuentas (resumen)",
       description:
-        "Busca cuentas por nombre o código y devuelve solo id, accountNumber y name. " +
-        "Para el resultado completo usar get_account(id). Output: [{id, accountNumber, name}]",
+        "Usar para ubicar rápido el ID de una cuenta por texto (devuelve solo id, accountNumber y name). " +
+        "No usar si necesitás paginación/filtros por name o code (ver list_accounts) ni el detalle (ver get_account). Output: [{id, accountNumber, name}]",
       inputSchema: z.object({
               query: z.string().min(1).describe("Texto de búsqueda (nombre o código de cuenta)"),
               limit: z.number().int().min(1).max(25).default(10).describe("Máximo de resultados (default 10, máx 25)"),
             }),
       annotations: { readOnlyHint: true },
     },
-    wrapReadOnly(async (args) => {
-      const res = await client.get("/accounts", { search: args.query, limit: args.limit });
+    wrapReadOnly(async (args, ctx) => {
+      const res = await client.get("/accounts", { search: args.query, limit: args.limit }, { signal: ctx.mcpReq.signal });
       const list = Array.isArray(res.data)
         ? res.data
         : (res.data as { data?: unknown[] } | null)?.data ?? [];
@@ -35,18 +39,18 @@ export function registerSearchTools(server: McpServer, client: GavrielClient): v
     {
       title: "Buscar tickets (resumen)",
       description:
-        "Busca tickets con filtros y devuelve campos reducidos. " +
-        "Para el detalle completo usar get_ticket(id). Output: [{id, title, status, priority, accountId, createdAt}]",
+        "Usar para un vistazo rápido de tickets con campos reducidos. " +
+        "No usar si necesitás todos los campos, paginación o más filtros (ver list_tickets) ni un ticket puntual (ver get_ticket). Output: [{id, title, status, priority, accountId, createdAt}]",
       inputSchema: z.object({
-              status: z.string().optional().describe("Filtrar por estado (open, in_progress, resolved, closed)"),
-              priority: z.string().optional().describe("Filtrar por prioridad (low, medium, high, urgent)"),
+              status: z.enum(TICKET_STATUSES).optional().describe("Filtrar por estado"),
+              priority: z.enum(TICKET_PRIORITIES).optional().describe("Filtrar por prioridad"),
               accountId: z.string().optional().describe("Filtrar por ID de cuenta"),
               accountSearch: z.string().optional().describe("Buscar tickets de una cuenta por nombre/número"),
               limit: z.number().int().min(1).max(50).default(15).describe("Máximo de resultados (default 15, máx 50)"),
             }),
       annotations: { readOnlyHint: true },
     },
-    wrapReadOnly(async (args) => {
+    wrapReadOnly(async (args, ctx) => {
       const params: Record<string, unknown> = {
         page: 1, limit: args.limit, sortBy: "createdAt", sortDirection: "desc",
       };
@@ -54,7 +58,7 @@ export function registerSearchTools(server: McpServer, client: GavrielClient): v
       if (args.priority) params.priority = args.priority;
       if (args.accountId) params.accountId = args.accountId;
       if (args.accountSearch) params.accountSearch = args.accountSearch;
-      const res = await client.get("/tickets", params);
+      const res = await client.get("/tickets", params, { signal: ctx.mcpReq.signal });
       const list = Array.isArray(res.data)
         ? res.data
         : (res.data as { data?: unknown[] } | null)?.data ?? [];
@@ -71,26 +75,27 @@ export function registerSearchTools(server: McpServer, client: GavrielClient): v
     {
       title: "Buscar eventos (resumen)",
       description:
-        "Busca eventos con filtros y devuelve campos reducidos. Backend lento: siempre filtrar por accountId y/o rango de fechas. " +
-        "Para el detalle completo usar get_event(id). Output: [{id, type, accountName, port, status, createdAt}]",
+        "Usar para un vistazo rápido de eventos con campos reducidos (backend lento: siempre filtrar por accountId y/o fechas). " +
+        "No usar si necesitás puerto/código/bridge o todos los campos (ver list_events) ni un evento puntual (ver get_event). Output: [{id, type, accountName, port, status, createdAt}]",
       inputSchema: z.object({
               accountId: z.string().describe("ID de cuenta (requerido para evitar queries lentas)"),
-              status: z.string().optional().describe("Estado del evento (pending, attending, processed, etc.)"),
+              status: z.enum(EVENT_STATUSES).optional().describe("Estado del evento"),
               dateFrom: z.string().optional().describe("Fecha inicio ISO datetime"),
               dateTo: z.string().optional().describe("Fecha fin ISO datetime"),
               limit: z.number().int().min(1).max(50).default(15).describe("Máximo de resultados (default 15, máx 50)"),
             }),
       annotations: { readOnlyHint: true },
     },
-    wrapReadOnly(async (args) => {
+    wrapReadOnly(async (args, ctx) => {
       const params: Record<string, unknown> = {
         page: 1, limit: args.limit, sortBy: "createdAt", sortDirection: "desc",
         accountId: args.accountId,
       };
-      if (args.status) params.pending = args.status === "pending";
+      if (args.status === "pending") params.pending = true;
+      else if (args.status) params.status = args.status;
       if (args.dateFrom) params.dateFrom = args.dateFrom;
       if (args.dateTo) params.dateTo = args.dateTo;
-      const res = await client.get("/events", params);
+      const res = await client.get("/events", params, { signal: ctx.mcpReq.signal });
       const list = Array.isArray(res.data)
         ? res.data
         : (res.data as { data?: unknown[] } | null)?.data ?? [];
@@ -116,7 +121,8 @@ export function registerSearchTools(server: McpServer, client: GavrielClient): v
     {
       title: "Buscar usuarios (resumen)",
       description:
-        "Busca usuarios por nombre o email y devuelve campos reducidos. " +
+        "Usar para ubicar usuarios por nombre o email con campos reducidos. " +
+        "No usar para el listado completo/paginado de usuarios (ver list_users). " +
         "Output: [{id, name, email, role}]",
       inputSchema: z.object({
               query: z.string().optional().describe("Texto de búsqueda (nombre o email)"),
@@ -124,10 +130,10 @@ export function registerSearchTools(server: McpServer, client: GavrielClient): v
             }),
       annotations: { readOnlyHint: true },
     },
-    wrapReadOnly(async (args) => {
+    wrapReadOnly(async (args, ctx) => {
       const params: Record<string, unknown> = { page: 1, limit: args.limit };
       if (args.query) params.search = args.query;
-      const res = await client.get("/users", params);
+      const res = await client.get("/users", params, { signal: ctx.mcpReq.signal });
       const list = Array.isArray(res.data)
         ? res.data
         : (res.data as { data?: unknown[] } | null)?.data ?? [];
