@@ -27,6 +27,10 @@ The server runs locally over stdio and acts with the credentials of one Gavriel 
 * Audit logs (`writes.log`, `perf.log`, rotated at 5 MB) redact any key matching `pass|token|secret|auth|2fa|code`. Never commit `.env`.
 * `get` rejects `..`, `%`, `?`, `#` in paths, only allows whitelisted read prefixes (`/auth/me` only under auth) and drops sensitive query keys.
 
+## CLI and TOTP seed
+
+`gavriel totp set` is opt-in and stores the seed only in the OS secret store (DPAPI / libsecret) under `totp_seed:<email>`, never in a file. Anyone with access to your OS user can then generate 2FA codes, so the second factor no longer protects that machine. The seed is never printed (only 6-digit codes) and is redacted from logs; `gavriel logout --purge` or `gavriel totp clear` removes it. Per-account passwords are stored as `password:<email>`; in profile mode the MCP never falls back to another account's environment password.
+
 ## Destructive Approval
 
 Every write needs `confirm: true` (otherwise it only previews). Additionally every `delete_*`, every `bulk_*` and `send_conversation_message` ask the human through MCP elicitation before running. If the client does not support elicitation, the operation is **rejected** (fail closed). Opt out explicitly with `GAVRIEL_MCP_DESTRUCTIVE_APPROVAL=off`. Batch tools accept at most 50 validated ids.

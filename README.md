@@ -75,6 +75,22 @@ The JWT is cached **in memory** (never on disk) and renewed ~5 minutes before
 expiration or after a 401. The API renews the token through the `x-new-token`
 header, which the client automatically respects.
 
+## CLI (`gavriel`)
+
+Second binary (`dist/cli.js`, no extra dependencies) to log in, manage several Gavriel accounts, renew the trusted device and register the MCP in Claude.
+
+```bash
+gavriel login                          # email + hidden password, stored in DPAPI / libsecret; handles 2FA
+gavriel renew [--all]                  # re-trust the device (code, stored TOTP seed, or prompt)
+gavriel profile list|add|use|remove|rename
+gavriel totp set|clear|code            # optional TOTP seed: lets the CLI and the MCP renew on their own
+gavriel whoami | gavriel doctor
+gavriel mcp install --profile work --role lite --dry-run
+gavriel tickets --status open | gavriel events pending | gavriel accounts search <text>
+```
+
+Profiles live in `~/.config/gavriel/profiles.json` (override with `GAVRIEL_CONFIG_DIR`) and hold no secrets. The MCP picks one with `GAVRIEL_PROFILE` (or the active profile when `GAVRIEL_EMAIL` is unset). Storing the TOTP seed removes the second factor on that machine; it is opt-in (see SECURITY.md).
+
 ## Secret Resolution
 
 The server resolves `password` and `trusted_device_token` at startup, in this

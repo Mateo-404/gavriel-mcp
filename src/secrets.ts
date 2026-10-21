@@ -136,8 +136,38 @@ export function keyringClear(account: string): void {
   }
 }
 
-export function resolvePassword(): string | null {
-  const fromKeyring = keyringLookup("password");
+const normEmail = (email: string): string => email.toLowerCase().trim();
+
+// Clave por email para multi-cuenta; `resolvePassword()` sin email sigue usando la global.
+export const passwordAccount = (email: string): string => `password:${normEmail(email)}`;
+export const totpSeedAccount = (email: string): string => `totp_seed:${normEmail(email)}`;
+
+export function storePassword(email: string, password: string): boolean {
+  return keyringStore(passwordAccount(email), password);
+}
+export function clearPassword(email: string): void {
+  keyringClear(passwordAccount(email));
+}
+export function readTotpSeed(email: string): string | null {
+  return keyringLookup(totpSeedAccount(email));
+}
+export function saveTotpSeed(email: string, seed: string): boolean {
+  return keyringStore(totpSeedAccount(email), seed);
+}
+export function clearTotpSeed(email: string): void {
+  keyringClear(totpSeedAccount(email));
+}
+
+// Para `gavriel doctor`: qué almacén seguro se usaría (sin leer secretos).
+export function secretBackend(): "dpapi" | "secret-tool" | "none" {
+  if (IS_WIN) return "dpapi";
+  return hasSecretTool() ? "secret-tool" : "none";
+}
+
+// strict (modo perfil): solo la clave de ese email, sin caer a la global ni a env/archivos de otra cuenta.
+export function resolvePassword(email?: string, strict = false): string | null {
+  if (strict && email) return keyringLookup(passwordAccount(email));
+  const fromKeyring = (email && keyringLookup(passwordAccount(email))) || keyringLookup("password");
   if (fromKeyring) return fromKeyring;
   if (process.env.GAVRIEL_PASSWORD) return process.env.GAVRIEL_PASSWORD;
   if (!plaintextAllowed()) return null;

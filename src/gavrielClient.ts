@@ -97,8 +97,12 @@ export class GavrielClient {
   private getFailures = 0;
   private breakerOpenUntil = 0;
 
-  constructor(config: Config) {
+  private getTwoFactorCode?: () => string | undefined | Promise<string | undefined>;
+
+  // getTwoFactorCode: fuente del código 2FA (CLI: prompt o semilla TOTP); sin ella se usa GAVRIEL_2FA_CODE.
+  constructor(config: Config, opts?: { getTwoFactorCode?: () => string | undefined | Promise<string | undefined> }) {
     this.config = config;
+    this.getTwoFactorCode = opts?.getTwoFactorCode;
     this.writeConcurrency = config.GAVRIEL_MCP_WRITE_CONCURRENCY ?? 5;
   }
 
@@ -108,6 +112,10 @@ export class GavrielClient {
 
   get email(): string | null {
     return this.userEmail;
+  }
+
+  get tokenExpiresAt(): number | null {
+    return this.jwt.expiresAt;
   }
 
   // Logins concurrentes (p.ej. varios 401 a la vez) comparten uno solo.
@@ -152,7 +160,7 @@ export class GavrielClient {
           msg.includes("dos factores") ||
           msg.includes("código de autenticación de dos factores");
         if (needs2fa) {
-          const code = process.env.GAVRIEL_2FA_CODE;
+          const code = (await this.getTwoFactorCode?.()) || process.env.GAVRIEL_2FA_CODE;
           if (!code) {
             throw new Error(
               "El usuario tiene 2FA activo y este dispositivo no está confiado. " +

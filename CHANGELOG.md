@@ -9,6 +9,8 @@ tag `vX.Y.Z`.
 ## [Unreleased]
 
 ### Added
+- `gavriel` CLI (`dist/cli.js`): multi-account profiles, login, trusted-device renewal, optional TOTP seed, `doctor`, `mcp install`, quick read queries. Zero new dependencies.
+- `GAVRIEL_PROFILE` and per-email password/TOTP keys; `GavrielClient` accepts a `getTwoFactorCode` hook (the MCP auto-renews with a stored seed).
 - ~100 new tools: notifications, video, SIP/operator telephony, infrastructure, core-gap endpoints; toolsets via `GAVRIEL_MCP_TOOLSETS`; server `instructions`.
 - Opt-in pending-events poller (`GAVRIEL_POLL_SEC`, min 30): logging notifications (warning) and `resources/updated` for `gavriel://events/pending`.
 - Tests (`node --test`, `pnpm test`): client cache/dedupe/retry/401, write helpers, rawGet, redact, poller diff, stdio contract test with `test/tools.snapshot.json` (`pnpm test:snapshot` to update).

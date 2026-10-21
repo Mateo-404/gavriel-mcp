@@ -6,7 +6,8 @@
   "type": "module",
   "main": "dist/index.js",
   "bin": {
-    "gavriel-mcp": "dist/index.js"
+    "gavriel-mcp": "dist/index.js",
+    "gavriel": "dist/cli.js"
   },
   "packageManager": "pnpm@11.21.0",
   "engines": {

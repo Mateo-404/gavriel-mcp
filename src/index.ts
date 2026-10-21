@@ -5,6 +5,8 @@ import { buildServer } from "./server.js";
 import { setLogDir } from "./auditLog.js";
 import { startPoller } from "./notifications/poller.js";
 import { setDestructiveApproval } from "./tools/writeHelpers.js";
+import { readTotpSeed } from "./secrets.js";
+import { totp } from "./totp.js";
 
 // Injected at bundle time by esbuild (see scripts/build-bin.mjs).
 declare const __GAVRIEL_VERSION__: string | undefined;
@@ -19,7 +21,13 @@ async function main(): Promise<void> {
   const config = loadConfig();
   setLogDir(logDir(config));
   setDestructiveApproval(config.GAVRIEL_MCP_DESTRUCTIVE_APPROVAL);
-  const client = new GavrielClient(config);
+  // Con semilla TOTP guardada (gavriel totp set) el MCP renueva solo el dispositivo confiable.
+  const client = new GavrielClient(config, {
+    getTwoFactorCode: () => {
+      const seed = readTotpSeed(config.GAVRIEL_EMAIL);
+      return seed ? totp(seed) : undefined;
+    },
+  });
   const server = buildServer(client, config.GAVRIEL_MCP_ROLE);
   server.server.registerCapabilities({ logging: {} });
   await server.connect(new StdioServerTransport());

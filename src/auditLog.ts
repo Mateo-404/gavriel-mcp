@@ -22,7 +22,7 @@ function ensureLogDir(): void {
 }
 
 // ── Redacción ───────────────────────────────────────────────────────
-const SENSITIVE_KEY = /pass|token|secret|auth|2fa|code|cloudLiveViewVerification/i;
+const SENSITIVE_KEY = /pass|token|secret|auth|2fa|code|seed|cloudLiveViewVerification/i;
 
 /** Copia recursiva con los valores de claves sensibles reemplazados por [REDACTED]. */
 export function redact(value: unknown, depth = 0): unknown {

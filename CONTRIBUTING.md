@@ -15,7 +15,7 @@ Node >= 20 is required. We use **pnpm**; do not mix it with npm/yarn in the lock
 
 ### Quick Development (optional)
 
-If you have [Bun](https://bun.sh) installed, `pnpm run test:fast` runs the selfcheck faster for local iteration (Bun executes the same Node script more quickly). It does not replace `pnpm selfcheck` or the canonical CI path — that is what must pass before opening a PR.
+`pnpm run test:fast` runs only the selfcheck (plain Node) for quick local iteration. It does not replace `pnpm test` or the canonical CI path — that is what must pass before opening a PR.
 
 ## Conventions
 

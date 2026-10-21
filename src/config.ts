@@ -3,6 +3,7 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import { z } from "zod";
 import { resolvePassword } from "./secrets.js";
+import { loadStore } from "./profiles.js";
 
 function isSecureBase(v: string): boolean {
   try {
@@ -68,9 +69,20 @@ function readEnv(): Record<string, string | undefined> {
   return out;
 }
 
-export function loadConfig(): Config {
+// Perfil: explícito, GAVRIEL_PROFILE, o el activo si no hay GAVRIEL_EMAIL (modo env intacto).
+export function loadConfig(opts: { profile?: string } = {}): Config {
   loadDotEnv();
-  const parsed = envSchema.safeParse(readEnv());
+  const env = readEnv();
+  const name = opts.profile ?? process.env.GAVRIEL_PROFILE ?? (env.GAVRIEL_EMAIL ? undefined : loadStore().active ?? undefined);
+  const profile = name ? loadStore().profiles[name] : undefined;
+  if (name && !profile) throw new Error(`El perfil "${name}" no existe (ver: gavriel accounts list).`);
+  if (profile) {
+    env.GAVRIEL_EMAIL = profile.email;
+    if (profile.apiBase) env.GAVRIEL_API_BASE = profile.apiBase;
+    if (profile.role) env.GAVRIEL_MCP_ROLE = profile.role;
+    if (profile.toolsets) process.env.GAVRIEL_MCP_TOOLSETS ??= profile.toolsets;
+  }
+  const parsed = envSchema.safeParse(env);
   if (!parsed.success) {
     const missing = parsed.error.issues
       .map((i) => `- ${i.path.join(".")}: ${i.message}`)
@@ -80,10 +92,12 @@ export function loadConfig(): Config {
         `Copiá .env.example a .env y completá las credenciales.`,
     );
   }
-  const password = resolvePassword();
+  const password = resolvePassword(parsed.data.GAVRIEL_EMAIL, Boolean(profile));
   if (!password) {
     throw new Error(
-      "No se encontró el password de Gavriel en el almacén seguro ni en GAVRIEL_PASSWORD (ver SECURITY.md).",
+      profile
+        ? `No hay password guardado para ${parsed.data.GAVRIEL_EMAIL}. Ejecutá: gavriel login --profile ${name}`
+        : "No se encontró el password de Gavriel en el almacén seguro ni en GAVRIEL_PASSWORD (ver SECURITY.md).",
     );
   }
   return { ...parsed.data, GAVRIEL_PASSWORD: password };
