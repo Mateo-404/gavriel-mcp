@@ -18,7 +18,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest]
-        node: [20, 22, 24]
+        node: [24, 26]
     steps:
       - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v6
@@ -36,7 +36,5 @@ jobs:
       - name: Audit (prod deps, no bloqueante)
         continue-on-error: true
         run: pnpm audit --prod
-      # Listo para bloquear: quitar continue-on-error cuando el lint esté en verde.
-      - name: Biome lint (no bloqueante)
-        continue-on-error: true
-        run: npx --yes @biomejs/biome@2.2.0 lint src test scripts
+      - name: Biome lint
+        run: pnpm run lint

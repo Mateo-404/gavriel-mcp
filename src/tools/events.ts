@@ -1,5 +1,5 @@
 import type { GavrielClient } from "../gavrielClient.js";
-import { ok, ensureOk, paginationSchema, okStructured, wrapReadOnly, forwardParams, okTruncated, truncateSchema, selectFields, requireFilters, fieldsSchema, idSchema, itemsOf } from "./shared.js";
+import { ok, ensureOk, paginationSchema, okStructured, wrapReadOnly, forwardParams, okTruncated, truncateSchema, selectFields, requireFilters, fieldsSchema, idSchema, itemsOf, isoDateTime } from "./shared.js";
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/server";
 import { requireConfirm, confirmSchema, runBatch, destructiveGuard, okOrInput, seg } from "./writeHelpers.js";
@@ -53,8 +53,8 @@ export function registerEventTools(server: McpServer, client: GavrielClient, rol
               inProgress: z.boolean().optional().describe("Solo eventos en curso"),
               bridgeId: z.string().optional().describe("ID del bridge (ver list_connections)"),
               connectionId: z.string().optional().describe("ID de la conexión"),
-              dateFrom: z.iso.datetime({ offset: true }).optional().describe("ISO datetime, ej 2026-08-01T00:00:00.000Z"),
-              dateTo: z.iso.datetime({ offset: true }).optional().describe("ISO datetime"),
+              dateFrom: isoDateTime.optional().describe("ISO datetime, ej 2026-08-01T00:00:00.000Z"),
+              dateTo: isoDateTime.optional().describe("ISO datetime"),
               fields: fieldsSchema,
             }),
       annotations: { readOnlyHint: true },
@@ -129,8 +129,8 @@ export function registerEventTools(server: McpServer, client: GavrielClient, rol
         accountId: idSchema.describe("ID de la cuenta"),
         port: z.string().optional(),
         eventCode: z.string().optional(),
-        dateFrom: z.iso.datetime({ offset: true }).optional().describe("ISO datetime"),
-        dateTo: z.iso.datetime({ offset: true }).optional().describe("ISO datetime"),
+        dateFrom: isoDateTime.optional().describe("ISO datetime"),
+        dateTo: isoDateTime.optional().describe("ISO datetime"),
         onlyPending: z.boolean().default(true).describe("Solo eventos pendientes (default true)"),
         targetStatus: z.enum(EVENT_STATUSES).default("processed").describe("Estado a asignar"),
         maxEvents: z.number().int().min(1).max(200).default(50).describe("Tope de eventos por ejecución"),

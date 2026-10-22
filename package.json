@@ -9,9 +9,9 @@
     "gavriel-mcp": "dist/index.js",
     "gavriel": "dist/cli.js"
   },
-  "packageManager": "pnpm@11.21.0",
+  "packageManager": "pnpm@12.14.0",
   "engines": {
-    "node": ">=20.0.0"
+    "node": ">=24.0.0"
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
@@ -24,20 +24,22 @@
     "test:fast": "node scripts/selfcheck.mjs",
     "test": "tsc -p tsconfig.json && node --test \"test/*.test.mjs\"",
     "test:snapshot": "tsc -p tsconfig.json && UPDATE_SNAPSHOT=1 node --test test/contract.test.mjs",
-    "lint": "npx --yes @biomejs/biome@2.2.0 lint src test scripts",
-    "format": "npx --yes @biomejs/biome@2.2.0 format src test",
-    "mcpb:pack": "npx --yes @anthropic-ai/mcpb pack"
+    "lint": "biome lint src test scripts",
+    "format": "biome format src test",
+    "mcpb:pack": "mcpb pack"
   },
   "dependencies": {
     "@modelcontextprotocol/client": "^2.3.1",
     "@modelcontextprotocol/server": "^2.3.1",
-    "zod": "^4.4.3"
+    "zod": "^4.6.7"
   },
   "devDependencies": {
-    "@types/node": "^26.2.0",
+    "@anthropic-ai/mcpb": "^2.1.2",
+    "@biomejs/biome": "^2.6.2",
+    "@types/node": "^26.6.5",
     "esbuild": "^0.28.2",
     "postject": "1.0.0-alpha.6",
-    "tsx": "^4.23.12",
+    "tsx": "^4.23.15",
     "typescript": "^7.0.2"
   },
   "files": [

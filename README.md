@@ -13,7 +13,7 @@ monitoring system — as tools for AI agents (OpenCode, Claude Desktop).
 
 ## Requirements
 
-* Node.js 20+ (tested with Node 22/24)
+* Node.js 24+ (LTS; CI also tests Node 26)
 * Gavriel user credentials (`app.gavriel.com.ar`)
 
 ## Installation

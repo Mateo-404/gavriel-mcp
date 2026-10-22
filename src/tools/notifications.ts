@@ -1,5 +1,5 @@
 import type { GavrielClient } from "../gavrielClient.js";
-import { okTruncated, truncateSchema, selectFields, fieldsSchema, wrapReadOnly, ensureOk, buildBody, forwardParams } from "./shared.js";
+import { okTruncated, truncateSchema, selectFields, fieldsSchema, wrapReadOnly, ensureOk, buildBody, forwardParams, isoDateTime } from "./shared.js";
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/server";
 import { requireConfirm, confirmSchema, seg, destructiveGuard, isDestructive, okOrInput } from "./writeHelpers.js";
@@ -43,8 +43,8 @@ export function registerNotificationTools(server: McpServer, client: GavrielClie
       status: z.enum(CAMPAIGN_STATUS).optional().describe("Estado de la campaña"),
       category: z.string().optional().describe("Categoría del aviso"),
       source: z.string().optional().describe("Origen del aviso"),
-      from: z.iso.datetime({ offset: true }).optional().describe("Desde (ISO)"),
-      to: z.iso.datetime({ offset: true }).optional().describe("Hasta (ISO)"),
+      from: isoDateTime.optional().describe("Desde (ISO)"),
+      to: isoDateTime.optional().describe("Hasta (ISO)"),
     },
     (a) => (a.id ? `/notifications/campaigns/${seg(a.id)}` : "/notifications/campaigns"),
     ["page", "pageSize", "status", "category", "source", "from", "to"]);
@@ -142,7 +142,7 @@ export function registerNotificationTools(server: McpServer, client: GavrielClie
 
   write("create_notification_campaign", "Enviar/programar aviso",
     "/notifications/campaigns. Usar cuando: enviar un aviso a personas (envío real masivo por los canales elegidos) o programarlo con scheduledAt. Hacer antes preview_notification_campaign. No usar para: probar (usar preview).",
-    { ...campaignShape, scheduledAt: z.iso.datetime({ offset: true }).optional().describe("Programar (ISO futuro); omitido = envío inmediato") },
+    { ...campaignShape, scheduledAt: isoDateTime.optional().describe("Programar (ISO futuro); omitido = envío inmediato") },
     "POST", () => "/notifications/campaigns", (a) => buildBody(a, { required: ["title", "body", "category", "channels", "userIds", "accountContactIds", "groups", "priority"], optional: ["link", "emailSubject", "scheduledAt"] }),
     { destructive: true });
 

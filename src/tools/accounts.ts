@@ -1,5 +1,5 @@
 import type { GavrielClient } from "../gavrielClient.js";
-import { ok, err, paginationSchema, okStructured, okTruncated, truncateSchema, selectFields, normalizeAccountNumber, buildBody, wrapReadOnly, forwardParams, fieldsSchema, idSchema } from "./shared.js";
+import { ok, err, paginationSchema, okStructured, okTruncated, truncateSchema, selectFields, normalizeAccountNumber, buildBody, wrapReadOnly, forwardParams, fieldsSchema, idSchema, isoDateTime } from "./shared.js";
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/server";
 import { requireConfirm, confirmSchema, runBatch, destructiveGuard, okOrInput, seg } from "./writeHelpers.js";
@@ -150,8 +150,8 @@ export function registerAccountTools(server: McpServer, client: GavrielClient, r
         accountId: idSchema,
         type: z.enum(["bitacora", "temporal", "fija"]).describe("Tipo de nota"),
         content: z.string().min(1),
-        validFrom: z.iso.datetime({ offset: true }).optional().describe("ISO datetime, solo para tipo temporal"),
-        validUntil: z.iso.datetime({ offset: true }).optional().describe("ISO datetime, solo para tipo temporal"),
+        validFrom: isoDateTime.optional().describe("ISO datetime, solo para tipo temporal"),
+        validUntil: isoDateTime.optional().describe("ISO datetime, solo para tipo temporal"),
         confirm: confirmSchema,
       },
     },
@@ -180,8 +180,8 @@ export function registerAccountTools(server: McpServer, client: GavrielClient, r
         accountIds: z.array(idSchema).min(1).max(100).describe("IDs de las cuentas destino"),
         type: z.enum(["bitacora", "temporal", "fija"]).describe("Tipo de nota"),
         content: z.string().min(1),
-        validFrom: z.iso.datetime({ offset: true }).optional().describe("ISO datetime, solo para tipo temporal"),
-        validUntil: z.iso.datetime({ offset: true }).optional().describe("ISO datetime, solo para tipo temporal"),
+        validFrom: isoDateTime.optional().describe("ISO datetime, solo para tipo temporal"),
+        validUntil: isoDateTime.optional().describe("ISO datetime, solo para tipo temporal"),
         confirm: confirmSchema,
       },
     },

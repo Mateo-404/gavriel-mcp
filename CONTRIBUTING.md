@@ -11,7 +11,7 @@ pnpm selfcheck   # starts the server against the environment and validates the h
 pnpm dev         # runs from src using tsx (no prior build required)
 ```
 
-Node >= 20 is required. We use **pnpm**; do not mix it with npm/yarn in the lockfile.
+Node >= 24 is required. We use **pnpm**; do not mix it with npm/yarn in the lockfile.
 
 ### Quick Development (optional)
 

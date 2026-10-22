@@ -1,5 +1,5 @@
 import type { GavrielClient } from "../gavrielClient.js";
-import { ok, wrapReadOnly, buildBody, okTruncated, truncateSchema, selectFields, fieldsSchema, idSchema } from "./shared.js";
+import { ok, wrapReadOnly, buildBody, okTruncated, truncateSchema, selectFields, fieldsSchema, idSchema, isoDateTime } from "./shared.js";
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/server";
 import { requireConfirm, confirmSchema, seg } from "./writeHelpers.js";
@@ -56,8 +56,7 @@ export function registerActivityTools(server: McpServer, client: GavrielClient, 
       description: "PATCH /activities/{id}/mark-as-read. Requiere confirm: true.",
       inputSchema: {
         activityId: idSchema,
-        readAt: z
-          .iso.datetime({ offset: true })
+        readAt: isoDateTime
           .optional()
           .describe("ISO datetime de lectura (si no viene, usa la fecha actual)"),
         confirm: confirmSchema,

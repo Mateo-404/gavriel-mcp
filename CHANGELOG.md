@@ -8,6 +8,11 @@ tag `vX.Y.Z`.
 
 ## [Unreleased]
 
+### Changed
+- Dependencies at latest: zod 4.6.7, @types/node 26.6.5, tsx 4.23.15, Biome 2.6.2 and mcpb 2.1.2 as pinned devDependencies, pnpm 12.14.0. SDK 2.3.1, TypeScript 7.0.2, esbuild 0.28.2 were already current.
+- Node >=24 (LTS); CI matrix Node 24 and 26; upload-artifact v7, download-artifact v8, attest-build-provenance v4. Lint is now blocking in CI.
+- Date-time inputs use a lightweight `isoDateTime` schema (zod 4.6 injected a ~250-char regex per field into `tools/list`).
+
 ### Added
 - `gavriel` CLI (`dist/cli.js`): multi-account profiles, login, trusted-device renewal, optional TOTP seed, `doctor`, `mcp install`, quick read queries. Zero new dependencies.
 - `GAVRIEL_PROFILE` and per-email password/TOTP keys; `GavrielClient` accepts a `getTwoFactorCode` hook (the MCP auto-renews with a stored seed).

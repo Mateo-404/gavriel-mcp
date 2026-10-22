@@ -58,6 +58,9 @@ export function selectFields<T extends Record<string, unknown>>(
 }
 
 // Id seguro para paths: la API usa uuid/numéricos/slugs. Reusar en toda tool de escritura.
+// Fecha-hora ISO sin el pattern gigante que zod 4.6 inyecta en el JSON Schema (ahorra tokens en tools/list).
+export const isoDateTime = z.string().refine((v) => /^d{4}-dd-ddT/.test(v) && !Number.isNaN(Date.parse(v)), "Fecha-hora ISO inválida (ej 2026-08-01T00:00:00.000Z)");
+
 export const idSchema = z.string().regex(/^[\w-]+$/, "ID inválido (solo letras, números, _ y -)");
 
 // Total de un listado: meta.pagination.total (envelope real) > meta.total > total > largo del array.
