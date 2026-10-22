@@ -1,4 +1,4 @@
-import { LOGO_ROWS, LOGO_WIDTH, MARK_WIDTH } from "./logo.js";
+import { LOGO_COLS, LOGO_DOTS, LOGO_LINES, MARK_COLS } from "./logo.js";
 
 // ── Capacidades de la terminal ───────────────────────────────────────────
 // Orden de decisión (skill tui-design): preferencia explícita > NO_COLOR > TTY/TERM > detección de profundidad.
@@ -95,7 +95,7 @@ export function stripControl(s: unknown): string {
 function graphemeWidth(g: string): number {
   const cp = g.codePointAt(0) ?? 0;
   if (cp < 32 || (cp >= 0x7f && cp < 0xa0)) return 0;
-  if (/^[\p{M}​-‏︎️]+$/u.test(g)) return 0;
+  if (/^(?:\p{M}|[\u200b-\u200f]|\ufe0e|\ufe0f)+$/u.test(g)) return 0;
   if (/\p{Extended_Pictographic}/u.test(g) && cp > 0x2fff) return 2;
   const wide =
     (cp >= 0x1100 && cp <= 0x115f) || (cp >= 0x2e80 && cp <= 0xa4cf) || (cp >= 0xac00 && cp <= 0xd7a3) ||
@@ -127,6 +127,7 @@ export function truncate(s: string, max: number): string {
   return out + ell;
 }
 
+export const padLabel = (s: string, w: number): string => s + " ".repeat(Math.max(0, w - visibleWidth(s)));
 const padRight = (s: string, w: number): string => s + " ".repeat(Math.max(0, w - visibleWidth(s)));
 const padLeft = (s: string, w: number): string => " ".repeat(Math.max(0, w - visibleWidth(s))) + s;
 
@@ -180,44 +181,92 @@ export const err = (): Painter => painter(process.stderr);
 // ── Logo ──────────────────────────────────────────────────────────────────
 const lerp = (a: number, b: number, t: number): number => Math.round(a + (b - a) * t);
 
-/** Una línea de terminal = dos filas de píxeles (▀ ▄ █). `shine` ∈ [0,1] mueve un brillo diagonal sobre la hoja. */
+// Bit braille de cada punto de la celda 2x4: [fila][columna].
+const BRAILLE_BIT = [[0, 3], [1, 4], [2, 5], [6, 7]];
+
+export type LogoMode = "braille" | "blocks" | "text" | "none";
+let logoOverride: LogoMode | undefined;
+export const setLogoMode = (m: LogoMode | undefined): void => { logoOverride = m; };
+/** GAVRIEL_LOGO / --logo: blocks (medios bloques sólidos, por defecto), braille (puntos, más fino), text (solo texto) o none. */
+export function logoMode(): LogoMode {
+  const v = logoOverride ?? env("GAVRIEL_LOGO");
+  return v === "braille" || v === "text" || v === "none" ? v : "blocks";
+}
+
+// Texto "Gavriel" en líneas de caja (se dibujan nativas en cualquier fuente).
+const WORDMARK = [
+  "╔═╗╔═╗╦  ╦╦═╗╦╔═╗╦  ",
+  "║ ╦╠═╣╚╗╔╝╠╦╝║║╣ ║  ",
+  "╚═╝╩ ╩ ╚╝ ╩╚═╩╚═╝╩═╝",
+];
+
+type Cls = "L" | "W" | ".";
+const cell = (cx: number, dy0: number, dy1: number): { on: number; cls: Cls } => {
+  let on = 0, wing = 0, word = 0;
+  for (let dy = dy0; dy < dy1; dy++) for (let dx = 0; dx < 2; dx++) {
+    const ch = LOGO_DOTS[dy][cx * 2 + dx];
+    if (ch === ".") continue;
+    on++;
+    if (ch === "L") wing++; else word++;
+  }
+  return { on, cls: on === 0 ? "." : wing >= word ? "L" : "W" };
+};
+
+/**
+ * Líneas del logo según el modo. braille: una celda = 2x4 puntos (ala con plumas y tipografía fina);
+ * blocks: medios bloques sólidos; text: solo "Gavriel". `shine` ∈ [0,1] mueve un brillo diagonal sobre el ala.
+ */
 function logoLines(level: Level, compact: boolean, shine = -1): string[] {
-  const rows = LOGO_ROWS;
-  const width = compact ? MARK_WIDTH : LOGO_WIDTH;
+  const mode = logoMode();
   const pal = palette();
   const reset = `${ESC}0m`;
-  const lines: string[] = [];
-  const total = rows.length / 2;
   const unicode = unicodeOn();
-  for (let r = 0; r < rows.length; r += 2) {
+  if (mode === "text") {
+    return WORDMARK.map((l, i) => (level === 0 ? l : `${color(level, [lerp(pal.brand[0], pal.brand2[0], i / 2), lerp(pal.brand[1], pal.brand2[1], i / 2), lerp(pal.brand[2], pal.brand2[2], i / 2)])}${l}${reset}`));
+  }
+  const cols = compact ? MARK_COLS : LOGO_COLS;
+  const wingRgb = (cx: number, y: number, h: number): RGB => {
+    const t = Math.min(1, y / h); // degradado vertical menta → verde azulado
+    let rgb: RGB = [lerp(pal.brand[0], pal.brand2[0], t), lerp(pal.brand[1], pal.brand2[1], t), lerp(pal.brand[2], pal.brand2[2], t)];
+    if (shine >= 0) {
+      const d = Math.abs((cx + y * (LOGO_COLS / LOGO_LINES) * 0.4) / (MARK_COLS + h * 0.4) - shine);
+      const k = Math.max(0, 1 - d * 7) * 0.6;
+      rgb = [lerp(rgb[0], 255, k), lerp(rgb[1], 255, k), lerp(rgb[2], 255, k)];
+    }
+    return rgb;
+  };
+  const lines: string[] = [];
+  for (let cy = 0; cy < LOGO_LINES; cy++) {
     let line = "";
-    for (let c = 0; c < width; c++) {
-      const top = rows[r][c], bot = rows[r + 1][c];
-      const hasTop = top !== ".", hasBot = bot !== ".";
-      if (!hasTop && !hasBot) { line += " "; continue; }
-      const px = (cls: string, y: number): RGB => {
-        if (cls === "W") return pal.text;
-        const t = Math.min(1, y / (rows.length - 1)); // degradado vertical menta → verde azulado
-        let rgb: RGB = [lerp(pal.brand[0], pal.brand2[0], t), lerp(pal.brand[1], pal.brand2[1], t), lerp(pal.brand[2], pal.brand2[2], t)];
-        if (shine >= 0) {
-          const d = Math.abs((c + y * 0.8) / (MARK_WIDTH + rows.length * 0.8) - shine);
-          const k = Math.max(0, 1 - d * 9) * 0.55;
-          rgb = [lerp(rgb[0], 255, k), lerp(rgb[1], 255, k), lerp(rgb[2], 255, k)];
+    for (let cx = 0; cx < cols; cx++) {
+      if (mode === "blocks") { // 1 celda = 1 px de ancho × 2 px de alto (cada px = 2x2 puntos, ≥2 encendidos)
+        const top = cell(cx, cy * 4, cy * 4 + 2), bot = cell(cx, cy * 4 + 2, cy * 4 + 4);
+        const tOn = top.on >= 2, bOn = bot.on >= 2;
+        if (!tOn && !bOn) { line += " "; continue; }
+        if (level === 0) { line += unicode ? (tOn && bOn ? "█" : tOn ? "▀" : "▄") : "#"; continue; }
+        const rgbOf = (c: Cls, y: number): RGB => (c === "W" ? pal.text : wingRgb(cx, y, LOGO_LINES));
+        const tc = tOn ? rgbOf(top.cls, cy + 0.25) : null, bc = bOn ? rgbOf(bot.cls, cy + 0.75) : null;
+        if (tc && bc) line += top.cls === bot.cls ? `${color(level, tc)}█${reset}` : level === 3 ? `${color(level, tc)}${color(level, bc, true)}▀${reset}` : `${color(level, tc)}▀${reset}`;
+        else if (tc) line += `${color(level, tc)}▀${reset}`;
+        else line += `${color(level, bc as RGB)}▄${reset}`;
+        continue;
+      }
+      let bits = 0, wing = 0, word = 0;
+      for (let dy = 0; dy < 4; dy++) {
+        for (let dx = 0; dx < 2; dx++) {
+          const ch = LOGO_DOTS[cy * 4 + dy][cx * 2 + dx];
+          if (ch === ".") continue;
+          bits |= 1 << BRAILLE_BIT[dy][dx];
+          if (ch === "L") wing++; else word++;
         }
-        return rgb;
-      };
-      if (level === 0) { line += unicode ? (hasTop && hasBot ? "█" : hasTop ? "▀" : "▄") : (top === "L" || bot === "L" ? "#" : "o"); continue; }
-      const tc = hasTop ? px(top, r) : null, bc = hasBot ? px(bot, r + 1) : null;
-      if (tc && bc) {
-        const same = top === bot;
-        line += same ? `${color(level, tc)}█` : level === 3 ? `${color(level, tc)}${color(level, bc, true)}▀` : `${color(level, tc)}▀`;
-      } else if (tc) line += `${color(level, tc)}▀`;
-      else line += `${color(level, bc as RGB)}▄`;
-      line += reset;
+      }
+      if (bits === 0) { line += " "; continue; }
+      const glyph = unicode ? String.fromCodePoint(0x2800 + bits) : wing >= word ? "#" : "o";
+      if (level === 0) { line += glyph; continue; }
+      line += `${color(level, wing >= word ? wingRgb(cx, cy + 0.5, LOGO_LINES) : pal.text)}${glyph}${reset}`;
     }
     lines.push(line.replace(/\s+$/, ""));
   }
-  void total;
   return lines;
 }
 
@@ -234,8 +283,8 @@ export async function banner(o: BannerOpts = {}): Promise<void> {
   const level = colorLevel(stream);
   o = { ...o, version: o.version ?? (appVersion || undefined) };
   const cols = stream.columns ?? 80;
-  const compact = cols < LOGO_WIDTH + 2;
-  if (plainMode() || !unicodeOn() || (!stream.isTTY && !env("FORCE_COLOR"))) { // pipes/CI: una línea, sin arte
+  const compact = logoMode() !== "text" && cols < LOGO_COLS + 2;
+  if (plainMode() || !unicodeOn() || logoMode() === "none" || (!stream.isTTY && !env("FORCE_COLOR"))) { // pipes/CI: una línea, sin arte
     stream.write(`gavriel${o.version ? ` ${o.version}` : ""}${o.tagline ? ` — ${o.tagline}` : ""}\n`);
     return;
   }
@@ -253,7 +302,7 @@ export async function banner(o: BannerOpts = {}): Promise<void> {
   process.once("exit", restore);
   stream.write(hide);
   try {
-    for (let i = 0; i < height; i++) { stream.write(`${base[i]}\n`); await sleep(28); } // revelado por líneas
+    for (let i = 0; i < height; i++) { stream.write(`${base[i]}\n`); await sleep(24); } // revelado por líneas
     for (let f = 1; f <= 8; f++) { // un barrido de brillo sobre la hoja
       const frame = logoLines(level, compact, f / 8);
       stream.write(`${ESC}${height}A${frame.map((l) => `${ESC}2K${l}`).join("\n")}\n`);

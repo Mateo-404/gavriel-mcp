@@ -95,6 +95,10 @@ gavriel tickets --status open | gavriel events pending | gavriel accounts search
 
 `login` authenticates first and only then stores the password/profile; a profile name already used by a different email is refused unless `--profile` is explicit. Exit codes: 0 ok, 1 error (130 on Ctrl-C), 2 bad usage. Piped input works: `printf 'me@x.com\nPASSWORD\n' | gavriel login`. The release also ships a standalone `gavriel-<platform>-<arch>` binary next to `gavriel-mcp-<platform>-<arch>`.
 
+Run `gavriel` with no arguments in a terminal (or `gavriel menu`) for an interactive menu: arrow keys / j k / number shortcuts, Enter to choose, Esc to go back. It covers login, renewing the trusted device, accounts (list/switch/rename/log out/remove), TOTP (live code, save/clear seed), diagnostics, queries (tickets, pending events, account search) and installing the MCP in Claude. A wrong password or 2FA code lets you retry (up to 5 times) and the password is echoed as `*`.
+
+Logo style: `--logo blocks|braille|text|none` or `GAVRIEL_LOGO` (default `blocks`; `braille` gives finer feather detail on fonts that draw braille well).
+
 Visual layer (follows the tui-design guidelines): the Gavriel logo (mint leaf + wordmark, rasterized from the official SVG with `scripts/gen-logo.mjs`) with a short reveal and shine animation, brand-colored tables with status/priority colors, spinners, a live TOTP countdown bar and colored JSON. It respects `NO_COLOR`, `FORCE_COLOR`, pipes (no art, no ANSI), `CI`, `TERM=dumb`, falls back to 16/256 colors and to ASCII glyphs on legacy consoles. Flags/env: `--no-color`, `--plain`, `--no-anim`, `GAVRIEL_THEME=light|dark`, `GAVRIEL_NO_ANIM=1`, `GAVRIEL_ASCII=1`, `GAVRIEL_PLAIN=1`.
 
 Profiles live in `~/.config/gavriel/profiles.json` (override with `GAVRIEL_CONFIG_DIR`) and hold no secrets. The MCP picks one with `GAVRIEL_PROFILE` (or the active profile when `GAVRIEL_EMAIL` is unset). Storing the TOTP seed removes the second factor on that machine; it is opt-in (see SECURITY.md).

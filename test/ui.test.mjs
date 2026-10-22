@@ -1,9 +1,9 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import * as ui from "../dist/cli/ui.js";
-import { LOGO_ROWS, LOGO_WIDTH } from "../dist/cli/logo.js";
+import { LOGO_DOTS, LOGO_COLS, LOGO_LINES } from "../dist/cli/logo.js";
 
-const KEYS = ["NO_COLOR", "FORCE_COLOR", "COLORTERM", "TERM", "TERM_PROGRAM", "WT_SESSION", "CI", "GAVRIEL_PLAIN", "GAVRIEL_ASCII", "GAVRIEL_NO_ANIM", "GAVRIEL_THEME", "COLORFGBG"];
+const KEYS = ["NO_COLOR", "FORCE_COLOR", "COLORTERM", "TERM", "TERM_PROGRAM", "WT_SESSION", "CI", "GAVRIEL_PLAIN", "GAVRIEL_ASCII", "GAVRIEL_NO_ANIM", "GAVRIEL_THEME", "COLORFGBG", "GAVRIEL_LOGO"];
 function withEnv(vars, fn) {
   const saved = Object.fromEntries(KEYS.map((k) => [k, process.env[k]]));
   for (const k of KEYS) delete process.env[k];
@@ -78,9 +78,10 @@ test("ui: tabla alineada, saneada y con ancho acotado", () => {
 });
 
 test("ui: logo bien formado y banner sin arte fuera de TTY", async () => {
-  assert.equal(LOGO_ROWS.length % 2, 0);
-  assert.ok(LOGO_ROWS.every((r) => r.length === LOGO_WIDTH && /^[.LW]+$/.test(r)));
-  assert.ok(LOGO_ROWS.some((r) => r.includes("L")) && LOGO_ROWS.some((r) => r.includes("W")));
+  assert.equal(LOGO_DOTS.length % 4, 0);
+  assert.equal(LOGO_LINES, LOGO_DOTS.length / 4);
+  assert.ok(LOGO_DOTS.every((r) => r.length === LOGO_COLS * 2 && /^[.LW]+$/.test(r)));
+  assert.ok(LOGO_DOTS.some((r) => r.includes("L")) && LOGO_DOTS.some((r) => r.includes("W")));
   const chunks = [];
   const stream = { isTTY: false, columns: 80, write: (s) => { chunks.push(s); return true; } };
   await withEnv({}, () => ui.banner({ stream, version: "9.9.9" }));
@@ -89,13 +90,32 @@ test("ui: logo bien formado y banner sin arte fuera de TTY", async () => {
   assert.match(text, /gavriel 9\.9\.9/);
 });
 
+test("ui: modos del logo (blocks, braille, text, none)", async () => {
+  const draw = async (mode) => {
+    const chunks = [];
+    const stream = { isTTY: true, columns: 100, write: (s) => { chunks.push(s); return true; } };
+    await withEnv({ FORCE_COLOR: "3", TERM: "xterm", WT_SESSION: "1", GAVRIEL_LOGO: mode }, () => ui.banner({ stream, animate: false }));
+    return strip(chunks.join(""));
+  };
+  const blocks = await draw("blocks");
+  assert.match(blocks, /[▀▄█]/);
+  assert.ok(!/[⠁-⣿]/.test(blocks));
+  assert.match(await draw("braille"), /[⠁-⣿]/);
+  const text = await draw("text");
+  assert.match(text, /╔═╗/);
+  assert.ok(text.split("\n").filter((l) => l.trim()).length <= 5);
+  const none = await draw("none");
+  assert.equal(none.trim().split("\n").length, 1);
+  assert.equal(withEnv({}, () => ui.logoMode()), "blocks");
+});
+
 test("ui: banner con arte en TTY ocupa una línea por dos filas y no desborda", async () => {
   const chunks = [];
   const stream = { isTTY: true, columns: 100, write: (s) => { chunks.push(s); return true; } };
   await withEnv({ FORCE_COLOR: "3", TERM: "xterm", WT_SESSION: "1", CI: "1" }, () => ui.banner({ stream, animate: false }));
   const lines = strip(chunks.join("")).split("\n").filter((l) => l.trim());
-  assert.ok(lines.length >= LOGO_ROWS.length / 2);
-  assert.ok(lines.every((l) => ui.visibleWidth(l) <= LOGO_WIDTH + 2 || /Monitoreo/.test(l)));
+  assert.ok(lines.length >= LOGO_LINES);
+  assert.ok(lines.every((l) => ui.visibleWidth(l) <= LOGO_COLS + 2 || /Monitoreo/.test(l)));
 });
 
 test("ui: json sin color es JSON válido y con color conserva el contenido", () => {

@@ -69,20 +69,20 @@ const DEL = "\u007f";
 const BS = "\b";
 
 // Entrada sin eco (password, semilla). Sin TTY (pipe) lee del mismo lector compartido (el prompt va a stderr).
-export function askHidden(question: string): Promise<string> {
-  const stdin = process.stdin;
+export function askHidden(question: string, stdin: NodeJS.ReadStream = process.stdin, output: NodeJS.WriteStream = process.stderr): Promise<string> {
   if (!stdin.isTTY) return ask(question);
   closeInput(); // el modo raw no debe convivir con el eco de readline
   return new Promise((resolve, reject) => {
-    process.stderr.write(question);
+    output.write(question);
     let buf = "";
     const finish = (): void => {
       stdin.setRawMode(false);
       stdin.pause();
       stdin.off("data", onData);
-      process.stderr.write(LF);
+      output.write(LF);
     };
     const onData = (chunk: string): void => {
+      if (chunk.startsWith("\u001b")) return; // flechas, Supr, etc.: no editan el texto
       for (const c of chunk) {
         if (c === CR || c === LF) {
           finish();
@@ -92,7 +92,15 @@ export function askHidden(question: string): Promise<string> {
           finish();
           return reject(new InputError("Cancelado", 130));
         }
-        buf = c === DEL || c === BS ? buf.slice(0, -1) : buf + c;
+        if (c === DEL || c === BS) {
+          if (buf.length > 0) {
+            buf = buf.slice(0, -1);
+            output.write("\b \b");
+          }
+        } else if (c >= " ") {
+          buf += c;
+          output.write("*"); // se ve la longitud, nunca el contenido
+        }
       }
     };
     stdin.setEncoding("utf8");

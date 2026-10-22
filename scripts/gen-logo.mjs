@@ -1,17 +1,24 @@
-// Rasteriza el SVG del logo de Gavriel a un bitmap ('.', 'L' hoja, 'W' texto) para src/cli/logo.ts.
-// Uso: node scripts/gen-logo.mjs gavriel-logo.svg [anchoPx=64] [umbralTexto=0.35]
+// Rasteriza el SVG del logo de Gavriel a una grilla de puntos braille (2x4 por celda, píxeles cuadrados):
+// '.' vacío, 'L' ala, 'W' texto. Salida: JSON de filas de puntos (para src/cli/logo.ts) + vista previa en stderr.
+// Uso: node scripts/gen-logo.mjs logo.svg [--wingcols 24] [--wordscale 0.6] [--wing 0.5] [--word 0.4] [--gap 6]
 // Fuente: https://gavriel.app/wp-content/uploads/2026/01/gavriel-logo.svg (solo comandos M m L l H h V v C c S s Z z).
 import { readFileSync } from "node:fs";
 
-const [, , file, widthArg = "64", wordThrArg = "0.35"] = process.argv;
+const args = process.argv.slice(2);
+const file = args[0];
+const opt = (name, def) => {
+  const i = args.indexOf(`--${name}`);
+  return i >= 0 ? Number(args[i + 1]) : def;
+};
 if (!file) {
-  console.error("Uso: node scripts/gen-logo.mjs <logo.svg> [anchoPx] [umbralTexto]");
+  console.error("Uso: node scripts/gen-logo.mjs <logo.svg> [--cols 74] [--wing 0.5] [--word 0.4]");
   process.exit(2);
 }
+const wingThr = opt("wing", 0.5);
+const wordThr = opt("word", 0.4);
+
 const svg = readFileSync(file, "utf8");
 const [, , vbW, vbH] = svg.match(/viewBox="([\d.\s-]+)"/)[1].split(/\s+/).map(Number);
-
-const NUM = /-?(?:\d+\.?\d*|\.\d+)(?:e[-+]?\d+)?/gi;
 
 function flatten(d) {
   const toks = d.match(/[a-zA-Z]|-?(?:\d+\.?\d*|\.\d+)(?:e[-+]?\d+)?/g);
@@ -20,8 +27,8 @@ function flatten(d) {
   const n = () => Number(toks[i++]);
   const cubic = (x1, y1, x2, y2, x3, y3) => {
     const x0 = x, y0 = y;
-    for (let t = 1; t <= 16; t++) {
-      const u = t / 16, v = 1 - u;
+    for (let t = 1; t <= 24; t++) {
+      const u = t / 24, v = 1 - u;
       cur.push([
         v * v * v * x0 + 3 * v * v * u * x1 + 3 * v * u * u * x2 + u * u * u * x3,
         v * v * v * y0 + 3 * v * v * u * y1 + 3 * v * u * u * y2 + u * u * u * y3,
@@ -34,17 +41,13 @@ function flatten(d) {
     if (/[a-zA-Z]/.test(toks[i])) cmd = toks[i++];
     const rel = cmd === cmd.toLowerCase();
     const up = cmd.toUpperCase();
-    if (up === "Z") {
-      if (cur) polys.push(cur);
-      cur = null; x = sx; y = sy; lastC = null;
-      continue;
-    }
+    if (up === "Z") { if (cur) polys.push(cur); cur = null; x = sx; y = sy; lastC = null; continue; }
     if (up === "M") {
       if (cur) polys.push(cur);
       const a = n(), b = n();
       x = rel ? x + a : a; y = rel ? y + b : b; sx = x; sy = y;
       cur = [[x, y]]; lastC = null;
-      cmd = rel ? "l" : "L"; // pares extra tras M son lineTo
+      cmd = rel ? "l" : "L";
       continue;
     }
     if (up === "L") { const a = n(), b = n(); x = rel ? x + a : a; y = rel ? y + b : b; cur.push([x, y]); lastC = null; }
@@ -65,7 +68,7 @@ function flatten(d) {
   return polys;
 }
 
-// Even-odd: cuenta cruces de un rayo horizontal con todos los polígonos del path.
+// Even-odd: cruces de un rayo horizontal con todos los polígonos del path (los agujeros de a/e/r quedan vacíos).
 function inside(polys, px, py) {
   let c = 0;
   for (const p of polys) {
@@ -77,37 +80,62 @@ function inside(polys, px, py) {
   return c % 2 === 1;
 }
 
-const leafD = [...svg.matchAll(/<path class="cls-1" d="([^"]+)"/g)].map((m) => m[1]);
-const wordD = [...svg.matchAll(/<path class="cls-2" d="([^"]+)"/g)].map((m) => m[1]);
-const leaf = leafD.flatMap(flatten);
-const words = wordD.map(flatten);
+const wing = [...svg.matchAll(/<path class="cls-1" d="([^"]+)"/g)].flatMap((m) => flatten(m[1]));
+const words = [...svg.matchAll(/<path class="cls-2" d="([^"]+)"/g)].map((m) => flatten(m[1]));
 
-const wordThr = Number(wordThrArg);
-const width = Math.round(Number(widthArg));
-const scale = width / vbW;
-let height = Math.round(vbH * scale);
-if (height % 2) height++; // half-blocks: filas pares
-const SS = 4;
-const rows = [];
-for (let r = 0; r < height; r++) {
-  let line = "";
-  for (let c = 0; c < width; c++) {
-    let lc = 0, wc = 0;
-    for (let a = 0; a < SS; a++) for (let b = 0; b < SS; b++) {
-      const sx = ((c + (b + 0.5) / SS) / scale), sy = ((r + (a + 0.5) / SS) / scale);
-      if (inside(leaf, sx, sy)) lc++;
-      else if (words.some((p) => inside(p, sx, sy))) wc++;
+// Ala y texto se rasterizan por separado: el ala necesita más resolución para que se vean las plumas.
+function raster(polysList, x0, y0, w, h, scale, thr) {
+  const W = Math.ceil(w * scale), H = Math.ceil(h * scale), SS = 4, g = [];
+  for (let r = 0; r < H; r++) {
+    const row = [];
+    for (let c = 0; c < W; c++) {
+      let n = 0;
+      for (let a = 0; a < SS; a++) for (let b = 0; b < SS; b++) {
+        const sx = x0 + (c + (b + 0.5) / SS) / scale, sy = y0 + (r + (a + 0.5) / SS) / scale;
+        if (polysList.some((p) => inside(p, sx, sy))) n++;
+      }
+      row.push(n / (SS * SS) >= thr);
     }
-    const tot = SS * SS;
-    line += lc / tot >= 0.5 ? "L" : wc / tot >= wordThr ? "W" : ".";
+    g.push(row);
   }
-  rows.push(line);
+  return g;
 }
-console.log(JSON.stringify(rows, null, 2));
-console.error(`${width}x${height}px → ${height / 2} líneas`);
-for (let r = 0; r < height; r += 2) {
-  console.error(rows[r].split("").map((ch, c) => {
-    const t = ch !== ".", b = rows[r + 1][c] !== ".";
-    return t && b ? "█" : t ? "▀" : b ? "▄" : " ";
-  }).join(""));
+const bbox = (list) => {
+  const pts = list.flat(2);
+  const xs = pts.map((p) => p[0]), ys = pts.map((p) => p[1]);
+  return [Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)];
+};
+const wingScale = (opt("wingcols", 24) * 2) / (bbox([wing])[2] - bbox([wing])[0]);
+const wordScale = opt("wordscale", 0.6);
+const [wx0, wy0, wx1, wy1] = bbox([wing]);
+const [tx0, ty0, tx1, ty1] = bbox(words);
+const wingG = raster([wing], wx0, wy0, wx1 - wx0, wy1 - wy0, wingScale, wingThr);
+const wordG = raster(words, tx0, ty0, tx1 - tx0, ty1 - ty0, wordScale, wordThr);
+const gap = opt("gap", 6);
+const H = Math.ceil(Math.max(wingG.length, wordG.length) / 4) * 4;
+const W = wingG[0].length + gap + wordG[0].length;
+const wingTop = Math.round((H - wingG.length) / 2);
+// El texto se centra con el centro del ala (como en el logo original).
+const wordTop = Math.round((H - wordG.length) / 2);
+const rows = Array.from({ length: H }, () => Array(W).fill("."));
+for (const [r, row] of wingG.entries()) for (const [c, on] of row.entries()) if (on) rows[wingTop + r][c] = "L";
+for (const [r, row] of wordG.entries()) for (const [c, on] of row.entries()) if (on) rows[wordTop + r][wingG[0].length + gap + c] = "W";
+const dotsW = Math.ceil(W / 2) * 2, dotsH = H;
+const out = rows.map((r) => r.join("").padEnd(dotsW, "."));
+console.log(JSON.stringify(out));
+
+// Vista previa braille
+const BITS = [[0, 3], [1, 4], [2, 5]];
+console.error(`${dotsW / 2} cols × ${dotsH / 4} líneas (${dotsW}×${dotsH} puntos)`);
+for (let r = 0; r < dotsH; r += 4) {
+  let line = "";
+  for (let c = 0; c < dotsW; c += 2) {
+    let bits = 0;
+    for (let dy = 0; dy < 4; dy++) for (let dx = 0; dx < 2; dx++) {
+      if (out[r + dy][c + dx] === ".") continue;
+      bits |= dy < 3 ? 1 << BITS[dy][dx] : 1 << (6 + dx);
+    }
+    line += String.fromCodePoint(0x2800 + bits);
+  }
+  console.error(line);
 }

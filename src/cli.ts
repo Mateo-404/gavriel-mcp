@@ -3,6 +3,7 @@ import { createRequire } from "node:module";
 import { parseArgs } from "node:util";
 import * as cmd from "./cli/commands.js";
 import { closeInput, InputError } from "./cli/io.js";
+import { runMenu } from "./cli/menu.js";
 import * as ui from "./cli/ui.js";
 
 // Injected at bundle time by esbuild (see scripts/build-bin.mjs).
@@ -18,6 +19,9 @@ function readVersion(): string {
 const VERSION = readVersion();
 
 const SECTIONS: readonly [string, readonly (readonly [string, string])[]][] = [
+  ["Interfaz", [
+    ["menu  (o sin argumentos en una terminal)", "Menú interactivo: cuentas, TOTP, diagnóstico, consultas, instalar en Claude"],
+  ]],
   ["Sesión", [
     ["login [-p perfil] [--email e] [--code 123456]", "Inicia sesión y guarda credenciales (password oculto)"],
     ["renew [-p perfil] [--all]", "Renueva el dispositivo confiable (código o semilla TOTP)"],
@@ -50,15 +54,16 @@ function helpText(stream: NodeJS.WriteStream): string {
     lines.push("");
   }
   lines.push(
-    `${p.paint("brand", "Opciones globales", { bold: true })}  ${p.paint("muted", "-p/--profile  --json  -y/--yes  --no-color  --plain  --no-anim  -h/--help  -v/--version")}`,
+    `${p.paint("brand", "Opciones globales", { bold: true })}  ${p.paint("muted", "-p/--profile  --json  -y/--yes  --no-color  --plain  --no-anim  --logo blocks|braille|text|none  -h/--help  -v/--version")}`,
     `${p.paint("brand", "Códigos de salida", { bold: true })}   ${p.paint("muted", `0 ok ${g.dot} 1 error ${g.dot} 2 uso incorrecto ${g.dot} 130 cancelado`)}`,
-    `${p.paint("brand", "Entorno", { bold: true })}            ${p.paint("muted", "NO_COLOR, FORCE_COLOR, GAVRIEL_THEME=light|dark, GAVRIEL_NO_ANIM, GAVRIEL_ASCII, GAVRIEL_PLAIN")}`,
+    `${p.paint("brand", "Entorno", { bold: true })}            ${p.paint("muted", "NO_COLOR, FORCE_COLOR, GAVRIEL_THEME=light|dark, GAVRIEL_NO_ANIM, GAVRIEL_ASCII, GAVRIEL_PLAIN, GAVRIEL_LOGO")}`,
   );
   return lines.join("\n");
 }
 
 const COMMANDS: Record<string, (ctx: cmd.Ctx) => Promise<void>> = {
   login: cmd.login, renew: cmd.renew, logout: cmd.logout, whoami: cmd.whoami, doctor: cmd.doctor,
+  menu: async () => runMenu(() => helpText(process.stdout)),
   profile: cmd.profile, profiles: cmd.profile, totp: cmd.totpCmd, mcp: cmd.mcp,
   tickets: cmd.tickets, events: cmd.events, accounts: cmd.accounts,
 };
@@ -83,8 +88,28 @@ async function main(): Promise<void> {
   }
   const { values, positionals } = parsed;
   ui.configure({ noColor: values["no-color"], plain: values.plain, noAnim: values["no-anim"] });
+  if (values.logo !== undefined) {
+    if (!["blocks", "braille", "text", "none"].includes(values.logo)) {
+      console.error(ui.line("fail", "--logo debe ser blocks, braille, text o none"));
+      process.exitCode = 2;
+      return;
+    }
+    ui.setLogoMode(values.logo as ui.LogoMode);
+  }
   if (values.version) return console.log(`gavriel ${VERSION}`);
   const [name, ...args] = positionals;
+  const interactive = Boolean(process.stdin.isTTY && process.stderr.isTTY && !values.json);
+  if (!name && !values.help && interactive) {
+    try {
+      await runMenu(() => helpText(process.stdout));
+    } catch (err) {
+      if (!(err instanceof cmd.SilentError)) console.error(ui.line("fail", `Error: ${(err as Error).message}`));
+      process.exitCode = err instanceof InputError ? err.exitCode : 1;
+    } finally {
+      closeInput();
+    }
+    return;
+  }
   if (values.help || !name) {
     await ui.banner({ stream: process.stdout });
     return console.log(helpText(process.stdout));

@@ -23,6 +23,7 @@ export const OPTIONS = {
   limit: { type: "string" },
   "server-path": { type: "string" },
   json: { type: "boolean" },
+  logo: { type: "string" },
   "no-color": { type: "boolean" },
   plain: { type: "boolean" },
   "no-anim": { type: "boolean" },
@@ -162,6 +163,10 @@ export function deriveProfileName(email: string): string {
   return n || "perfil";
 }
 
+const MAX_LOGIN_TRIES = 5;
+// Errores del backend que tienen sentido reintentar en una terminal (credenciales o código); los de red no.
+const CREDENTIAL_ERROR = /Login (con 2FA )?falló \((400|401|403|422)\)|Código 2FA rechazado/;
+
 export async function login(ctx: Ctx): Promise<void> {
   const apiBase = optApiBase(ctx);
   const role = optRole(ctx);
@@ -177,15 +182,35 @@ export async function login(ctx: Ctx): Promise<void> {
   if (prev && !explicit && prev.email.toLowerCase() !== email.toLowerCase()) {
     throw new Error(`El perfil "${name}" ya existe con otro email (${prev.email}). Usá --profile <nombre> para elegir o reemplazar uno.`);
   }
-  const password = await askHidden(ui.prompt("Password"));
-  if (!password) throw new Error("Password requerido");
   // Primero se autentica con el password candidato (sin persistirlo); solo si anda se guarda todo.
-  const config = {
-    GAVRIEL_EMAIL: email, GAVRIEL_PASSWORD: password, GAVRIEL_API_BASE: apiBase ?? prev?.apiBase ?? DEFAULT_API,
-    GAVRIEL_MCP_ROLE: role ?? prev?.role ?? "full", GAVRIEL_MCP_WRITE_CONCURRENCY: 5, GAVRIEL_MCP_DESTRUCTIVE_APPROVAL: "elicitation", strictProfile: true,
-  } as Config;
-  const client = new GavrielClient(config, { getTwoFactorCode: twoFactor(ctx, email) });
-  await loginWithSpinner(client, "Autenticando con Gavriel");
+  // En una terminal, un password o código incorrecto permite reintentar (sin pisar nada guardado).
+  let password = "";
+  let client!: GavrielClient;
+  let askPassword = true;
+  let codeFlag = str(ctx.values.code);
+  for (let attempt = 1; ; attempt++) {
+    if (askPassword) {
+      password = await askHidden(ui.prompt(attempt === 1 ? "Password" : "Password (reintento)"));
+      if (!password) throw new Error("Password requerido");
+    }
+    const config = {
+      GAVRIEL_EMAIL: email, GAVRIEL_PASSWORD: password, GAVRIEL_API_BASE: apiBase ?? prev?.apiBase ?? DEFAULT_API,
+      GAVRIEL_MCP_ROLE: role ?? prev?.role ?? "full", GAVRIEL_MCP_WRITE_CONCURRENCY: 5, GAVRIEL_MCP_DESTRUCTIVE_APPROVAL: "elicitation", strictProfile: true,
+    } as Config;
+    const tryCtx: Ctx = { ...ctx, values: { ...ctx.values, code: codeFlag } };
+    client = new GavrielClient(config, { getTwoFactorCode: twoFactor(tryCtx, email) });
+    try {
+      await loginWithSpinner(client, "Autenticando con Gavriel");
+      break;
+    } catch (e) {
+      const msg = (e as Error).message;
+      if (!process.stdin.isTTY || attempt >= MAX_LOGIN_TRIES || !CREDENTIAL_ERROR.test(msg)) throw e;
+      const badCode = /Código 2FA rechazado|2FA falló/.test(msg);
+      askPassword = !badCode; // código malo: se reutiliza el password y se pide solo el código
+      codeFlag = undefined; // un --code ya usado no sirve de nuevo
+      console.error(ui.line("warn", `${badCode ? "Código 2FA incorrecto" : "Email o password incorrectos"} (intento ${attempt}/${MAX_LOGIN_TRIES}). Probá de nuevo o Ctrl-C para salir.`));
+    }
+  }
   if (!storePassword(email, password)) {
     throw new Error("No hay almacén seguro disponible (Windows: DPAPI; Linux: libsecret-tools). No se guardó nada.");
   }
