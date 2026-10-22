@@ -14,7 +14,9 @@ import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+// pnpm 12 reenvía el "--" tal cual (`pnpm run install:cli -- --yes`): se ignora.
 const { values } = parseArgs({
+  args: process.argv.slice(2).filter((a) => a !== "--"),
   options: {
     mcp: { type: "boolean" }, client: { type: "string" }, dir: { type: "string" }, "no-path": { type: "boolean" },
     yes: { type: "boolean", short: "y" }, "dry-run": { type: "boolean" }, "skip-build": { type: "boolean" },
