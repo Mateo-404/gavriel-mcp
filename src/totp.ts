@@ -47,3 +47,10 @@ export function parseSeedInput(input: string): string {
 export function secondsLeft(nowMs = Date.now(), periodSec = 30): number {
   return periodSec - (Math.floor(nowMs / 1000) % periodSec);
 }
+
+// Código TOTP válido por al menos ~2 s: si la ventana está por cerrar, espera a la siguiente
+// (si no, el código puede vencer en tránsito y el backend lo rechaza).
+export async function totpFresh(seedBase32: string): Promise<string> {
+  if (secondsLeft() < 2) await new Promise((r) => setTimeout(r, secondsLeft() * 1000 + 250));
+  return totp(seedBase32);
+}

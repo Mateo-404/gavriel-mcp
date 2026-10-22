@@ -39,7 +39,18 @@ const INSTRUCTIONS = [
   "Si no hay tool dedicada para una lectura, probá la tool get (solo rutas permitidas).",
 ].join(" ");
 
+/** Configuración inválida de GAVRIEL_MCP_TOOLSETS; index.ts la captura y termina el proceso. */
+export class ToolsetsError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "ToolsetsError";
+  }
+}
+
 type Reg = (server: McpServer, client: GavrielClient, role: Role) => void;
+
+// Resources y prompts no dependen de toolsets: se registran siempre.
+const ALWAYS: Reg[] = [registerCatalogResources, registerEntityResources, registerPrompts];
 
 const TOOLSETS: Record<string, Reg[]> = {
   core: [
@@ -47,7 +58,6 @@ const TOOLSETS: Record<string, Reg[]> = {
     registerActivityTools, registerConversationTools, registerSearchTools, registerDashboardTools,
     registerBatchTools, registerHealthTools, registerAuditTools, registerRawGetTool, registerServiceTools,
     registerOrgTools, registerMonitoringTools, registerDeviceTools, registerEventCatalogTools,
-    registerCatalogResources, registerEntityResources, registerPrompts,
   ],
   notifications: [registerNotificationTools],
   video: [registerVideoTools],
@@ -64,14 +74,19 @@ function selectedToolsets(): string[] {
   const names = raw.split(",").map((n) => n.trim()).filter(Boolean);
   const bad = names.filter((n) => !valid.includes(n));
   if (bad.length) {
-    console.error(`GAVRIEL_MCP_TOOLSETS: grupos desconocidos: ${bad.join(", ")}. Válidos: all, ${valid.join(", ")}`);
-    process.exit(1);
+    throw new ToolsetsError(`GAVRIEL_MCP_TOOLSETS: grupos desconocidos: ${bad.join(", ")}. Válidos: all, ${valid.join(", ")}`);
   }
   return names;
 }
 
 export function buildServer(client: GavrielClient, role: Role = "full"): McpServer {
   const server = new McpServer({ name: "gavriel-mcp", version: VERSION }, { instructions: INSTRUCTIONS });
+  // Cuenta las tools registradas (el SDK no expone el total) para avisar si la selección quedó vacía.
+  let tools = 0;
+  const origRegister = server.registerTool.bind(server) as (...a: unknown[]) => unknown;
+  (server as unknown as { registerTool: unknown }).registerTool = (...a: unknown[]) => { tools++; return origRegister(...a); };
   for (const name of selectedToolsets()) for (const reg of TOOLSETS[name]) reg(server, client, role);
+  for (const reg of ALWAYS) reg(server, client, role);
+  if (tools === 0) console.error(`[gavriel-mcp] ADVERTENCIA: 0 tools registradas (toolsets=${process.env.GAVRIEL_MCP_TOOLSETS ?? "all"}, role=${role}).`);
   return server;
 }

@@ -54,7 +54,7 @@ export function registerTelephonyAndOpsTools(server: McpServer, client: GavrielC
   registerTool(
     server, role, "full", "create_sip_call",
     {
-      title: "Registrar llamada SIP (ESCRITURA)",
+      title: "Registrar llamada SIP",
       description:
         "POST /sip/calls. Usar cuando se deba registrar los metadatos de una llamada ya realizada. No usar para originar una llamada (la API solo registra). Requiere confirm: true.",
       inputSchema: {
@@ -79,7 +79,7 @@ export function registerTelephonyAndOpsTools(server: McpServer, client: GavrielC
   registerTool(
     server, role, "full", "attach_sip_call_recording",
     {
-      title: "Adjuntar grabación a llamada SIP (ESCRITURA)",
+      title: "Adjuntar grabación a llamada SIP",
       description: "POST /sip/calls/{id}/recording. Usar cuando ya se subió el archivo de audio y hay que vincularlo a la llamada. No usar para subir el archivo. Requiere confirm: true.",
       inputSchema: {
         callId: idSchema.describe("ID de la llamada SIP"),
@@ -121,7 +121,7 @@ export function registerTelephonyAndOpsTools(server: McpServer, client: GavrielC
   registerTool(
     server, role, "full", "review_citizen_report",
     {
-      title: "Marcar reporte ciudadano como revisado (ESCRITURA)",
+      title: "Marcar reporte ciudadano como revisado",
       description: "POST /citizen-reports/{id}/review. Usar cuando un operador ya revisó el reporte; opcionalmente con comentario. No usar para listar. Requiere confirm: true.",
       inputSchema: {
         id: idSchema.describe("ID del reporte"),
@@ -206,7 +206,7 @@ export function registerTelephonyAndOpsTools(server: McpServer, client: GavrielC
   registerTool(
     server, role, "full", "create_useful_contact",
     {
-      title: "Crear contacto útil (ESCRITURA)",
+      title: "Crear contacto útil",
       description: "POST /useful-contacts. Usar cuando se deba agregar un teléfono de utilidad a una jurisdicción. No usar para contactos de una cuenta (add_account_contact). Requiere confirm: true.",
       inputSchema: { jurisdictionId: idSchema.describe("ID de la jurisdicción"), ...contactFields, confirm: confirmSchema },
     },
@@ -220,7 +220,7 @@ export function registerTelephonyAndOpsTools(server: McpServer, client: GavrielC
   registerTool(
     server, role, "full", "update_useful_contact",
     {
-      title: "Actualizar contacto útil (ESCRITURA)",
+      title: "Actualizar contacto útil",
       description: "PATCH /useful-contacts/{id}. Solo envía los campos provistos. Requiere confirm: true.",
       inputSchema: {
         id: idSchema.describe("ID del contacto útil"),
@@ -285,7 +285,7 @@ export function registerTelephonyAndOpsTools(server: McpServer, client: GavrielC
   registerTool(
     server, role, "full", "create_event_format",
     {
-      title: "Crear formato de evento (ESCRITURA)",
+      title: "Crear formato de evento",
       description: "POST /events-formats. 409 si name/code ya existen. Requiere confirm: true.",
       inputSchema: { ...formatFields, confirm: confirmSchema },
     },
@@ -299,7 +299,7 @@ export function registerTelephonyAndOpsTools(server: McpServer, client: GavrielC
   registerTool(
     server, role, "full", "update_event_format",
     {
-      title: "Actualizar formato de evento (ESCRITURA)",
+      title: "Actualizar formato de evento",
       description: "PATCH /events-formats/{id}. Solo envía los campos provistos. Requiere confirm: true.",
       inputSchema: {
         id: idSchema.describe("ID del formato"),

@@ -41,7 +41,7 @@ export interface WriteExecution {
 // GAVRIEL_MCP_DESTRUCTIVE_APPROVAL=off. Sin cliente con elicitation falla cerrado.
 export function isDestructive(tool: string): boolean {
   return /^(delete_|bulk_|restart_|toggle_|cleanup_|cancel_notification_|retry_failed_notification_|archive_notification_)/.test(tool)
-    || /^(send_conversation_message|create_notification_campaign|reset_user_otp|create_user|update_user|notify_barrio|set_technician_slot_config|deactivate_intervention_category)$/.test(tool);
+    || /^(send_conversation_message|create_notification_campaign|reset_user_otp|create_user|update_user|notify_barrio|set_technician_slot_config|deactivate_intervention_category|mark_events_processed|create_bulk_interventions|close_ticket|close_intervention|set_zone_maintenance|update_bridge|update_connection|update_company|set_company_sip_config)$/.test(tool);
 }
 
 type ApprovalMode = "off" | "elicitation";
@@ -69,17 +69,32 @@ export function okOrInput(r: unknown): CallToolResult {
 //    lo adapta a clientes 2025 con su legacy shim). Al reintento lee inputResponses.
 //  - ElicitFn (legacy, ctx.mcpReq.elicitInput): fallback deprecado, lanza en clientes 2026.
 // Si no hay forma de preguntar o falla, NO ejecuta (falla cerrado).
+// opts.force: permite un guard para una tool fuera de isDestructive(); sin force
+// ese caso lanza (fail closed) en vez de devolver undefined y saltear la aprobación.
 export function destructiveGuard(
   tool: string,
   exec: WriteExecution,
   via?: ServerContext | ElicitFn,
+  opts?: { force?: boolean },
 ): Guard | undefined {
-  if (approvalMode !== "elicitation" || !isDestructive(tool)) return undefined;
+  if (approvalMode !== "elicitation") return undefined;
+  if (!opts?.force && !isDestructive(tool)) {
+    throw new Error(`destructiveGuard: "${tool}" no coincide con isDestructive(); agregarla ahí o pasar { force: true }`);
+  }
+  const p = exec.params as Record<string, unknown> | null;
+  const counts = Object.entries(p && typeof p === "object" ? p : {})
+    .filter(([k, v]) => Array.isArray(v) || (k === "count" && typeof v === "number"))
+    .map(([k, v]) => `${k}: ${Array.isArray(v) ? v.length : v}`);
+  const body = (JSON.stringify(exec.params) ?? "").slice(0, 300);
   const params: ElicitRequestFormParams = {
     mode: "form",
     message:
       `Operación destructiva: ${exec.tool}
-${exec.method} ${exec.path}
+${exec.method} ${exec.path.slice(0, 200)}
+` +
+      (counts.length ? `Alcance: ${counts.join(", ")}
+` : "") +
+      `Body: ${body}
 ` +
       `¿Ejecutar? (el agente ya mostró el preview y pidió confirm)`,
     requestedSchema: {

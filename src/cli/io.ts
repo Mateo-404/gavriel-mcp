@@ -1,22 +1,78 @@
-import { createInterface } from "node:readline/promises";
+import { createInterface, type Interface } from "node:readline";
 
-export async function ask(question: string): Promise<string> {
-  const rl = createInterface({ input: process.stdin, output: process.stderr });
-  try {
-    return (await rl.question(question)).trim();
-  } finally {
-    rl.close();
+// Error de entrada: exitCode 130 si fue Ctrl-C, 1 si se cerró stdin (EOF).
+export class InputError extends Error {
+  readonly exitCode: number;
+  constructor(message: string, exitCode: number) {
+    super(message);
+    this.exitCode = exitCode;
   }
+}
+
+// Un único lector compartido: con stdin por pipe, un readline por pregunta pierde las líneas ya bufferizadas.
+let rl: Interface | undefined;
+let ended = false;
+const buffered: string[] = [];
+const waiters: { resolve: (l: string) => void; reject: (e: Error) => void }[] = [];
+
+function failAll(err: Error): void {
+  for (const w of waiters.splice(0)) w.reject(err);
+}
+
+function reader(): Interface {
+  if (rl) return rl;
+  ended = false;
+  const r = createInterface({ input: process.stdin, output: process.stderr, terminal: Boolean(process.stdin.isTTY) });
+  r.on("line", (l) => {
+    const w = waiters.shift();
+    if (w) w.resolve(l);
+    else buffered.push(l);
+  });
+  r.on("close", () => {
+    ended = true;
+    failAll(new InputError("Entrada cerrada", 1));
+  });
+  r.on("SIGINT", () => failAll(new InputError("Cancelado", 130)));
+  rl = r;
+  return r;
+}
+
+// Cierra el lector (idempotente); se llama al terminar el CLI para que stdin no retenga el proceso.
+export function closeInput(): void {
+  rl?.removeAllListeners("close");
+  rl?.close();
+  rl = undefined;
+}
+
+export function ask(question: string): Promise<string> {
+  const r = reader();
+  if (buffered.length > 0) {
+    process.stderr.write(question);
+    return Promise.resolve((buffered.shift() as string).trim());
+  }
+  if (ended) return Promise.reject(new InputError("Entrada cerrada", 1));
+  return new Promise((resolve, reject) => {
+    waiters.push({ resolve: (l) => resolve(l.trim()), reject });
+    r.setPrompt(question);
+    r.prompt();
+  });
 }
 
 export async function confirm(question: string): Promise<boolean> {
   return /^(s|si|sí|y|yes)$/i.test(await ask(`${question} [s/N] `));
 }
 
-// Entrada sin eco (password, semilla). Sin TTY (pipe) lee una línea normal.
+const CR = "\r";
+const LF = "\n";
+const CTRL_C = "\u0003";
+const DEL = "\u007f";
+const BS = "\b";
+
+// Entrada sin eco (password, semilla). Sin TTY (pipe) lee del mismo lector compartido (el prompt va a stderr).
 export function askHidden(question: string): Promise<string> {
   const stdin = process.stdin;
   if (!stdin.isTTY) return ask(question);
+  closeInput(); // el modo raw no debe convivir con el eco de readline
   return new Promise((resolve, reject) => {
     process.stderr.write(question);
     let buf = "";
@@ -24,19 +80,19 @@ export function askHidden(question: string): Promise<string> {
       stdin.setRawMode(false);
       stdin.pause();
       stdin.off("data", onData);
-      process.stderr.write("\n");
+      process.stderr.write(LF);
     };
     const onData = (chunk: string): void => {
       for (const c of chunk) {
-        if (c === "\r" || c === "\n") {
+        if (c === CR || c === LF) {
           finish();
           return resolve(buf.trim());
         }
-        if (c === "\u0003") {
+        if (c === CTRL_C) {
           finish();
-          return reject(new Error("Cancelado"));
+          return reject(new InputError("Cancelado", 130));
         }
-        buf = c === "\u007f" || c === "\b" ? buf.slice(0, -1) : buf + c;
+        buf = c === DEL || c === BS ? buf.slice(0, -1) : buf + c;
       }
     };
     stdin.setEncoding("utf8");

@@ -1,5 +1,11 @@
 # Tier 3 — Endpoints inventariados y NO implementados
 
+> **Desactualizado.** Muchos endpoints de este inventario se implementaron después
+> (borrados `delete_*`, usuarios, bridges/conexiones/dispositivos/particiones/zonas,
+> catálogos, archivos). La lista real de tools es `test/tools.snapshot.json`.
+> Siguen pendientes: `/auth/register`, `/auth/2fa/*`, facturación/órdenes y
+> credenciales de integración.
+
 Inventario de endpoints del bundle de `app.gavriel.com.ar` que se **documentan
 pero no se implementan** en esta fase. Criterio: DELETE, gestión de
 usuarios/roles/permisos, activación/desactivación de monitoreo, configuración

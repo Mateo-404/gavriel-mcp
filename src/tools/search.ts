@@ -1,5 +1,5 @@
 import type { GavrielClient } from "../gavrielClient.js";
-import { ok, wrapReadOnly } from "./shared.js";
+import { ok, wrapReadOnly, ensureOk, itemsOf } from "./shared.js";
 import { TICKET_STATUSES, TICKET_PRIORITIES } from "./shared.js";
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/server";
@@ -23,11 +23,8 @@ export function registerSearchTools(server: McpServer, client: GavrielClient): v
     },
     wrapReadOnly(async (args, ctx) => {
       const res = await client.get("/accounts", { search: args.query, limit: args.limit }, { signal: ctx.mcpReq.signal });
-      const list = Array.isArray(res.data)
-        ? res.data
-        : (res.data as { data?: unknown[] } | null)?.data ?? [];
-      const results = list.map((a) => {
-        const r = a as Record<string, unknown>;
+      const list = itemsOf(ensureOk(res, "search_accounts"));
+      const results = list.map((r) => {
         return { id: r.id, accountNumber: r.accountNumber, name: r.name };
       });
       return ok(results);
@@ -59,11 +56,8 @@ export function registerSearchTools(server: McpServer, client: GavrielClient): v
       if (args.accountId) params.accountId = args.accountId;
       if (args.accountSearch) params.accountSearch = args.accountSearch;
       const res = await client.get("/tickets", params, { signal: ctx.mcpReq.signal });
-      const list = Array.isArray(res.data)
-        ? res.data
-        : (res.data as { data?: unknown[] } | null)?.data ?? [];
-      const results = list.map((t) => {
-        const r = t as Record<string, unknown>;
+      const list = itemsOf(ensureOk(res, "search_tickets"));
+      const results = list.map((r) => {
         return { id: r.id, title: r.title, status: r.status, priority: r.priority, accountId: r.accountId, createdAt: r.createdAt };
       });
       return ok(results);
@@ -96,11 +90,8 @@ export function registerSearchTools(server: McpServer, client: GavrielClient): v
       if (args.dateFrom) params.dateFrom = args.dateFrom;
       if (args.dateTo) params.dateTo = args.dateTo;
       const res = await client.get("/events", params, { signal: ctx.mcpReq.signal });
-      const list = Array.isArray(res.data)
-        ? res.data
-        : (res.data as { data?: unknown[] } | null)?.data ?? [];
-      const results = list.map((e) => {
-        const r = e as Record<string, unknown>;
+      const list = itemsOf(ensureOk(res, "search_events"));
+      const results = list.map((r) => {
         const account = r.account as Record<string, unknown> | undefined;
         const eventsType = r.eventsType as Record<string, unknown> | undefined;
         return {
@@ -134,11 +125,8 @@ export function registerSearchTools(server: McpServer, client: GavrielClient): v
       const params: Record<string, unknown> = { page: 1, limit: args.limit };
       if (args.query) params.search = args.query;
       const res = await client.get("/users", params, { signal: ctx.mcpReq.signal });
-      const list = Array.isArray(res.data)
-        ? res.data
-        : (res.data as { data?: unknown[] } | null)?.data ?? [];
-      const results = list.map((u) => {
-        const r = u as Record<string, unknown>;
+      const list = itemsOf(ensureOk(res, "search_users"));
+      const results = list.map((r) => {
         return { id: r.id, name: r.name, email: r.email, role: r.role };
       });
       return ok(results);

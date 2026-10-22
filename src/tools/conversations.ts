@@ -1,5 +1,5 @@
 import type { GavrielClient } from "../gavrielClient.js";
-import { ok, paginationSchema, okTruncated, truncateSchema, selectFields, wrapReadOnly, fieldsSchema } from "./shared.js";
+import { ok, paginationSchema, okTruncated, truncateSchema, selectFields, wrapReadOnly, fieldsSchema, idSchema } from "./shared.js";
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/server";
 import { requireConfirm, confirmSchema, seg, destructiveGuard, okOrInput } from "./writeHelpers.js";
@@ -10,7 +10,7 @@ export function registerConversationTools(server: McpServer, client: GavrielClie
     "list_conversations",
     {
       title: "Conversaciones del usuario",
-      description: "Conversaciones del usuario.",
+      description: "Usar cuando necesitás las conversaciones del helpdesk (paginadas). Para sus mensajes ver list_conversation_messages.",
       inputSchema: z.object({
               ...paginationSchema,
               truncate: truncateSchema,
@@ -49,10 +49,10 @@ export function registerConversationTools(server: McpServer, client: GavrielClie
   registerTool(
     server, role, "full", "send_conversation_message",
     {
-      title: "Enviar mensaje (ESCRITURA)",
+      title: "Enviar mensaje",
       description: "POST /conversations/{id}/messages. Requiere confirm: true y aprobación del usuario.",
       inputSchema: {
-        conversationId: z.string(),
+        conversationId: idSchema,
         body: z.string().min(1).describe("Contenido del mensaje"),
         confirm: confirmSchema,
       },
@@ -65,11 +65,11 @@ export function registerConversationTools(server: McpServer, client: GavrielClie
   );
 
   registerTool(
-    server, role, "full", "conversation_claim",
+    server, role, "lite", "conversation_claim",
     {
-      title: "Tomar conversación (ESCRITURA)",
+      title: "Tomar conversación",
       description: "POST /conversations/{id}/claim. Requiere confirm: true.",
-      inputSchema: { conversationId: z.string(), confirm: confirmSchema },
+      inputSchema: { conversationId: idSchema, confirm: confirmSchema },
       annotations: { idempotentHint: true },
     },
     async (args) => {
@@ -83,11 +83,11 @@ export function registerConversationTools(server: McpServer, client: GavrielClie
   );
 
   registerTool(
-    server, role, "full", "conversation_release",
+    server, role, "lite", "conversation_release",
     {
-      title: "Liberar conversación (ESCRITURA)",
+      title: "Liberar conversación",
       description: "POST /conversations/{id}/release. Requiere confirm: true.",
-      inputSchema: { conversationId: z.string(), confirm: confirmSchema },
+      inputSchema: { conversationId: idSchema, confirm: confirmSchema },
       annotations: { idempotentHint: true },
     },
     async (args) => {
@@ -103,10 +103,10 @@ export function registerConversationTools(server: McpServer, client: GavrielClie
   registerTool(
     server, role, "full", "conversation_set_status",
     {
-      title: "Estado de conversación (ESCRITURA)",
+      title: "Estado de conversación",
       description: "PATCH /conversations/{id}. Requiere confirm: true.",
       inputSchema: {
-        conversationId: z.string(),
+        conversationId: idSchema,
         status: z.string().describe("Nuevo estado (consultar catálogo si aplica)"),
         confirm: confirmSchema,
       },
@@ -126,7 +126,7 @@ export function registerConversationTools(server: McpServer, client: GavrielClie
     "get_conversation_stats",
     {
       title: "Stats de conversaciones",
-      description: "Stats de conversaciones.",
+      description: "Usar cuando necesitás conteos globales de conversaciones del helpdesk.",
       inputSchema: z.object({
               truncate: truncateSchema,
             }),
@@ -139,11 +139,11 @@ export function registerConversationTools(server: McpServer, client: GavrielClie
   );
 
   registerTool(
-    server, role, "full", "conversation_mark_read",
+    server, role, "lite", "conversation_mark_read",
     {
-      title: "Marcar leída (ESCRITURA)",
+      title: "Marcar leída",
       description: "POST /conversations/{id}/read. Requiere confirm: true.",
-      inputSchema: { conversationId: z.string(), confirm: confirmSchema },
+      inputSchema: { conversationId: idSchema, confirm: confirmSchema },
       annotations: { idempotentHint: true },
     },
     async (args) => {

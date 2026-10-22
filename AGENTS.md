@@ -39,8 +39,9 @@ Los nombres MCP no llevan prefijo (`create_ticket`, `list_tickets`…). En las
 sesiones de opencode se exponen antepuestos con el nombre del server
 (`gavriel_`): `create_ticket` → `gavriel_create_ticket`.
 
-El inventario completo (98 tools, lectura vs escritura) está en
-`README.md · Herramientas`. Regla corta que no se pierde con la
+El inventario completo (hoy 213 tools; la fuente de verdad es
+`test/tools.snapshot.json`, que regenera `pnpm test:snapshot`) está en
+`README.md · Tools`. Regla corta que no se pierde con la
 compactación: toda tool de **escritura** lleva `confirm`, toda tool de
 **lectura** no. Las batch (`bulk_*`) devuelven `{ summary:{total,ok,failed},
 results:[{id,ok,status?,error?}] }`.
@@ -102,9 +103,14 @@ Estados de evento: `pending`, `attending`, `processed`, `self-processed`,
 - Día no laboral de empresa: `POST /companies/{id}/non-working-days`
   `{ date (YYYY-MM-DD), label? }`
 
-Los endpoints de escritura que exceden el perfil de riesgo aprobado (borrados,
-gestión de usuarios/roles, activación de monitoreo, facturación, catálogos,
-archivos) están en `TIER3_PENDIENTE.md`: **documentados pero no implementados**.
+`TIER3_PENDIENTE.md` es un inventario **histórico y desactualizado**: desde
+entonces se implementaron los borrados (`delete_*`), alta/edición/reset-otp de
+usuarios, bridges/conexiones/dispositivos/particiones/zonas, catálogos
+(`upsert_catalog_item`, `delete_catalog_item`, event types/codes/formats,
+marcas/modelos) y archivos (`link_file_to_ticket`, `delete_file`). Siguen sin
+implementar `/auth/register`, `/auth/2fa/*`, facturación/órdenes y
+credenciales de integración. Verificar contra `test/tools.snapshot.json`
+antes de asumir que algo falta.
 
 ## Escrituras: concurrencia y robustez
 
@@ -171,14 +177,43 @@ antes de crear codes para un formato nuevo.
 La tabla completa de variables vive en `README.md · Configuración`. Nota
 operativa:
 
+- `GAVRIEL_MCP_ROLE`: `readonly` | `lite` (lectura + escrituras core: tickets,
+  intervenciones, conversaciones) | `full` (default del server; el
+  `manifest.json` de MCPB defaultea a `readonly` a propósito: el bundle para
+  Claude Desktop arranca con el mínimo privilegio y se sube a mano).
+- `GAVRIEL_PROFILE`: perfil del CLI (`gavriel login`) a usar; sin
+  `GAVRIEL_EMAIL` se usa el perfil activo. Perfiles en `GAVRIEL_CONFIG_DIR`
+  (default `~/.config/gavriel`), sin secretos.
+- `GAVRIEL_ALLOW_PLAINTEXT=1`: permite guardar el trusted token en texto plano
+  cuando no hay almacén seguro (Windows usa DPAPI, Linux libsecret).
+- `GAVRIEL_ALLOW_CUSTOM_API_BASE=1`: necesario (en el entorno real, no en
+  `.env`) para apuntar `GAVRIEL_API_BASE` a un host que no sea el de Gavriel.
+- `GAVRIEL_POLL_SEC`: poller opt-in de eventos pendientes (mín. 30 s; emite
+  notificaciones de log y `resources/updated`).
+- `GAVRIEL_CLAUDE_DESKTOP_CONFIG`: ruta alternativa del JSON de Claude Desktop
+  para `gavriel mcp install` (tests).
 - `GAVRIEL_MCP_TOOLSETS`: lista separada por comas (default `all`) de grupos de módulos: core, notifications, video, telephony, infrastructure, coreGaps, composites. Nombre desconocido = error al arrancar.
-- `GAVRIEL_MCP_DESTRUCTIVE_APPROVAL`: `off` (default) | `elicitation`. Con
-  `elicitation`, las tools destructivas (`delete_account_note`,
-  `bulk_mark_events_by_filter`, `bulk_add_account_note`) piden **aprobación
-  humana por elicitation** (form con boolean) además del `confirm`. Si el
+- `GAVRIEL_MCP_DESTRUCTIVE_APPROVAL`: `elicitation` (**default**) | `off`. Con
+  `elicitation`, las tools destructivas piden **aprobación humana por
+  elicitation** (form con boolean) además del `confirm`. El conjunto cubre
+  `delete_*`, `bulk_*`, `restart_*`, `toggle_*`, `cleanup_*`,
+  `send_conversation_message`, las campañas de notificación, `create_user` /
+  `update_user` / `reset_user_otp`, `notify_barrio`, el mantenimiento de zonas y
+  las actualizaciones de bridge/conexión/empresa (ver `src/tools/*`). Si el
   cliente no soporta elicitation o el usuario rechaza, no se ejecuta (falla
-  cerrado). Nota: `ctx.mcpReq.elicitInput` está deprecado en la spec
+  cerrado); `off` lo desactiva explícitamente. Nota: `ctx.mcpReq.elicitInput` está deprecado en la spec
   2026-07-28 (usa `inputRequired`) pero sigue funcional en clientes 2025-era.
+
+## CLI `gavriel`
+
+`dist/cli.js` (bin `gavriel`, y binario SEA `gavriel-<plat>-<arch>`): `login`,
+`renew`, `logout`, `whoami`, `doctor [--online]`, `profile`, `totp`,
+`mcp install [--force] [--server-path]` y consultas rápidas (`tickets`,
+`events pending`, `accounts`). Código en `src/cli.ts` y `src/cli/*.ts`.
+Reglas: `login` autentica **antes** de persistir password/perfil; no pisa un
+perfil de otro email sin `--profile`; `--limit` 1..200; `--role`/`--toolsets`/
+`--api-base` se validan; salida 0 ok, 1 error (130 con Ctrl-C), 2 uso
+incorrecto. Stdin por pipe funciona (`printf 'mail\npass\n' | gavriel login`).
 
 ## Reglas de proyecto
 
@@ -198,7 +233,8 @@ operativa:
 5. El gate `confirm` es el control técnico de escrituras (además del log
    local): ninguna tool de escritura se ejecuta sin `confirm: true`.
 6. Roles (`GAVRIEL_MCP_ROLE`): `readonly` expone solo lectura (+ `get` y
-   `audit_logs`); `full` (default) expone todas, con `confirm` vigente.
+   `audit_logs`); `lite` suma las escrituras core; `full` (default) expone
+   todas, con `confirm` vigente.
    Rol y `confirm` son capas distintas: rol = disponibilidad de tools,
    confirm = aprobación. Roles no sustituye al usuario/permission del
    backend de Gavriel (defensa en profundidad).

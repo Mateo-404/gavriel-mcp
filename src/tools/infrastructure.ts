@@ -37,17 +37,17 @@ export function registerInfrastructureTools(server: McpServer, client: GavrielCl
   const BRIDGE_KEYS = ["name", "code", "ip", "httpPort", "activated"] as const;
 
   registerTool(server, role, "full", "create_bridge", {
-    title: "Crear bridge (ESCRITURA)",
+    title: "Crear bridge",
     description: "POST /bridges. Usar cuando hay que dar de alta un bridge (name, code, ip). No usar para editar uno existente (update_bridge). 409 = nombre/código duplicado. Requiere confirm: true.",
     inputSchema: { ...bridgeFields, name: z.string().describe("Nombre"), code: z.string().describe("Código"), ip: z.string().describe("IP"), confirm: confirmSchema },
   }, async (a, ctx) => run("create_bridge", "POST", "/bridges", buildBody(a, { required: ["name", "code", "ip"], optional: ["httpPort", "activated"] }), a.confirm, ctx));
 
   registerTool(server, role, "full", "update_bridge", {
-    title: "Actualizar bridge (ESCRITURA)",
+    title: "Actualizar bridge",
     description: "PATCH /bridges/{id}. Usar cuando hay que cambiar name/code/ip/httpPort de un bridge. No usar para activar/desactivar (toggle_bridge_activation). Requiere confirm: true.",
     inputSchema: { bridgeId: id("ID del bridge"), ...bridgeFields, confirm: confirmSchema },
     annotations: { idempotentHint: true },
-  }, async (a, ctx) => run("update_bridge", "PATCH", `/bridges/${seg(a.bridgeId)}`, buildBody(a, { optional: BRIDGE_KEYS }), a.confirm, ctx));
+  }, async (a, ctx) => run("update_bridge", "PATCH", `/bridges/${seg(a.bridgeId)}`, buildBody(a, { optional: BRIDGE_KEYS }), a.confirm, ctx, true));
 
   registerTool(server, role, "full", "toggle_bridge_activation", {
     title: "Activar/desactivar bridge (DESTRUCTIVA)",
@@ -95,17 +95,17 @@ export function registerInfrastructureTools(server: McpServer, client: GavrielCl
   const CONN_KEYS = Object.keys(connFields);
 
   registerTool(server, role, "full", "create_connection", {
-    title: "Crear conexión (ESCRITURA)",
+    title: "Crear conexión",
     description: "POST /connections. Usar cuando hay que dar de alta una conexión de receptor bajo un bridge. Los campos extra (puertos, etc.) no están expuestos: usar solo los listados. No usar para editar (update_connection). Requiere confirm: true.",
     inputSchema: { ...connFields, confirm: confirmSchema },
   }, async (a, ctx) => run("create_connection", "POST", "/connections", buildBody(a, { optional: CONN_KEYS }), a.confirm, ctx));
 
   registerTool(server, role, "full", "update_connection", {
-    title: "Actualizar conexión (ESCRITURA)",
+    title: "Actualizar conexión",
     description: "PATCH /connections/{id}. Usar cuando hay que cambiar datos, empresas asociadas o umbrales de heartbeat de una conexión. Requiere confirm: true.",
     inputSchema: { connectionId: id("ID de la conexión"), ...connFields, confirm: confirmSchema },
     annotations: { idempotentHint: true },
-  }, async (a, ctx) => run("update_connection", "PATCH", `/connections/${seg(a.connectionId)}`, buildBody(a, { optional: CONN_KEYS }), a.confirm, ctx));
+  }, async (a, ctx) => run("update_connection", "PATCH", `/connections/${seg(a.connectionId)}`, buildBody(a, { optional: CONN_KEYS }), a.confirm, ctx, true));
 
   registerTool(server, role, "full", "delete_connection", {
     title: "Eliminar conexión (DESTRUCTIVA)",
@@ -116,13 +116,13 @@ export function registerInfrastructureTools(server: McpServer, client: GavrielCl
 
   // ── Partitions ────────────────────────────────────────────────────
   registerTool(server, role, "full", "create_partition", {
-    title: "Crear partición (ESCRITURA)",
+    title: "Crear partición",
     description: "POST /accounts/{accountId}/partitions. Usar cuando hay que agregar una partición a una cuenta. Requiere confirm: true.",
     inputSchema: { accountId: id("ID de la cuenta"), code: z.string().describe("Código de la partición"), name: z.string().describe("Nombre"), confirm: confirmSchema },
   }, async (a, ctx) => run("create_partition", "POST", `/accounts/${seg(a.accountId)}/partitions`, { code: a.code, name: a.name, accountId: a.accountId }, a.confirm, ctx));
 
   registerTool(server, role, "full", "update_partition", {
-    title: "Actualizar partición (ESCRITURA)",
+    title: "Actualizar partición",
     description: "PUT /partitions/{id}. Usar cuando hay que cambiar code/name de una partición. Requiere confirm: true.",
     inputSchema: { partitionId: id("ID de la partición"), code: z.string().optional().describe("Código"), name: z.string().optional().describe("Nombre"), confirm: confirmSchema },
     annotations: { idempotentHint: true },
@@ -144,7 +144,7 @@ export function registerInfrastructureTools(server: McpServer, client: GavrielCl
   };
 
   registerTool(server, role, "full", "add_partition_member", {
-    title: "Asociar a partición (ESCRITURA)",
+    title: "Asociar a partición",
     description: "POST /partitions/{id}/{zones|users|contacts}. Usar cuando hay que asociar una zona, usuario o contacto a una partición. Requiere confirm: true.",
     inputSchema: memberSchema,
   }, async (a, ctx) => run("add_partition_member", "POST", `/partitions/${seg(a.partitionId)}/${a.kind}`, { [MEMBER[a.kind]]: a.memberId }, a.confirm, ctx));
@@ -158,11 +158,11 @@ export function registerInfrastructureTools(server: McpServer, client: GavrielCl
 
   // ── Zones ─────────────────────────────────────────────────────────
   registerTool(server, role, "full", "set_zone_maintenance", {
-    title: "Poner zona en mantenimiento (ESCRITURA)",
+    title: "Poner zona en mantenimiento",
     description: "PATCH /zones/{id}/maintenance. Usar cuando hay que silenciar una zona por N horas por mantenimiento. No usar para editar la zona (update_zone). Requiere confirm: true.",
     inputSchema: { zoneId: id("ID de la zona"), durationHours: z.number().positive().describe("Duración del mantenimiento en horas"), confirm: confirmSchema },
     annotations: { idempotentHint: true },
-  }, async (a, ctx) => run("set_zone_maintenance", "PATCH", `/zones/${seg(a.zoneId)}/maintenance`, { durationHours: a.durationHours }, a.confirm, ctx));
+  }, async (a, ctx) => run("set_zone_maintenance", "PATCH", `/zones/${seg(a.zoneId)}/maintenance`, { durationHours: a.durationHours }, a.confirm, ctx, true));
 
   registerTool(server, role, "full", "delete_zone_maintenance", {
     title: "Quitar mantenimiento de zona (DESTRUCTIVA)",
@@ -190,17 +190,17 @@ export function registerInfrastructureTools(server: McpServer, client: GavrielCl
   const COMPANY_KEYS = Object.keys(companyFields);
 
   registerTool(server, role, "full", "create_company", {
-    title: "Crear empresa (ESCRITURA)",
+    title: "Crear empresa",
     description: "POST /companies. Usar cuando hay que dar de alta una empresa (técnica y/o de monitoreo). 409 = duplicada. Requiere confirm: true.",
     inputSchema: { ...companyFields, name: z.string().describe("Nombre"), code: z.string().describe("Código"), confirm: confirmSchema },
   }, async (a, ctx) => run("create_company", "POST", "/companies", buildBody(a, { optional: COMPANY_KEYS }), a.confirm, ctx));
 
   registerTool(server, role, "full", "update_company", {
-    title: "Actualizar empresa (ESCRITURA)",
+    title: "Actualizar empresa",
     description: "PATCH /companies/{id}. Usar cuando hay que cambiar datos de una empresa. Requiere confirm: true.",
     inputSchema: { companyId: id("ID de la empresa"), ...companyFields, confirm: confirmSchema },
     annotations: { idempotentHint: true },
-  }, async (a, ctx) => run("update_company", "PATCH", `/companies/${seg(a.companyId)}`, buildBody(a, { optional: COMPANY_KEYS }), a.confirm, ctx));
+  }, async (a, ctx) => run("update_company", "PATCH", `/companies/${seg(a.companyId)}`, buildBody(a, { optional: COMPANY_KEYS }), a.confirm, ctx, true));
 
   registerTool(server, role, "full", "delete_company", {
     title: "Eliminar empresa (DESTRUCTIVA)",
@@ -217,7 +217,7 @@ export function registerInfrastructureTools(server: McpServer, client: GavrielCl
   }, async (a, ctx) => run("delete_company_non_working_day", "DELETE", `/companies/${seg(a.companyId)}/non-working-days/${seg(a.dayId)}`, undefined, a.confirm, ctx, true));
 
   registerTool(server, role, "full", "set_company_sip_config", {
-    title: "Configurar telefonía SIP de empresa (ESCRITURA)",
+    title: "Configurar telefonía SIP de empresa",
     description: "PUT /companies/{id}/sip-config. Usar cuando hay que habilitar/ajustar la telefonía SIP de una empresa (wssUrl, dominio, prefijo). Si enabled=true wssUrl y domain deben ser reales. Requiere confirm: true.",
     inputSchema: {
       companyId: id("ID de la empresa"),
@@ -229,5 +229,5 @@ export function registerInfrastructureTools(server: McpServer, client: GavrielCl
     },
     annotations: { idempotentHint: true },
   }, async (a, ctx) => run("set_company_sip_config", "PUT", `/companies/${seg(a.companyId)}/sip-config`,
-    { enabled: a.enabled, wssUrl: a.wssUrl, domain: a.domain, outboundPrefix: a.outboundPrefix ?? null }, a.confirm, ctx));
+    { enabled: a.enabled, wssUrl: a.wssUrl, domain: a.domain, outboundPrefix: a.outboundPrefix ?? null }, a.confirm, ctx, true));
 }

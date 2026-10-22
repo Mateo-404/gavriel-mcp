@@ -3,11 +3,16 @@ import assert from "node:assert/strict";
 import { GavrielClient, retryDelayMs, parseRetryAfter } from "../dist/gavrielClient.js";
 import { requireConfirm, isDestructive } from "../dist/tools/writeHelpers.js";
 import { normalizePath, isAllowed, sanitizeQuery } from "../dist/tools/rawGet.js";
-import { redact } from "../dist/auditLog.js";
+import { redact, redactText } from "../dist/auditLog.js";
+import { loadStore, saveStore, getProfile, validateProfileName } from "../dist/profiles.js";
+import { loadConfig } from "../dist/config.js";
+import { mkdtempSync, writeFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { diffNewEvents, parsePollSec } from "../dist/notifications/poller.js";
 
-function mkClient() {
-  const c = new GavrielClient({ GAVRIEL_API_BASE: "http://localhost:1/api", GAVRIEL_EMAIL: "x@x", GAVRIEL_PASSWORD: "x" });
+function mkClient(extra = {}) {
+  const c = new GavrielClient({ GAVRIEL_API_BASE: "http://localhost:1/api", GAVRIEL_EMAIL: "x@x", GAVRIEL_PASSWORD: "x", ...extra });
   let n = 0;
   c.login = async () => { // login stub: sin red
     c.jwt.token = `t${++n}`;
@@ -104,4 +109,165 @@ test("poller: diffNewEvents y parsePollSec", () => {
   assert.equal(parsePollSec("0"), null);
   assert.equal(parsePollSec("5"), 30);
   assert.equal(parsePollSec("90"), 90);
+});
+
+// ── Auditoría: login, cache, invalidación, redacción, perfiles, config ──
+function realClient() {
+  return new GavrielClient({ GAVRIEL_API_BASE: "http://localhost:1/api", GAVRIEL_EMAIL: "x@x", GAVRIEL_PASSWORD: "x" });
+}
+
+test("login: el POST /auth/login lleva AbortSignal (timeout)", async () => {
+  const origFetch = global.fetch;
+  let sig;
+  global.fetch = async (url, o) => {
+    sig = o.signal;
+    return new Response(JSON.stringify({ access_token: "a.b.c" }), { status: 200, headers: J });
+  };
+  try {
+    await realClient().login();
+    assert.ok(sig instanceof AbortSignal);
+    assert.equal(sig.aborted, false);
+  } finally { global.fetch = origFetch; }
+});
+
+test("login: un fallo se recuerda y no se re-postea en cada llamada", async () => {
+  await withFetch([{ status: 401, body: JSON.stringify({ message: "credenciales" }), headers: J }], async (calls) => {
+    const c = realClient();
+    await assert.rejects(c.login(), /Login falló/);
+    await assert.rejects(c.login(), /Login falló/);
+    await assert.rejects(c.get("/tickets"), /Login falló/);
+    assert.equal(calls.length, 1);
+  });
+});
+
+test("client: no cachea bodies string (no-JSON/truncados)", async () => {
+  await withFetch([{ status: 200, body: "{trunca" }, { status: 200, body: "{trunca" }], async (calls) => {
+    const c = mkClient();
+    const r = await c.get("/tickets", {}, { ttl: 5000 });
+    assert.equal(typeof r.data, "string");
+    await c.get("/tickets", {}, { ttl: 5000 });
+    assert.equal(calls.length, 2);
+  });
+});
+
+test("client: cache y dedupe devuelven copias independientes", async () => {
+  await withFetch([ok({ a: { b: 1 } })], async () => {
+    const c = mkClient();
+    const r1 = await c.get("/tickets", {}, { ttl: 5000 });
+    r1.data.a.b = 99;
+    const r2 = await c.get("/tickets", {}, { ttl: 5000 });
+    assert.equal(r2.data.a.b, 1);
+  });
+});
+
+test("client: una escritura invalida GETs en vuelo (ni cache ni dedupe del GET viejo)", async () => {
+  const c = mkClient();
+  const origFetch = global.fetch;
+  let release;
+  const gate = new Promise((r) => { release = r; });
+  let n = 0;
+  global.fetch = async () => {
+    const i = ++n;
+    if (i === 1) { await gate; return new Response(JSON.stringify({ v: "old" }), { status: 200, headers: J }); }
+    return new Response(JSON.stringify({ v: "new" }), { status: 200, headers: J });
+  };
+  try {
+    const g1 = c.get("/tickets", {}, { ttl: 5000 });
+    await new Promise((r) => setTimeout(r, 10));
+    await c.patch("/tickets/1", { a: 1 });
+    const g2 = await c.get("/tickets", {}, { ttl: 5000 }); // no se cuelga del GET viejo
+    release();
+    assert.equal((await g1).data.v, "old");
+    const g3 = await c.get("/tickets", {}, { ttl: 5000 }); // el GET viejo no pisó el cache
+    assert.equal(g2.data.v, "new");
+    assert.equal(g3.data.v, "new");
+    assert.equal(n, 3);
+  } finally { global.fetch = origFetch; }
+});
+
+test("client: escritura con 5xx también invalida el cache; 4xx no", async () => {
+  await withFetch([ok({ v: 1 }), { status: 400, body: "{}", headers: J }, { status: 502, body: "{}", headers: J }, ok({ v: 2 })], async (calls) => {
+    const c = mkClient();
+    await c.get("/tickets", {}, { ttl: 5000 });
+    await c.patch("/tickets/1", {}); // 400: cache intacto
+    await c.get("/tickets", {}, { ttl: 5000 });
+    assert.equal(calls.length, 2);
+    await c.patch("/tickets/1", {}); // 502: pudo aplicarse, se invalida
+    const r = await c.get("/tickets", {}, { ttl: 5000 });
+    assert.equal(r.data.v, 2);
+  });
+});
+
+test("client: semáforo de escrituras entrega el slot a los waiters", async () => {
+  const c = mkClient({ GAVRIEL_MCP_WRITE_CONCURRENCY: 1 });
+  const origFetch = global.fetch;
+  let active = 0, max = 0;
+  global.fetch = async () => {
+    max = Math.max(max, ++active);
+    await new Promise((r) => setTimeout(r, 5));
+    active--;
+    return new Response("{}", { status: 200, headers: J });
+  };
+  try {
+    await Promise.all([1, 2, 3, 4].map((i) => c.post(`/x/${i}`, {})));
+    assert.equal(max, 1);
+  } finally { global.fetch = origFetch; }
+});
+
+test("client: nunca manda el bearer a un host absoluto", async () => {
+  await withFetch([ok({})], async (calls) => {
+    await mkClient().get("http://evil.example/steal");
+    assert.ok(calls[0].url.startsWith("http://localhost:1/api"), calls[0].url);
+  });
+});
+
+test("auditLog.redact: conserva code de evento y redacta credenciales", () => {
+  const r = redact({
+    code: "E301", statusCode: 200, zipCode: "1900", authorName: "ana",
+    password: "p", jwt: "j", otp: "1", twoFactorCode: "2", verificationCode: "3", api_key: "k", Authorization: "Bearer x", pin: "1234",
+  });
+  for (const k of ["code", "statusCode", "zipCode", "authorName"]) assert.notEqual(r[k], "[REDACTED]", k);
+  for (const k of ["password", "jwt", "otp", "twoFactorCode", "verificationCode", "api_key", "Authorization", "pin"]) assert.equal(r[k], "[REDACTED]", k);
+});
+
+test("auditLog.redactText: password=, token y Bearer en texto no-JSON", () => {
+  const t = redactText("email=a@b&password=s3cr3t&x=1 {\"accessToken\":\"abc\"} Authorization: Bearer aa.bb.cc");
+  assert.ok(!/s3cr3t|abc|aa\.bb/.test(t), t);
+  assert.ok(t.includes("email=a@b") && t.includes("x=1"));
+});
+
+test("profiles.loadStore: ENOENT = vacío; JSON corrupto lanza (no se pisa)", () => {
+  const dir = mkdtempSync(join(tmpdir(), "gav-prof-"));
+  const prev = process.env.GAVRIEL_CONFIG_DIR;
+  process.env.GAVRIEL_CONFIG_DIR = dir;
+  try {
+    assert.deepEqual({ ...loadStore().profiles }, {});
+    saveStore({ active: "a", profiles: { a: { email: "a@b.c" } } });
+    assert.equal(loadStore().profiles.a.email, "a@b.c");
+    assert.equal(getProfile(loadStore(), "constructor"), undefined);
+    assert.throws(() => validateProfileName("__proto__"));
+    writeFileSync(join(dir, "profiles.json"), "{corrupto");
+    assert.throws(() => loadStore(), /JSON válido/);
+  } finally {
+    if (prev === undefined) delete process.env.GAVRIEL_CONFIG_DIR; else process.env.GAVRIEL_CONFIG_DIR = prev;
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("config: variables vacías se normalizan a undefined (defaults aplican)", () => {
+  const keys = ["GAVRIEL_EMAIL", "GAVRIEL_PASSWORD", "GAVRIEL_API_BASE", "GAVRIEL_MCP_ROLE", "GAVRIEL_MCP_WRITE_CONCURRENCY", "GAVRIEL_MCP_DESTRUCTIVE_APPROVAL", "GAVRIEL_PROFILE", "GAVRIEL_2FA_CODE"];
+  const prev = Object.fromEntries(keys.map((k) => [k, process.env[k]]));
+  Object.assign(process.env, {
+    GAVRIEL_EMAIL: "t@example.com", GAVRIEL_PASSWORD: "pw", GAVRIEL_API_BASE: "", GAVRIEL_MCP_ROLE: "",
+    GAVRIEL_MCP_WRITE_CONCURRENCY: "", GAVRIEL_MCP_DESTRUCTIVE_APPROVAL: "", GAVRIEL_PROFILE: "", GAVRIEL_2FA_CODE: "",
+  });
+  try {
+    const cfg = loadConfig();
+    assert.equal(cfg.GAVRIEL_API_BASE, "https://app.gavriel.com.ar/api");
+    assert.equal(cfg.GAVRIEL_MCP_ROLE, "full");
+    assert.equal(cfg.GAVRIEL_MCP_WRITE_CONCURRENCY, 5);
+    assert.equal(cfg.GAVRIEL_2FA_CODE, undefined);
+  } finally {
+    for (const k of keys) { if (prev[k] === undefined) delete process.env[k]; else process.env[k] = prev[k]; }
+  }
 });

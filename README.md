@@ -46,6 +46,10 @@ as `user_config`, the password is sensitive). After `pnpm install && pnpm build`
 | `GAVRIEL_MCP_WRITE_CONCURRENCY`    | no       | `5` (1–20)                            |
 | `GAVRIEL_MCP_DESTRUCTIVE_APPROVAL` | no       | `elicitation` (`off` to disable)      |
 | `GAVRIEL_MCP_TOOLSETS`             | no       | `all` (comma-separated toolsets)      |
+| `GAVRIEL_PROFILE`                  | no       | active profile (see CLI); picks the account profile |
+| `GAVRIEL_CONFIG_DIR`               | no       | `~/.config/gavriel` (profiles.json, no secrets) |
+| `GAVRIEL_ALLOW_CUSTOM_API_BASE`    | no       | unset (`1`, real environment only, allows a non-Gavriel API host) |
+| `GAVRIEL_CLAUDE_DESKTOP_CONFIG`    | no       | platform default (CLI: alternate Claude Desktop config path) |
 | `GAVRIEL_ALLOW_PLAINTEXT`          | no       | unset (`1` allows plaintext token storage when no secure store exists) |
 | `GAVRIEL_POLL_SEC`                 | no       | off (min 30; polls pending events, emits log notifications) |
 
@@ -56,7 +60,7 @@ as `user_config`, the password is sensitive). After `pnpm install && pnpm build`
 * `readonly`: read-only; write tools are **not registered** (they do not
   exist for the agent). Includes `get` and `audit_logs`, which are GETs.
 
-Without the variable → `full` (current behavior). `confirm` remains in effect in
+Without the variable → `full` (current behavior). The MCPB `manifest.json` deliberately defaults to `readonly` (least privilege for the Claude Desktop bundle). `confirm` remains in effect in
 all roles: role = availability, confirm = approval. The actual security role is
 the Gavriel user the server logs in with.
 
@@ -84,10 +88,12 @@ gavriel login                          # email + hidden password, stored in DPAP
 gavriel renew [--all]                  # re-trust the device (code, stored TOTP seed, or prompt)
 gavriel profile list|add|use|remove|rename
 gavriel totp set|clear|code            # optional TOTP seed: lets the CLI and the MCP renew on their own
-gavriel whoami | gavriel doctor
-gavriel mcp install --profile work --role lite --dry-run
+gavriel whoami | gavriel doctor [--online]   # --online performs a real login
+gavriel mcp install --profile work --role lite --dry-run   # --force replaces an existing entry; --server-path <file> overrides the server location
 gavriel tickets --status open | gavriel events pending | gavriel accounts search <text>
 ```
+
+`login` authenticates first and only then stores the password/profile; a profile name already used by a different email is refused unless `--profile` is explicit. Exit codes: 0 ok, 1 error (130 on Ctrl-C), 2 bad usage. Piped input works: `printf 'me@x.com\nPASSWORD\n' | gavriel login`. The release also ships a standalone `gavriel-<platform>-<arch>` binary next to `gavriel-mcp-<platform>-<arch>`.
 
 Profiles live in `~/.config/gavriel/profiles.json` (override with `GAVRIEL_CONFIG_DIR`) and hold no secrets. The MCP picks one with `GAVRIEL_PROFILE` (or the active profile when `GAVRIEL_EMAIL` is unset). Storing the TOTP seed removes the second factor on that machine; it is opt-in (see SECURITY.md).
 
@@ -238,10 +244,10 @@ company/type/technical.
 
 ## Unimplemented Endpoints (Tier 3)
 
-Write endpoints that exceed the approved risk profile (deletions,
-user/role management, monitoring activation, billing, catalogs,
-files) are inventoried in `TIER3_PENDIENTE.md` and **are not implemented**
-without explicit instruction.
+`TIER3_PENDIENTE.md` is a historical inventory and is **partly stale**: deletions,
+user management, infrastructure, catalogs and file linking have since been
+implemented (all behind `confirm` and, by default, human elicitation). The
+authoritative tool list is `test/tools.snapshot.json` (213 tools).
 
 ## Write Log
 

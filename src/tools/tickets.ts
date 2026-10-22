@@ -1,8 +1,8 @@
 import type { GavrielClient } from "../gavrielClient.js";
-import { ok, TICKET_STATUSES, TICKET_PRIORITIES, paginationSchema, okTruncated, buildBody, wrapReadOnly, forwardParams, truncateSchema, selectFields, fieldsSchema } from "./shared.js";
+import { ok, TICKET_STATUSES, TICKET_PRIORITIES, paginationSchema, okTruncated, buildBody, wrapReadOnly, forwardParams, truncateSchema, selectFields, fieldsSchema, idSchema, ensureOk } from "./shared.js";
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/server";
-import { requireConfirm, confirmSchema } from "./writeHelpers.js";
+import { requireConfirm, confirmSchema, seg, destructiveGuard, okOrInput } from "./writeHelpers.js";
 import { registerTool, type Role } from "./roles.js";
 
 const oneOrMany = <T extends z.ZodType>(e: T) => z.union([e, z.array(e)]).optional();
@@ -15,7 +15,7 @@ function addWriteTicketTools(server: McpServer, client: GavrielClient, role: Rol
   registerTool(
     server, role, "lite", "create_ticket",
     {
-      title: "Crear ticket (ESCRITURA)",
+      title: "Crear ticket",
       description:
         "POST /tickets. status y priority se validan contra catálogos (gavriel://catalog/tickets/*). La descripción se envía como texto/HTML.",
       inputSchema: {
@@ -23,9 +23,9 @@ function addWriteTicketTools(server: McpServer, client: GavrielClient, role: Rol
         description: z.string().optional(),
         priority: z.enum(TICKET_PRIORITIES).default("medium"),
         status: z.enum(TICKET_STATUSES).default("open"),
-        accountId: z.string().nullish(),
-        categoryId: z.string().nullish(),
-        assignedUserId: z.string().nullish(),
+        accountId: idSchema.nullish(),
+        categoryId: idSchema.nullish(),
+        assignedUserId: idSchema.nullish(),
         confirm: confirmSchema,
       },
     },
@@ -46,18 +46,18 @@ function addWriteTicketTools(server: McpServer, client: GavrielClient, role: Rol
   registerTool(
     server, role, "lite", "update_ticket",
     {
-      title: "Actualizar ticket (ESCRITURA)",
+      title: "Actualizar ticket",
       description:
         "Usar para editar campos de un ticket (PATCH, solo envía los provistos). No usar para cerrarlo con resolución (ver close_ticket).",
       inputSchema: {
-        ticketId: z.string(),
+        ticketId: idSchema,
         title: z.string().optional(),
         description: z.string().optional(),
         priority: z.enum(TICKET_PRIORITIES).optional(),
         status: z.enum(TICKET_STATUSES).optional(),
-        accountId: z.string().nullish(),
-        categoryId: z.string().nullish(),
-        assignedUserId: z.string().nullish(),
+        accountId: idSchema.nullish().describe("null = desvincular cuenta"),
+        categoryId: idSchema.nullish(),
+        assignedUserId: idSchema.nullish(),
         resolution: z.string().optional(),
         confirm: confirmSchema,
       },
@@ -65,52 +65,55 @@ function addWriteTicketTools(server: McpServer, client: GavrielClient, role: Rol
     async (args) => {
       const body = buildBody(args as Record<string, unknown>, {
         optional: ["title", "description", "priority", "status", "accountId", "categoryId", "assignedUserId", "resolution"],
+        nullable: ["accountId", "categoryId", "assignedUserId"],
       });
       return requireConfirm(
         args.confirm,
-        { tool: "update_ticket", method: "PATCH", path: `/tickets/${args.ticketId}`, params: body },
+        { tool: "update_ticket", method: "PATCH", path: `/tickets/${seg(args.ticketId)}`, params: body },
         client,
-        () => client.patch(`/tickets/${args.ticketId}`, body),
+        () => client.patch(`/tickets/${seg(args.ticketId)}`, body),
       ).then(ok);
     },
   );
 
   registerTool(
-    server, role, "full", "close_ticket",
+    server, role, "lite", "close_ticket",
     {
-      title: "Cerrar ticket (ESCRITURA)",
+      title: "Cerrar ticket",
       description:
         "Usar para cerrar un ticket con resolución (PATCH /tickets/{id}/close). No usar para editar otros campos (ver update_ticket) ni para varios tickets (ver bulk_close_tickets).",
       inputSchema: {
-        ticketId: z.string(),
+        ticketId: idSchema,
         resolution: z.string().describe("Resolución / comentario de cierre"),
         confirm: confirmSchema,
       },
       annotations: { destructiveHint: true },
     },
-    async (args) => {
+    async (args, ctx) => {
       const body = { resolution: args.resolution };
+      const exec = { tool: "close_ticket", method: "PATCH", path: `/tickets/${seg(args.ticketId)}/close`, params: body };
       return requireConfirm(
         args.confirm,
-        { tool: "close_ticket", method: "PATCH", path: `/tickets/${args.ticketId}/close`, params: body },
+        exec,
         client,
-        () => client.patch(`/tickets/${args.ticketId}/close`, body),
-      ).then(ok);
+        () => client.patch(`/tickets/${seg(args.ticketId)}/close`, body),
+        destructiveGuard("close_ticket", exec, ctx),
+      ).then(okOrInput);
     },
   );
 
   registerTool(
-    server, role, "full", "add_ticket_activity",
+    server, role, "lite", "add_ticket_activity",
     {
-      title: "Agregar actividad a ticket (ESCRITURA)",
+      title: "Agregar actividad a ticket",
       description:
         "POST /activities: comentario/actividad en un ticket. type: MESSAGE|TASK|NOTIFICATION|REMINDER|ALERT|UPDATE (default MESSAGE). Requiere confirm: true.",
       inputSchema: {
-        ticketId: z.string(),
+        ticketId: idSchema,
         title: z.string().describe("Título de la actividad (requerido por la API)"),
         description: z.string().optional(),
         type: z.enum(ACTIVITY_TYPES).default("MESSAGE"),
-        assignedUserId: z.string().nullish(),
+        assignedUserId: idSchema.nullish(),
         confirm: confirmSchema,
       },
     },
@@ -166,7 +169,8 @@ export function registerTicketTools(server: McpServer, client: GavrielClient, ro
         ...forwardParams(args as Record<string, unknown>, ["search", "status", "priority", "accountSearch", "accountId", "categoryId", "assignedUserId"]),
       };
       const res = await client.get("/tickets", params, { signal: ctx.mcpReq.signal });
-      const data = args.fields ? selectFields(res.data as Record<string, unknown>[], args.fields) : res.data;
+      ensureOk(res, "list_tickets");
+      const data = args.fields ? selectFields(res.data as Record<string, unknown>, args.fields) : res.data;
       return args.truncate ? okTruncated(data, args.truncate) : ok(data);
     }),
   );
@@ -185,10 +189,10 @@ export function registerTicketTools(server: McpServer, client: GavrielClient, ro
       annotations: { readOnlyHint: true },
     },
     wrapReadOnly(async (args, ctx) => {
-      const ticket = await client.get(`/tickets/${args.id}`, undefined, { signal: ctx.mcpReq.signal });
+      const ticket = await client.get(`/tickets/${seg(args.id)}`, undefined, { signal: ctx.mcpReq.signal });
       const shouldFetchActivities = !args.include || args.include.includes("activities");
       if (shouldFetchActivities) {
-        const activities = await client.get(`/activities/ticket/${args.id}`, undefined, { signal: ctx.mcpReq.signal });
+        const activities = await client.get(`/activities/ticket/${seg(args.id)}`, undefined, { signal: ctx.mcpReq.signal });
         const result = { ticket: ticket.data, activities: activities.data };
         const filtered = args.fields ? selectFields(result as Record<string, unknown>, args.fields) : result;
         return args.truncate ? okTruncated(filtered, args.truncate) : ok(filtered);

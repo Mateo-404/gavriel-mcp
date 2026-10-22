@@ -11,7 +11,8 @@ import { isDestructive } from "./writeHelpers.js";
 
 // Rol del server (GAVRIEL_MCP_ROLE).
 // readonly: solo lectura (+ get y audit_logs).
-// lite: lectura + tools core de escritura (tickets, interventions, conversations).
+// lite: lectura + escrituras core marcadas "lite" en cada tool (tickets, actividades de ticket,
+//       intervenciones, notas de cuenta, claim/release/mark_read de conversaciones).
 // full: todas las tools.
 export type Role = "readonly" | "lite" | "full";
 
@@ -79,6 +80,9 @@ const IDEMPOTENT_NAME = /^(update_|set_|conversation_set_|conversation_mark_|mar
 
 export function withDefaultAnnotations<C extends ToolConfigBase>(name: string, config: C): C {
   const a = config.annotations ?? {};
+  if (a.destructiveHint === true && !isDestructive(name)) {
+    throw new Error(`Tool "${name}" declara destructiveHint:true pero isDestructive() no la cubre (sin aprobación humana). Agregarla en writeHelpers.isDestructive.`);
+  }
   const readOnly = a.readOnlyHint === true;
   return {
     ...config,

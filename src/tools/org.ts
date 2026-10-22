@@ -1,8 +1,8 @@
 import type { GavrielClient } from "../gavrielClient.js";
-import { ok, paginationSchema, okTruncated, truncateSchema, selectFields, wrapReadOnly, forwardParams, fieldsSchema } from "./shared.js";
+import { ok, paginationSchema, okTruncated, truncateSchema, selectFields, wrapReadOnly, forwardParams, fieldsSchema, idSchema } from "./shared.js";
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/server";
-import { requireConfirm, confirmSchema } from "./writeHelpers.js";
+import { requireConfirm, confirmSchema, seg } from "./writeHelpers.js";
 import { registerTool, type Role } from "./roles.js";
 
 const CACHE_TTL = 5 * 60_000;
@@ -12,7 +12,7 @@ export function registerOrgTools(server: McpServer, client: GavrielClient, role:
     "list_companies",
     {
       title: "Listar empresas",
-      description: "Lista empresas.",
+      description: "Usar cuando necesitás listar empresas (paginado, búsqueda por nombre/código). No usar para técnicos de una empresa (ver list_company_technicians).",
       inputSchema: z.object({
               ...paginationSchema,
               search: z.string().optional().describe("Búsqueda libre (nombre/código)"),
@@ -32,7 +32,7 @@ export function registerOrgTools(server: McpServer, client: GavrielClient, role:
     "list_company_technicians",
     {
       title: "Listar técnicos de empresa",
-      description: "Técnicos de una empresa.",
+      description: "Usar cuando necesitás los técnicos de una empresa por su ID (ver list_companies).",
       inputSchema: z.object({
               id: z.string(),
               truncate: truncateSchema,
@@ -41,7 +41,7 @@ export function registerOrgTools(server: McpServer, client: GavrielClient, role:
       annotations: { readOnlyHint: true },
     },
     wrapReadOnly(async (args) => {
-      const res = await client.get(`/companies/${args.id}/technicians`);
+      const res = await client.get(`/companies/${seg(args.id)}/technicians`);
       return okTruncated(selectFields(res.data as Record<string, unknown>, args.fields), args.truncate);
     }),
   );
@@ -50,7 +50,7 @@ export function registerOrgTools(server: McpServer, client: GavrielClient, role:
     "list_users",
     {
       title: "Listar usuarios",
-      description: "Lista usuarios.",
+      description: "Usar cuando necesitás el listado paginado de usuarios del sistema. No usar para ubicar uno por nombre/email con campos reducidos (ver search_users).",
       inputSchema: z.object({
               ...paginationSchema,
               search: z.string().optional().describe("Búsqueda libre (nombre/email)"),
@@ -70,7 +70,7 @@ export function registerOrgTools(server: McpServer, client: GavrielClient, role:
     "list_roles",
     {
       title: "Listar roles",
-      description: "Roles del sistema.",
+      description: "Usar cuando necesitás los roles disponibles (p. ej. para asignar o filtrar usuarios).",
       inputSchema: z.object({
               truncate: truncateSchema,
             }),
@@ -86,7 +86,7 @@ export function registerOrgTools(server: McpServer, client: GavrielClient, role:
     "get_my_profile",
     {
       title: "Obtener perfil propio",
-      description: "Perfil del usuario logueado.",
+      description: "Usar cuando necesitás saber quién es el usuario de la sesión (id, rol, permisos) antes de asignar o filtrar por él.",
       inputSchema: z.object({}),
       annotations: { readOnlyHint: true },
     },
@@ -99,11 +99,11 @@ export function registerOrgTools(server: McpServer, client: GavrielClient, role:
   registerTool(
     server, role, "full", "add_technician_non_working_days",
     {
-      title: "Agregar días no laborales a técnico (ESCRITURA)",
+      title: "Agregar días no laborales a técnico",
       description:
         "POST /users/{id}/non-working-days/range. Marca días no laborales del técnico. Requiere confirm: true.",
       inputSchema: {
-        userId: z.string(),
+        userId: idSchema,
         from: z.iso.date().describe("Fecha de inicio (YYYY-MM-DD)"),
         to: z.iso.date().describe("Fecha de fin (YYYY-MM-DD)"),
         label: z.string().optional().describe("Etiqueta/razón opcional"),
@@ -113,7 +113,7 @@ export function registerOrgTools(server: McpServer, client: GavrielClient, role:
     async (args) => {
       const body: Record<string, unknown> = { from: args.from, to: args.to };
       if (args.label !== undefined) body.label = args.label;
-      const path = `/users/${args.userId}/non-working-days/range`;
+      const path = `/users/${seg(args.userId)}/non-working-days/range`;
       return requireConfirm(
         args.confirm,
         { tool: "add_technician_non_working_days", method: "POST", path, params: body },
@@ -126,11 +126,11 @@ export function registerOrgTools(server: McpServer, client: GavrielClient, role:
   registerTool(
     server, role, "full", "add_company_non_working_day",
     {
-      title: "Agregar día no laboral a empresa (ESCRITURA)",
+      title: "Agregar día no laboral a empresa",
       description:
         "POST /companies/{id}/non-working-days. Marca un día no laboral de la empresa. Requiere confirm: true.",
       inputSchema: {
-        companyId: z.string(),
+        companyId: idSchema,
         date: z.iso.date().describe("Fecha (YYYY-MM-DD)"),
         label: z.string().optional().describe("Etiqueta/razón opcional"),
         confirm: confirmSchema,
@@ -139,7 +139,7 @@ export function registerOrgTools(server: McpServer, client: GavrielClient, role:
     async (args) => {
       const body: Record<string, unknown> = { date: args.date };
       if (args.label !== undefined) body.label = args.label;
-      const path = `/companies/${args.companyId}/non-working-days`;
+      const path = `/companies/${seg(args.companyId)}/non-working-days`;
       return requireConfirm(
         args.confirm,
         { tool: "add_company_non_working_day", method: "POST", path, params: body },

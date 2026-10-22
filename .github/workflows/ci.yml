@@ -30,11 +30,13 @@ jobs:
       - run: pnpm run typecheck
       - run: pnpm run build
       - run: pnpm run selfcheck
+      # Incluye contract.test: falla si test/tools.snapshot.json derivó (regenerar: pnpm test:snapshot).
       - name: Test
         run: node --test "test/*.test.mjs"
       - name: Audit (prod deps, no bloqueante)
         continue-on-error: true
         run: pnpm audit --prod
+      # Listo para bloquear: quitar continue-on-error cuando el lint esté en verde.
       - name: Biome lint (no bloqueante)
         continue-on-error: true
         run: npx --yes @biomejs/biome@2.2.0 lint src test scripts

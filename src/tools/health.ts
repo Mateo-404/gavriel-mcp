@@ -9,7 +9,7 @@ export function registerHealthTools(server: McpServer, client: GavrielClient, _r
     "health",
     {
       title: "Salud de monitoreo",
-      description: "Salud de conexiones y bridges.",
+      description: "Usar cuando necesitás saber si conexiones y bridges están sanos u offline. Para detalle de un bridge ver get_bridge_disk_space / list_bridge_logs.",
       inputSchema: z.object({
               bridgeId: z.string().optional().describe("Filtra los logs de salud del bridge"),
               connectionId: z.string().optional(),

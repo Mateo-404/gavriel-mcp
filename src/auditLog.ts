@@ -22,7 +22,16 @@ function ensureLogDir(): void {
 }
 
 // ── Redacción ───────────────────────────────────────────────────────
-const SENSITIVE_KEY = /pass|token|secret|auth|2fa|code|seed|cloudLiveViewVerification/i;
+// Se compara por palabras (camelCase/snake partidos) para no tapar campos de negocio como
+// el `code` de un evento, statusCode, zipCode o author*; solo claves tipo credencial.
+const SENSITIVE_SUBSTR = /password|passwd|token|secret|authorization|cookie|apikey|bearer|credential|twofactor|twofa|verificationcode|cloudliveviewverification|totp/;
+const SENSITIVE_WORDS = new Set(["pass", "pwd", "jwt", "otp", "seed", "2fa", "pin"]);
+const SENSITIVE_KEY = {
+  test(k: string): boolean {
+    const words = k.replace(/([a-z0-9])([A-Z])/g, "$1_$2").toLowerCase().split(/[^a-z0-9]+/);
+    return SENSITIVE_SUBSTR.test(words.join("")) || words.some((w) => SENSITIVE_WORDS.has(w));
+  },
+};
 
 /** Copia recursiva con los valores de claves sensibles reemplazados por [REDACTED]. */
 export function redact(value: unknown, depth = 0): unknown {
@@ -38,18 +47,32 @@ export function redact(value: unknown, depth = 0): unknown {
   return value;
 }
 
-/** rawBody es un string (posible JSON): se redacta si parsea, si no se trunca. */
+/** Redacción por regex de texto no-JSON (cuerpos truncados, form-encoded, headers). */
+export function redactText(raw: string): string {
+  return raw
+    .replace(/\bBearer\s+[\w.~+/=-]+/gi, "Bearer [REDACTED]")
+    .replace(
+      /(\b[\w-]*(?:pass(?:word|wd)?|pwd|token|secret|jwt|otp|totp|api[_-]?key|authorization|cookie|credential)[\w-]*["']?\s*[:=]\s*)("[^"]*"|'[^']*'|[^\s&,;]+)/gi,
+      "$1[REDACTED]",
+    );
+}
+
+/** rawBody es un string (posible JSON): se redacta si parsea, si no por regex y luego se trunca. */
 function redactRaw(raw: string): string {
   try {
     return JSON.stringify(redact(JSON.parse(raw)));
   } catch {
-    return raw.length > 500 ? `${raw.slice(0, 500)}…[truncated ${raw.length}]` : raw;
+    // Primero redactar, después truncar: cortar antes podría dejar un valor sensible sin su clave.
+    const t = redactText(raw);
+    return t.length > 500 ? `${t.slice(0, 500)}…[truncated ${raw.length}]` : t;
   }
 }
 
 // ── Escritura no bloqueante con rotación por tamaño ─────────────────
 const pending = new Map<string, string[]>();
 let flushing: Promise<void> | null = null;
+// Líneas que se están escribiendo ahora: si el proceso sale a mitad, el handler de exit las completa.
+const inflight = new Map<string, string>();
 
 function rotateIfNeeded(file: string): void {
   try {
@@ -69,9 +92,12 @@ async function flush(): Promise<void> {
     for (const [file, lines] of [...pending]) {
       pending.delete(file);
       rotateIfNeeded(file);
-      await appendFile(file, lines.join(""), "utf8").catch((e: Error) =>
+      const chunk = lines.join("");
+      inflight.set(file, chunk);
+      await appendFile(file, chunk, "utf8").catch((e: Error) =>
         console.error(`[auditLog] no se pudo escribir ${file}: ${e.message}`),
       );
+      inflight.delete(file);
     }
   } finally {
     flushing = null;
@@ -85,7 +111,11 @@ export async function flushLogs(): Promise<void> {
 }
 
 // Al salir se vuelca lo que quede en cola (síncrono: el loop ya no corre).
+// shortcut: si el append en vuelo ya escribió parte, puede duplicar esas líneas (mejor que perderlas).
 process.on("exit", () => {
+  for (const [file, chunk] of inflight) {
+    try { appendFileSync(file, chunk, "utf8"); } catch { /* best effort */ }
+  }
   for (const [file, lines] of pending) {
     try { appendFileSync(file, lines.join(""), "utf8"); } catch { /* best effort */ }
   }

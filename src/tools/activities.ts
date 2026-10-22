@@ -1,8 +1,8 @@
 import type { GavrielClient } from "../gavrielClient.js";
-import { ok, wrapReadOnly, buildBody, okTruncated, truncateSchema, selectFields, fieldsSchema } from "./shared.js";
+import { ok, wrapReadOnly, buildBody, okTruncated, truncateSchema, selectFields, fieldsSchema, idSchema } from "./shared.js";
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/server";
-import { requireConfirm, confirmSchema } from "./writeHelpers.js";
+import { requireConfirm, confirmSchema, seg } from "./writeHelpers.js";
 import { registerTool, type Role } from "./roles.js";
 
 const ACTIVITY_TYPES = [
@@ -28,7 +28,7 @@ export function registerActivityTools(server: McpServer, client: GavrielClient, 
       annotations: { readOnlyHint: true },
     },
     wrapReadOnly(async (args) => {
-      const res = await client.get(`/activities/ticket/${args.id}`);
+      const res = await client.get(`/activities/ticket/${seg(args.id)}`);
       return okTruncated(selectFields(res.data as Record<string, unknown>, args.fields as string[] | undefined), args.truncate);
     }),
   );
@@ -37,7 +37,7 @@ export function registerActivityTools(server: McpServer, client: GavrielClient, 
     "get_activity_stats",
     {
       title: "Stats de actividades",
-      description: "Stats de actividades.",
+      description: "Usar cuando necesitás conteos globales de actividades (no leídas, por tipo).",
       inputSchema: z.object({
               truncate: truncateSchema,
             }),
@@ -52,10 +52,10 @@ export function registerActivityTools(server: McpServer, client: GavrielClient, 
   registerTool(
     server, role, "full", "mark_activity_read",
     {
-      title: "Marcar leída (ESCRITURA)",
+      title: "Marcar leída",
       description: "PATCH /activities/{id}/mark-as-read. Requiere confirm: true.",
       inputSchema: {
-        activityId: z.string(),
+        activityId: idSchema,
         readAt: z
           .iso.datetime({ offset: true })
           .optional()
@@ -66,7 +66,7 @@ export function registerActivityTools(server: McpServer, client: GavrielClient, 
     },
     async (args) => {
       const body = { readAt: args.readAt ?? new Date().toISOString() };
-      const path = `/activities/${args.activityId}/mark-as-read`;
+      const path = `/activities/${seg(args.activityId)}/mark-as-read`;
       return requireConfirm(
         args.confirm,
         { tool: "mark_activity_read", method: "PATCH", path, params: body },
@@ -79,16 +79,16 @@ export function registerActivityTools(server: McpServer, client: GavrielClient, 
   registerTool(
     server, role, "full", "mark_activity_unread",
     {
-      title: "Marcar no leída (ESCRITURA)",
+      title: "Marcar no leída",
       description: "PATCH /activities/{id}/mark-as-unread. Requiere confirm: true.",
       inputSchema: {
-        activityId: z.string(),
+        activityId: idSchema,
         confirm: confirmSchema,
       },
       annotations: { idempotentHint: true },
     },
     async (args) => {
-      const path = `/activities/${args.activityId}/mark-as-unread`;
+      const path = `/activities/${seg(args.activityId)}/mark-as-unread`;
       return requireConfirm(
         args.confirm,
         { tool: "mark_activity_unread", method: "PATCH", path, params: {} },
@@ -101,15 +101,15 @@ export function registerActivityTools(server: McpServer, client: GavrielClient, 
   registerTool(
     server, role, "full", "update_activity",
     {
-      title: "Actualizar actividad (ESCRITURA)",
+      title: "Actualizar actividad",
       description: "PATCH /activities/{id}. Requiere confirm: true.",
       inputSchema: {
-        activityId: z.string(),
+        activityId: idSchema,
         title: z.string().optional(),
         description: z.string().optional(),
         type: z.enum(ACTIVITY_TYPES).optional(),
-        assignedUserId: z.string().nullish(),
-        ticketId: z.string().nullish(),
+        assignedUserId: idSchema.nullish(),
+        ticketId: idSchema.nullish(),
         confirm: confirmSchema,
       },
     },
@@ -117,7 +117,7 @@ export function registerActivityTools(server: McpServer, client: GavrielClient, 
       const body = buildBody(args as Record<string, unknown>, {
         optional: ["title", "description", "type", "assignedUserId", "ticketId"],
       });
-      const path = `/activities/${args.activityId}`;
+      const path = `/activities/${seg(args.activityId)}`;
       return requireConfirm(
         args.confirm,
         { tool: "update_activity", method: "PATCH", path, params: body },

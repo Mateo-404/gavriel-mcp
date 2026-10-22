@@ -22,6 +22,17 @@ tag `vX.Y.Z`.
 - Release workflow fails if the tag differs from `package.json` or CHANGELOG has no entry.
 - `tsconfig`: dropped `DOM` lib; `test:fast` no longer uses bun.
 
+### Fixed (CLI / packaging / docs)
+- CLI input: single shared readline (piped stdin no longer loses lines); EOF exits 1 ("Entrada cerrada"), Ctrl-C exits 130; hidden prompt reads the same reader without TTY.
+- `gavriel login` authenticates with the candidate password before persisting anything; failed logins and 2FA failures keep the previous password/profile; a profile name taken by a different email is refused unless `--profile` is given; derived names are sanitized.
+- `gavriel doctor`: live login is opt-in (`--online`); every step reports `FALLA` instead of crashing; exit 1 on any failure.
+- CLI flag validation (`--limit` 1..200, `--role`, `--toolsets`, `--api-base`), duplicate/missing `-p` rejected with short errors, prototype-safe profile lookups.
+- `gavriel mcp install`: refuses to replace an existing entry without `--force`, validates the JSON shape, atomic write after `.bak`, `--server-path`, `GAVRIEL_CLAUDE_DESKTOP_CONFIG`, safe quoting for PowerShell/cmd/POSIX plus JSON args for `claude mcp add`.
+- `gavriel --version` reads `package.json` when not bundled.
+- Release: second SEA binary `gavriel-<plat>-<arch>`, local `postject` (no `npx`), `import.meta.url` handled in the CJS bundle, build provenance attestation, tag must match `manifest.json` too, `gh release --repo`.
+- `.gitattributes` (LF), `tsconfig` `newLine: lf`, grouped Dependabot updates.
+- Docs: AGENTS/README/TIER3 brought in line (213 tools, elicitation default, `lite` role, new env vars, CLI section).
+
 ### Security
 - Hardening: stricter `get` path/query sanitizing, wider log redaction, https-only API base.
 - Windows DPAPI secret storage; plaintext fallback only with `GAVRIEL_ALLOW_PLAINTEXT=1`.

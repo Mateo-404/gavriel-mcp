@@ -1,17 +1,18 @@
 import type { GavrielClient } from "../gavrielClient.js";
 import { z } from "zod";
+import { idSchema } from "./shared.js";
 import type { McpServer } from "@modelcontextprotocol/server";
 import { requireConfirm, confirmSchema, runBatch, destructiveGuard, okOrInput, seg } from "./writeHelpers.js";
 import { registerTool, type Role } from "./roles.js";
 
 const idList = (what: string) =>
-  z.array(z.string().regex(/^[\w-]+$/, "id inválido")).min(1).max(50).describe(what);
+  z.array(idSchema).min(1).max(50).describe(what);
 
 export function registerBatchTools(server: McpServer, client: GavrielClient, role: Role): void {
   registerTool(
     server, role, "full", "bulk_close_tickets",
     {
-      title: "Cerrar múltiples tickets (ESCRITURA)",
+      title: "Cerrar múltiples tickets",
       description: "Cierra varios tickets en lote (máx 50) con la misma resolución. Requiere confirm: true.",
       inputSchema: {
         ticketIds: idList("IDs de los tickets a cerrar"),
@@ -41,7 +42,7 @@ export function registerBatchTools(server: McpServer, client: GavrielClient, rol
   registerTool(
     server, role, "full", "bulk_process_events",
     {
-      title: "Procesar múltiples eventos (ESCRITURA)",
+      title: "Procesar múltiples eventos",
       description: "Marca varios eventos (máx 50) como procesados en lote. Requiere confirm: true.",
       inputSchema: {
         eventIds: idList("IDs de los eventos a procesar"),

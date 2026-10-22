@@ -1,10 +1,20 @@
 #!/usr/bin/env node
+import { createRequire } from "node:module";
 import { parseArgs } from "node:util";
 import * as cmd from "./cli/commands.js";
+import { closeInput, InputError } from "./cli/io.js";
 
 // Injected at bundle time by esbuild (see scripts/build-bin.mjs).
 declare const __GAVRIEL_VERSION__: string | undefined;
-const VERSION = typeof __GAVRIEL_VERSION__ !== "undefined" ? __GAVRIEL_VERSION__ : "dev";
+function readVersion(): string {
+  if (typeof __GAVRIEL_VERSION__ !== "undefined") return __GAVRIEL_VERSION__;
+  try {
+    return (createRequire(import.meta.url)("../package.json") as { version: string }).version; // dist/cli.js → raíz
+  } catch {
+    return "dev";
+  }
+}
+const VERSION = readVersion();
 
 const HELP = `gavriel — CLI de Gavriel MCP
 
@@ -15,14 +25,14 @@ Sesión
   renew [-p perfil] [--all]                       Renueva el dispositivo confiable (código o semilla TOTP)
   logout [-p perfil] [--all] [--purge]            Borra el dispositivo confiable (--purge: también password y perfil)
   whoami                                          Usuario de la sesión
-  doctor                                          Diagnóstico: almacén, perfil, API, sesión
+  doctor [--online]                               Diagnóstico: almacén, perfil, API (--online: login real)
 
 Cuentas (perfiles)
   profile list|add|use|remove|rename              Administra varias cuentas de Gavriel
   totp set|clear|code                             Semilla TOTP opcional (renovación automática)
 
 Claude
-  mcp install [--client desktop|code] [--role r] [--toolsets t] [--dry-run] [-y]
+  mcp install [--client desktop|code] [--role r] [--toolsets t] [--force] [--server-path ruta] [--dry-run] [-y]
 
 Consultas
   tickets [--status s] [--limit n]
@@ -39,11 +49,19 @@ const COMMANDS: Record<string, (ctx: cmd.Ctx) => Promise<void>> = {
 };
 
 async function main(): Promise<void> {
+  const argv = process.argv.slice(2);
+  const dd = argv.indexOf("--");
+  const profileFlags = (dd < 0 ? argv : argv.slice(0, dd)).filter((a) => /^(-p|--profile)(=.*)?$/.test(a)).length;
+  if (profileFlags > 1) {
+    console.error("Opción -p/--profile repetida: indicá un solo perfil.");
+    process.exitCode = 2;
+    return;
+  }
   let parsed;
   try {
-    parsed = parseArgs({ args: process.argv.slice(2), options: cmd.OPTIONS, allowPositionals: true });
+    parsed = parseArgs({ args: argv, options: cmd.OPTIONS, allowPositionals: true });
   } catch (err) {
-    console.error(`${(err as Error).message}\n\n${HELP}`);
+    console.error(`${(err as Error).message}\nVer: gavriel --help`);
     process.exitCode = 2;
     return;
   }
@@ -51,7 +69,7 @@ async function main(): Promise<void> {
   if (values.version) return console.log(`gavriel ${VERSION}`);
   const [name, ...args] = positionals;
   if (values.help || !name) return console.log(HELP);
-  const run = COMMANDS[name];
+  const run = Object.hasOwn(COMMANDS, name) ? COMMANDS[name] : undefined;
   if (!run) {
     console.error(`Comando desconocido: ${name}\n\n${HELP}`);
     process.exitCode = 2;
@@ -61,7 +79,9 @@ async function main(): Promise<void> {
     await run({ values, args });
   } catch (err) {
     console.error(`Error: ${(err as Error).message}`);
-    process.exitCode = 1;
+    process.exitCode = err instanceof InputError ? err.exitCode : 1;
+  } finally {
+    closeInput();
   }
 }
 

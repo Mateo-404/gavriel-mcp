@@ -2,7 +2,7 @@ import type { GavrielClient } from "../gavrielClient.js";
 import { okTruncated, truncateSchema, selectFields, fieldsSchema, wrapReadOnly, ensureOk, buildBody, forwardParams } from "./shared.js";
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/server";
-import { requireConfirm, confirmSchema, seg, destructiveGuard, okOrInput } from "./writeHelpers.js";
+import { requireConfirm, confirmSchema, seg, destructiveGuard, isDestructive, okOrInput } from "./writeHelpers.js";
 import { registerTool, type Role } from "./roles.js";
 
 const CHANNELS = ["in_app", "push", "whatsapp", "sms", "email"] as const;
@@ -125,7 +125,7 @@ export function registerNotificationTools(server: McpServer, client: GavrielClie
     registerTool(
       server, role, "full", name,
       {
-        title: `${title} (ESCRITURA)`,
+        title,
         description: `${method} ${description} Requiere confirm: true.`,
         inputSchema: { ...shape, confirm: confirmSchema } as any,
         annotations: { destructiveHint: !!opts.destructive, idempotentHint: !!opts.idempotent },
@@ -135,8 +135,7 @@ export function registerNotificationTools(server: McpServer, client: GavrielClie
         const b = body(a);
         const exec = { tool: name, method, path: p, params: b ?? {} };
         const m = method.toLowerCase() as "post" | "put" | "patch" | "delete";
-        // shortcut: destructiveGuard solo pide aprobación humana para delete_*/bulk_*; el resto depende de confirm.
-        const guard = opts.destructive ? destructiveGuard(name, exec, ctx) : undefined;
+        const guard = isDestructive(name) ? destructiveGuard(name, exec, ctx) : undefined;
         return requireConfirm(a.confirm, exec, client, () => (client as any)[m](p, ...(b === undefined ? [] : [b])), guard).then(okOrInput);
       },
     );

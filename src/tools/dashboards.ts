@@ -1,10 +1,22 @@
 import type { GavrielClient } from "../gavrielClient.js";
-import { ok, ensureOk, wrapReadOnly } from "./shared.js";
+import { ok, ensureOk, wrapReadOnly, totalOf, itemsOf } from "./shared.js";
+import { seg } from "./writeHelpers.js";
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/server";
 
 const CACHE_TTL = 5 * 60_000;
 const CONCURRENCY = 5;
+
+// Resultado de un sub-call: data si fue 2xx; si no, deja un warning y devuelve undefined.
+function dataOrWarn(r: PromiseSettledResult<{ status: number; data: unknown }>, label: string, warnings: string[]): unknown {
+  try {
+    if (r.status === "rejected") throw r.reason;
+    return ensureOk(r.value, label);
+  } catch (e) {
+    warnings.push(`${label}: ${(e as Error).message}`);
+    return undefined;
+  }
+}
 
 export function registerDashboardTools(server: McpServer, client: GavrielClient): void {
   server.registerTool(
@@ -20,43 +32,36 @@ export function registerDashboardTools(server: McpServer, client: GavrielClient)
       annotations: { readOnlyHint: true },
     },
     wrapReadOnly(async (args, ctx) => {
+      const id = seg(args.id);
+      const warnings: string[] = [];
       const [accountRes, devicesRes, interventionsRes, eventsRes] = await Promise.allSettled([
-        client.get(`/accounts/${args.id}`, undefined, { signal: ctx.mcpReq.signal }),
-        client.get(`/accounts/${args.id}/devices`, undefined, { ttl: CACHE_TTL, signal: ctx.mcpReq.signal }),
-        client.get(`/interventions/account/${args.id}/open`, undefined, { signal: ctx.mcpReq.signal }),
+        client.get(`/accounts/${id}`, undefined, { signal: ctx.mcpReq.signal }),
+        client.get(`/accounts/${id}/devices`, undefined, { ttl: CACHE_TTL, signal: ctx.mcpReq.signal }),
+        client.get(`/interventions/account/${id}/open`, undefined, { signal: ctx.mcpReq.signal }),
         client.get("/events", { accountId: args.id, pending: true, limit: 50 }, { signal: ctx.mcpReq.signal }),
       ]);
 
-      const account = accountRes.status === "fulfilled"
-        ? (() => {
-            const a = ensureOk<Record<string, unknown>>(accountRes.value, `cuenta ${args.id}`);
-            return { id: a.id, name: a.name, accountNumber: a.accountNumber, phone: a.phone, address: a.address };
-          })()
+      const a = dataOrWarn(accountRes, `cuenta ${args.id}`, warnings) as Record<string, unknown> | undefined;
+      const account = a
+        ? { id: a.id, name: a.name, accountNumber: a.accountNumber, phone: a.phone, address: a.address }
         : { error: "No se pudo obtener la cuenta" };
 
-      const devices = devicesRes.status === "fulfilled"
-        ? (Array.isArray(devicesRes.value.data) ? devicesRes.value.data : []).map((d: Record<string, unknown>) => {
-            const brand = d.brand as Record<string, unknown> | undefined;
-            const model = d.model as Record<string, unknown> | undefined;
-            return { id: d.id, serialNumber: d.serialNumber, brand: brand?.name, model: model?.name, status: d.status };
-          })
-        : [];
+      const devicesData = dataOrWarn(devicesRes, "dispositivos", warnings);
+      const devices = itemsOf(devicesData).map((d) => {
+        const brand = d.brand as Record<string, unknown> | undefined;
+        const model = d.model as Record<string, unknown> | undefined;
+        return { id: d.id, serialNumber: d.serialNumber, brand: brand?.name, model: model?.name, status: d.status };
+      });
 
-      const interventions = interventionsRes.status === "fulfilled"
-        ? (Array.isArray(interventionsRes.value.data) ? interventionsRes.value.data : [])
-        : [];
-
-      const ev = eventsRes.status === "fulfilled" ? eventsRes.value.data : null;
-      const evTotal = (ev as { total?: number } | null)?.total;
-      const pendingEvents = typeof evTotal === "number"
-        ? evTotal
-        : (Array.isArray(ev) ? ev : (ev as { data?: unknown[] } | null)?.data ?? []).length;
+      const interventionsData = dataOrWarn(interventionsRes, "intervenciones abiertas", warnings);
+      const ev = dataOrWarn(eventsRes, "eventos pendientes", warnings);
 
       return ok({
         account,
         devices,
-        openInterventions: interventions.length,
-        pendingEvents,
+        openInterventions: interventionsData === undefined ? null : itemsOf(interventionsData).length,
+        pendingEvents: ev === undefined ? null : totalOf(ev),
+        ...(warnings.length ? { warnings } : {}),
       });
     }),
   );
@@ -74,35 +79,36 @@ export function registerDashboardTools(server: McpServer, client: GavrielClient)
       annotations: { readOnlyHint: true },
     },
     wrapReadOnly(async (args, ctx) => {
+      const warnings: string[] = [];
       const [ticketRes, activitiesRes] = await Promise.allSettled([
-        client.get(`/tickets/${args.id}`, undefined, { signal: ctx.mcpReq.signal }),
-        client.get(`/activities/ticket/${args.id}`, undefined, { signal: ctx.mcpReq.signal }),
+        client.get(`/tickets/${seg(args.id)}`, undefined, { signal: ctx.mcpReq.signal }),
+        client.get(`/activities/ticket/${seg(args.id)}`, undefined, { signal: ctx.mcpReq.signal }),
       ]);
 
-      const ticket = ticketRes.status === "fulfilled"
-        ? ensureOk<Record<string, unknown>>(ticketRes.value, `ticket ${args.id}`)
-        : null;
-      const accountId = (ticket as Record<string, unknown> | null)?.accountId as string | undefined;
+      // Sin ticket no hay contexto: error claro en vez de {ticket:null}.
+      if (ticketRes.status === "rejected") throw ticketRes.reason;
+      const ticket = ensureOk<Record<string, unknown>>(ticketRes.value, `ticket ${args.id}`);
+      const accountId = ticket.accountId as string | undefined;
 
-      const inline = (ticket as Record<string, unknown> | null)?.account as Record<string, unknown> | undefined;
+      const inline = ticket.account as Record<string, unknown> | undefined;
       let account = null;
       if (inline?.id) {
         account = { id: inline.id, name: inline.name, phone: inline.phone, email: inline.email };
       } else if (accountId) {
         try {
-          const accountRes = await client.get(`/accounts/${accountId}`, undefined, { signal: ctx.mcpReq.signal });
-          const a = accountRes.data as Record<string, unknown>;
+          const accountRes = await client.get(`/accounts/${seg(accountId)}`, undefined, { signal: ctx.mcpReq.signal });
+          const a = ensureOk<Record<string, unknown>>(accountRes, `cuenta ${accountId}`);
           account = { id: a.id, name: a.name, phone: a.phone, email: a.email };
-        } catch {
+        } catch (e) {
+          warnings.push((e as Error).message);
           account = { id: accountId, error: "No se pudo obtener la cuenta" };
         }
       }
 
-      const activities = activitiesRes.status === "fulfilled"
-        ? (Array.isArray(activitiesRes.value.data) ? activitiesRes.value.data : []).map((a: Record<string, unknown>) => ({ id: a.id, title: a.title, type: a.type, createdAt: a.createdAt }))
-        : [];
+      const activities = itemsOf(dataOrWarn(activitiesRes, "actividades", warnings))
+        .map((a) => ({ id: a.id, title: a.title, type: a.type, createdAt: a.createdAt }));
 
-      return ok({ ticket, account, activities });
+      return ok({ ticket, account, activities, ...(warnings.length ? { warnings } : {}) });
     }),
   );
 
@@ -119,7 +125,8 @@ export function registerDashboardTools(server: McpServer, client: GavrielClient)
       annotations: { readOnlyHint: true },
     },
     wrapReadOnly(async (args, ctx) => {
-      const eventRes = await client.get(`/events/${args.id}`, undefined, { signal: ctx.mcpReq.signal });
+      const eventRes = await client.get(`/events/${seg(args.id)}`, undefined, { signal: ctx.mcpReq.signal });
+      const warnings: string[] = [];
       const event = ensureOk<Record<string, unknown>>(eventRes, `evento ${args.id}`);
       const account = event.account as Record<string, unknown> | undefined;
       const connection = event.connection as Record<string, unknown> | undefined;
@@ -127,10 +134,11 @@ export function registerDashboardTools(server: McpServer, client: GavrielClient)
       let accountDetail = null;
       if (account?.id) {
         try {
-          const accountRes = await client.get(`/accounts/${account.id}`, undefined, { signal: ctx.mcpReq.signal });
-          const a = accountRes.data as Record<string, unknown>;
+          const accountRes = await client.get(`/accounts/${seg(String(account.id))}`, undefined, { signal: ctx.mcpReq.signal });
+          const a = ensureOk<Record<string, unknown>>(accountRes, `cuenta ${account.id}`);
           accountDetail = { id: a.id, name: a.name, phone: a.phone, email: a.email };
-        } catch {
+        } catch (e) {
+          warnings.push((e as Error).message);
           accountDetail = { id: account.id, name: account.name };
         }
       }
@@ -139,6 +147,7 @@ export function registerDashboardTools(server: McpServer, client: GavrielClient)
         event: { id: event.id, status: event.status, createdAt: event.createdAt, port: event.port },
         account: accountDetail,
         connection: connection ? { id: connection.id, type: connection.type, activated: connection.activated } : null,
+        ...(warnings.length ? { warnings } : {}),
       });
     }),
   );
@@ -157,36 +166,36 @@ export function registerDashboardTools(server: McpServer, client: GavrielClient)
     },
     wrapReadOnly(async (args, ctx) => {
       const accountsRes = await client.get("/events/accounts-with-pending-events", undefined, { signal: ctx.mcpReq.signal });
-      const accounts = Array.isArray(accountsRes.data)
-        ? accountsRes.data.slice(0, args.limit)
-        : [];
+      const accounts = itemsOf(ensureOk(accountsRes, "cuentas con eventos pendientes")).slice(0, args.limit);
 
-      // Pool de CONCURRENCY workers; solo se piden los 5 eventos que se muestran.
-      const dashboard: unknown[] = [];
+      // Pool de CONCURRENCY workers; resultados por índice para conservar el orden original.
+      const rows: unknown[] = new Array(accounts.length);
+      const warnings: string[] = [];
       let next = 0;
       const worker = async () => {
         while (next < accounts.length) {
-          const a = accounts[next++] as Record<string, unknown>;
+          const i = next++;
+          const a = accounts[i];
           try {
             const eventsRes = await client.get("/events", { accountId: a.id, pending: true, limit: 5 }, { signal: ctx.mcpReq.signal });
-            const d = eventsRes.data as unknown;
-            const events: Record<string, unknown>[] = Array.isArray(d) ? d : (d as { data?: Record<string, unknown>[] } | null)?.data ?? [];
-            const total = (d as { total?: number } | null)?.total;
-            dashboard.push({
+            const d = ensureOk(eventsRes, `eventos de cuenta ${a.id}`);
+            const events = itemsOf(d);
+            rows[i] = {
               accountId: a.id,
               accountName: a.name,
               accountNumber: a.accountNumber,
-              pendingEvents: typeof total === "number" ? total : events.length,
+              pendingEvents: totalOf(d),
               events: events.map((e) => ({ id: e.id, port: e.port, createdAt: e.createdAt })),
-            });
-          } catch {
-            // cuenta omitida (igual que antes con allSettled)
+            };
+          } catch (e) {
+            warnings.push(`cuenta ${a.id}: ${(e as Error).message}`);
           }
         }
       };
       await Promise.all(Array.from({ length: Math.min(CONCURRENCY, accounts.length) }, worker));
 
-      return ok(dashboard);
+      const dashboard = rows.filter((r) => r !== undefined);
+      return ok(warnings.length ? { dashboard, warnings } : dashboard);
     }),
   );
 }

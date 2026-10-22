@@ -173,7 +173,7 @@ export function registerVideoTools(server: McpServer, client: GavrielClient, rol
   registerTool(
     server, role, "full", "sync_video_camera",
     {
-      title: "Sincronizar cámara de video (ESCRITURA)",
+      title: "Sincronizar cámara de video",
       description:
         "POST /video/cameras/sync. Usar cuando una cámara (por serial) debe re-sincronizarse con el proveedor, opcionalmente vinculándola a una cuenta. Requiere confirm: true.",
       inputSchema: {
@@ -197,7 +197,7 @@ export function registerVideoTools(server: McpServer, client: GavrielClient, rol
   registerTool(
     server, role, "full", "create_video_wall",
     {
-      title: "Guardar mosaico de video (ESCRITURA)",
+      title: "Guardar mosaico de video",
       description:
         "POST /video/walls. Usar cuando se guarda un mosaico con nombre y distribución de cámaras. Si existe uno propio con el mismo nombre el frontend pide reemplazo. `layout` se pasa tal cual (celdas/cámaras del mosaico; copiar la forma de list_video_walls). Requiere confirm: true.",
       inputSchema: {
@@ -221,7 +221,7 @@ export function registerVideoTools(server: McpServer, client: GavrielClient, rol
   registerTool(
     server, role, "full", "delete_video_wall",
     {
-      title: "Borrar mosaico de video (ESCRITURA)",
+      title: "Borrar mosaico de video",
       description: "DELETE /video/walls/{id}. Usar cuando se elimina un mosaico guardado. Irreversible. Requiere confirm: true y aprobación humana.",
       inputSchema: { id: id("Id del mosaico"), confirm: confirmSchema },
       annotations: { destructiveHint: true },
@@ -237,7 +237,7 @@ export function registerVideoTools(server: McpServer, client: GavrielClient, rol
   registerTool(
     server, role, "full", "verify_cloud_live_view",
     {
-      title: "Verificar live-view en la nube de un dispositivo (ESCRITURA)",
+      title: "Verificar live-view en la nube de un dispositivo",
       description:
         "POST /accounts/{accountId}/devices/{deviceId}/cloud-live-view-verification-for-{ezviz|team}-preview. Usar cuando se verifica si un dispositivo soporta live-view por nube Ezviz o Hik-Connect for Teams. No usar para credenciales de acceso. Requiere confirm: true.",
       inputSchema: {

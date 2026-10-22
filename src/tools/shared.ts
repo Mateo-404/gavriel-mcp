@@ -35,7 +35,8 @@ export const truncateSchema = z
 
 // ── Field selection ──────────────────────────────────────────────────
 // Selecciona solo los campos pedidos de un objeto/array. Si fields está
-// vacío/undefined, retorna el original.
+// vacío/undefined, retorna el original. Sobre un envelope {data:[...], meta}
+// proyecta cada ítem de data y conserva meta y el resto de las claves.
 export function selectFields<T extends Record<string, unknown>>(
   data: T | T[],
   fields?: string[],
@@ -49,7 +50,28 @@ export function selectFields<T extends Record<string, unknown>>(
     return out;
   };
   if (Array.isArray(data)) return data.map((item) => pick(item as Record<string, unknown>, fields) as T);
+  if (data && Array.isArray((data as Record<string, unknown>).data)) {
+    const env = data as Record<string, unknown>;
+    return { ...env, data: (env.data as Record<string, unknown>[]).map((i) => pick(i, fields)) } as unknown as T;
+  }
   return pick(data, fields) as T;
+}
+
+// Id seguro para paths: la API usa uuid/numéricos/slugs. Reusar en toda tool de escritura.
+export const idSchema = z.string().regex(/^[\w-]+$/, "ID inválido (solo letras, números, _ y -)");
+
+// Total de un listado: meta.pagination.total (envelope real) > meta.total > total > largo del array.
+export function totalOf(d: unknown): number {
+  if (Array.isArray(d)) return d.length;
+  const o = d as { total?: unknown; data?: unknown; meta?: { total?: unknown; pagination?: { total?: unknown } } } | null;
+  for (const t of [o?.meta?.pagination?.total, o?.meta?.total, o?.total]) if (typeof t === "number") return t;
+  return Array.isArray(o?.data) ? o.data.length : 0;
+}
+
+// Ítems de un listado: array directo o envelope {data:[...]}.
+export function itemsOf(d: unknown): Record<string, unknown>[] {
+  const l = Array.isArray(d) ? d : (d as { data?: unknown } | null)?.data;
+  return Array.isArray(l) ? (l as Record<string, unknown>[]) : [];
 }
 
 // Normalize account numbers: left-pads with zeros to 10 digits.
@@ -63,12 +85,14 @@ export function normalizeAccountNumber(input: string): string {
 // ── Body builder ─────────────────────────────────────────────────────
 export function buildBody(
   args: Record<string, unknown>,
-  opts: { required?: readonly string[]; optional?: readonly string[] },
+  opts: { required?: readonly string[]; optional?: readonly string[]; nullable?: readonly string[] },
 ): Record<string, unknown> {
   const body: Record<string, unknown> = {};
   for (const f of opts.required ?? []) body[f] = args[f];
   for (const f of opts.optional ?? []) {
-    if (args[f] !== undefined && args[f] !== null) body[f] = args[f];
+    if (args[f] === undefined) continue;
+    // null explícito solo en campos nullable (limpiar la relación); en el resto se omite.
+    if (args[f] !== null || opts.nullable?.includes(f)) body[f] = args[f];
   }
   return body;
 }
@@ -83,7 +107,8 @@ export function wrapReadOnly<
     try {
       return await fn(args, ctx);
     } catch (e) {
-      return err((e as Error).message);
+      const cause = (e as { cause?: { message?: string } }).cause?.message;
+      return err(cause ? `${(e as Error).message} (causa: ${cause})` : (e as Error).message);
     }
   };
 }

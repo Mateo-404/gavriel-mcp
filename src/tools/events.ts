@@ -1,8 +1,8 @@
 import type { GavrielClient } from "../gavrielClient.js";
-import { ok, paginationSchema, okStructured, wrapReadOnly, forwardParams, okTruncated, truncateSchema, selectFields, requireFilters, fieldsSchema } from "./shared.js";
+import { ok, ensureOk, paginationSchema, okStructured, wrapReadOnly, forwardParams, okTruncated, truncateSchema, selectFields, requireFilters, fieldsSchema, idSchema, itemsOf } from "./shared.js";
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/server";
-import { requireConfirm, confirmSchema, runBatch, destructiveGuard, okOrInput } from "./writeHelpers.js";
+import { requireConfirm, confirmSchema, runBatch, destructiveGuard, okOrInput, seg } from "./writeHelpers.js";
 import { registerTool, type Role } from "./roles.js";
 
 const EVENT_STATUSES = [
@@ -28,7 +28,7 @@ export function registerEventTools(server: McpServer, client: GavrielClient, rol
       annotations: { readOnlyHint: true },
     },
     wrapReadOnly(async (args, ctx) => {
-      const res = await client.get(`/events/${args.id}`, undefined, { signal: ctx.mcpReq.signal });
+      const res = await client.get(`/events/${seg(args.id)}`, undefined, { signal: ctx.mcpReq.signal });
       const data = selectFields(res.data as Record<string, unknown>, args.fields);
       return args.truncate ? okTruncated(data, args.truncate) : ok(data);
     }),
@@ -74,6 +74,7 @@ export function registerEventTools(server: McpServer, client: GavrielClient, rol
         ]),
       };
       const res = await client.get("/events", params, { signal: ctx.mcpReq.signal });
+      ensureOk(res, "list_events");
       const data = selectFields(res.data as Record<string, unknown>, args.fields);
       return okStructured(data);
     }),
@@ -82,11 +83,11 @@ export function registerEventTools(server: McpServer, client: GavrielClient, rol
   registerTool(
     server, role, "full", "mark_events_processed",
     {
-      title: "Marcar eventos como procesados (ESCRITURA)",
+      title: "Marcar eventos como procesados",
       description:
-        "Marca eventos como procesados. Requiere confirm.",
+        "Usar para cambiar el estado (default processed) de hasta 50 eventos por ID. Destructiva: pide aprobación humana. Para muchos eventos de una cuenta ver bulk_mark_events_by_filter.",
       inputSchema: {
-        eventIds: z.array(z.string()).min(1).describe("IDs de los eventos a marcar"),
+        eventIds: z.array(idSchema).min(1).max(50).describe("IDs de los eventos a marcar (máx 50)"),
         status: z
           .enum(EVENT_STATUSES)
           .default("processed")
@@ -95,11 +96,11 @@ export function registerEventTools(server: McpServer, client: GavrielClient, rol
       },
       annotations: { idempotentHint: true },
     },
-    async (args) => {
+    async (args, ctx) => {
       const exec = {
         tool: "mark_events_processed",
         method: "PATCH",
-        path: args.eventIds.map((id) => `/events/${id}`).join(", "),
+        path: args.eventIds.map((id) => `/events/${seg(id)}`).join(", "),
         params: { eventIds: args.eventIds, status: args.status },
       };
       return requireConfirm(args.confirm, exec, client, async () => {
@@ -108,29 +109,32 @@ export function registerEventTools(server: McpServer, client: GavrielClient, rol
         // TIER3_PENDIENTE.md); si aparece uno, reemplazar el loop.
         const results = [];
         for (const id of args.eventIds) {
-          const r = await client.patch(`/events/${id}`, { status: args.status });
+          const r = await client.patch(`/events/${seg(id)}`, { status: args.status });
           results.push({ id, status: r.status, data: r.data });
         }
         return { status: 200, data: { results } };
-      }).then(ok);
+      }, destructiveGuard("mark_events_processed", exec, ctx)).then(okOrInput);
     },
   );
 
   registerTool(
     server, role, "full", "bulk_mark_events_by_filter",
     {
-      title: "Marcar eventos por filtro (ESCRITURA MASIVA)",
+      title: "Marcar eventos por filtro (masivo)",
       description:
-        "Resuelve eventos con filtros (cuenta obligatoria) y los marca al estado indicado. " +
-        "Sin confirm muestra los IDs afectados; con confirm ejecuta los PATCH en lote.",
+        "Usar para marcar en lote los eventos de una cuenta que cumplen un filtro (por defecto solo pendientes). " +
+        "Dos pasos: sin confirm devuelve los IDs afectados; para ejecutar, repetí la llamada con confirm:true y esos mismos IDs en eventIds " +
+        "(si el conjunto cambió entre preview y confirm no ejecuta). Destructiva: pide aprobación humana.",
       inputSchema: {
-        accountId: z.string().describe("ID de la cuenta"),
+        accountId: idSchema.describe("ID de la cuenta"),
         port: z.string().optional(),
         eventCode: z.string().optional(),
         dateFrom: z.iso.datetime({ offset: true }).optional().describe("ISO datetime"),
         dateTo: z.iso.datetime({ offset: true }).optional().describe("ISO datetime"),
+        onlyPending: z.boolean().default(true).describe("Solo eventos pendientes (default true)"),
         targetStatus: z.enum(EVENT_STATUSES).default("processed").describe("Estado a asignar"),
         maxEvents: z.number().int().min(1).max(200).default(50).describe("Tope de eventos por ejecución"),
+        eventIds: z.array(idSchema).max(200).optional().describe("IDs devueltos por el preview; obligatorio con confirm:true"),
         confirm: confirmSchema,
       },
     },
@@ -141,16 +145,28 @@ export function registerEventTools(server: McpServer, client: GavrielClient, rol
         sortBy: "createdAt",
         sortDirection: "desc",
       };
+      if (args.onlyPending) params.pending = true;
       if (args.port) params.port = args.port;
       if (args.eventCode) params.eventCode = args.eventCode;
       if (args.dateFrom) params.dateFrom = args.dateFrom;
       if (args.dateTo) params.dateTo = args.dateTo;
       const res = await client.get("/events", params, { signal: ctx.mcpReq.signal });
-      const items = Array.isArray(res.data)
-        ? res.data
-        : ((res.data as { data?: unknown[] } | null)?.data ?? []);
-      if (!items.length) return ok({ matchedCount: 0, nota: "Ningún evento coincide con el filtro." });
-      const ids = items.map((i) => String((i as Record<string, unknown>).id));
+      ensureOk(res, "listado de eventos");
+      const ids = itemsOf(res.data).map((i) => String(i.id));
+      if (!ids.length) return ok({ matchedCount: 0, nota: "Ningún evento coincide con el filtro." });
+      if (args.confirm === true) {
+        // El conjunto queda fijado por el preview: debe coincidir exacto con el actual.
+        const pinned = args.eventIds ?? [];
+        const same = pinned.length === ids.length && pinned.every((id) => ids.includes(id));
+        if (!same) {
+          return ok({
+            ok: false,
+            writeStatus: "not_executed",
+            mensaje: "confirm:true requiere eventIds idéntico al preview; el conjunto actual difiere (o falta eventIds). Revisá y reintentá con estos IDs.",
+            eventIds: ids,
+          });
+        }
+      }
       const exec = {
         tool: "bulk_mark_events_by_filter",
         method: "PATCH",
@@ -159,7 +175,7 @@ export function registerEventTools(server: McpServer, client: GavrielClient, rol
       };
       return requireConfirm(args.confirm, exec, client, async () => {
         const report = await runBatch(
-          ids.map((id) => ({ id, run: (signal) => client.patch(`/events/${id}`, { status: args.targetStatus }, signal) })),
+          ids.map((id) => ({ id, run: (signal) => client.patch(`/events/${seg(id)}`, { status: args.targetStatus }, signal) })),
           ctx,
         );
         return { status: 200, data: report };

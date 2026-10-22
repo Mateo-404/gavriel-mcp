@@ -2,7 +2,7 @@ import type { McpServer, ServerContext } from "@modelcontextprotocol/server";
 import { z } from "zod";
 import type { GavrielClient } from "../gavrielClient.js";
 import { ok, okTruncated, err, wrapReadOnly, ensureOk, buildBody, forwardParams, selectFields, paginationSchema, truncateSchema, fieldsSchema } from "./shared.js";
-import { requireConfirm, confirmSchema, destructiveGuard, okOrInput, seg } from "./writeHelpers.js";
+import { requireConfirm, confirmSchema, destructiveGuard, isDestructive, okOrInput, seg } from "./writeHelpers.js";
 import { registerTool, type Role } from "./roles.js";
 
 const id = (d: string) => z.string().regex(/^[\w-]+$/).describe(d);
@@ -30,6 +30,13 @@ const CATALOGS = {
   "activity-type-options": { path: "/activities/type-options" },
 } as const satisfies Record<string, { path: string; paged?: boolean; active?: boolean; write?: readonly string[] }>;
 type CatalogName = keyof typeof CATALOGS;
+// campos de búsqueda por catálogo, igual que el frontend (el backend filtra por esos campos)
+const SEARCH_FIELDS: Partial<Record<CatalogName, readonly string[]>> = {
+  protocols: ["name", "code", "description"],
+  "device-connection-types": ["name", "code"],
+  "events-formats": ["name", "code", "description"],
+  jurisdictions: ["name", "state"],
+};
 const READ_CATALOGS = Object.keys(CATALOGS) as [CatalogName, ...CatalogName[]];
 const WRITE_CATALOGS = ["protocols", "jurisdictions", "intervention-categories", "device-connection-types"] as const;
 const writeFields = (c: (typeof WRITE_CATALOGS)[number]): readonly string[] => CATALOGS[c].write;
@@ -75,7 +82,7 @@ export function registerCoreGapTools(server: McpServer, client: GavrielClient, r
           : method === "PATCH" ? client.patch(path, body)
           : method === "PUT" ? client.put(path, body)
           : client.delete(path);
-        return requireConfirm(a.confirm as boolean, exec, client, call, s.destructive ? destructiveGuard(s.name, exec, ctx) : undefined).then(okOrInput);
+        return requireConfirm(a.confirm as boolean, exec, client, call, isDestructive(s.name) ? destructiveGuard(s.name, exec, ctx) : undefined).then(okOrInput);
       }) as never,
     );
 
@@ -101,7 +108,7 @@ export function registerCoreGapTools(server: McpServer, client: GavrielClient, r
       let path = c.path;
       if (a.catalog === "device-models" && a.brandId) path = `/device-models/brand/${seg(a.brandId)}`;
       else if (a.active && c.active) path += "/active";
-      const params: Record<string, unknown> = c.paged && !(a.active && c.active) ? { page: a.page, limit: a.limit, ...(a.search ? { name: a.search } : {}) } : {};
+      const params: Record<string, unknown> = c.paged && !(a.active && c.active) ? { page: a.page, limit: a.limit, ...(a.search ? Object.fromEntries((SEARCH_FIELDS[a.catalog as CatalogName] ?? ["name"]).map((f) => [f, a.search])) : {}) } : {};
       if (a.stateId) params.stateId = a.stateId;
       const res = await client.get(path, params);
       return out(ensureOk(res, path), a);
@@ -168,7 +175,8 @@ export function registerCoreGapTools(server: McpServer, client: GavrielClient, r
     },
     async (a) => {
       const res = await client.get("/accounts/map-markers", a.hasPlayableCloudDevices ? { hasPlayableCloudDevices: true } : {});
-      let rows = ((ensureOk<{ data?: Record<string, unknown>[] }>(res, "map-markers")).data ?? []);
+      let rows = ((ensureOk<{ data?: Record<string, unknown>[] }>(res, "map-markers")).data ?? [])
+        .filter((r) => r.latitude != null && r.longitude != null);
       if (a.search) {
         const q = String(a.search).toLowerCase();
         rows = rows.filter((r) => `${r.name} ${r.accountNumber}`.toLowerCase().includes(q));
@@ -267,7 +275,7 @@ export function registerCoreGapTools(server: McpServer, client: GavrielClient, r
   };
   write({
     name: "upsert_catalog_item",
-    title: "Crear/actualizar ítem de catálogo (ESCRITURA)",
+    title: "Crear/actualizar ítem de catálogo",
     description:
       "Usar cuando haya que crear (sin itemId: POST) o modificar (con itemId: PATCH) un protocolo, jurisdicción, categoría de intervención o tipo de conexión de dispositivo. No usar para borrar (delete_catalog_item). Solo se envían los campos que aplican al catálogo. Requiere confirm: true.",
     shape: { ...catalogShape, itemId: id("ID del ítem a modificar; omitir para crear").optional() },
@@ -289,7 +297,7 @@ export function registerCoreGapTools(server: McpServer, client: GavrielClient, r
   });
   write({
     name: "deactivate_intervention_category",
-    title: "Desactivar categoría de intervención (ESCRITURA)",
+    title: "Desactivar categoría de intervención",
     description: "Usar cuando una categoría de intervención deba dejar de ofrecerse sin borrarla (PATCH /intervention-categories/{id}/deactivate). No usar para borrarla. Requiere confirm: true.",
     shape: { categoryId: id("ID de la categoría") },
     destructive: true,
@@ -310,7 +318,7 @@ export function registerCoreGapTools(server: McpServer, client: GavrielClient, r
   const USER_FIELDS = Object.keys(userShape);
   write({
     name: "create_user",
-    title: "Crear usuario (ESCRITURA)",
+    title: "Crear usuario",
     description: "Usar cuando haya que dar de alta un usuario del sistema (POST /users). Requiere email, username y password. No usar para usuarios de cuenta (create_account_user). Requiere confirm: true.",
     shape: { ...userShape, email: z.string().email().describe("Email"), username: z.string().min(1), password: z.string().min(8).describe("Contraseña (se redacta en logs)") },
     destructive: true,
@@ -318,7 +326,7 @@ export function registerCoreGapTools(server: McpServer, client: GavrielClient, r
   });
   write({
     name: "update_user",
-    title: "Actualizar usuario (ESCRITURA)",
+    title: "Actualizar usuario",
     description: "Usar cuando haya que cambiar rol, empresas, bloqueo, contraseña o datos de un usuario (PATCH /users/{id}); solo envía los campos provistos. Cambia permisos: confirmar con el humano. Requiere confirm: true.",
     shape: { userId: id("ID del usuario"), ...userShape },
     destructive: true,
@@ -334,7 +342,7 @@ export function registerCoreGapTools(server: McpServer, client: GavrielClient, r
   });
   write({
     name: "reset_user_otp",
-    title: "Reiniciar 2FA de usuario (ESCRITURA)",
+    title: "Reiniciar 2FA de usuario",
     description: "Usar cuando un usuario perdió su segundo factor y hay que reiniciarlo (POST /users/{id}/reset-otp). Afecta seguridad de la cuenta. Requiere confirm: true.",
     shape: { userId: id("ID del usuario") },
     destructive: true,
@@ -356,19 +364,19 @@ export function registerCoreGapTools(server: McpServer, client: GavrielClient, r
   ] as const;
   write({
     name: "create_account",
-    title: "Crear cuenta (ESCRITURA)",
+    title: "Crear cuenta",
     description:
       "Usar cuando haya que dar de alta una cuenta de monitoreo (POST /accounts). accountNumber y name son obligatorios; empresas/jurisdicción por id (list_account_companies, list_catalog). No usar para modificar (update_account). Requiere confirm: true.",
     shape: {
       accountNumber: z.string().min(1).describe("Número de cuenta"),
       name: z.string().min(1).describe("Nombre"),
-      ...Object.fromEntries(ACCOUNT_CREATE.filter((f) => f !== "name").map((f) => [f, z.string().optional().describe(f)])),
+      ...Object.fromEntries(ACCOUNT_CREATE.filter((f) => f !== "name").map((f) => [f, (f === "latitude" || f === "longitude" ? z.coerce.number() : z.string()).optional().describe(f)])),
     },
     op: (a) => ({ method: "POST", path: "/accounts", body: buildBody(a, { required: ["accountNumber", "name"], optional: ACCOUNT_CREATE }) }),
   });
   write({
     name: "add_account_quick_contact",
-    title: "Agregar contacto rápido a cuenta (ESCRITURA)",
+    title: "Agregar contacto rápido a cuenta",
     description:
       "Usar cuando haya que sumar a una cuenta un contacto de teléfono (kind=phone: contactType + phoneNumber) o de email (kind=email) en un paso (POST /accounts/{id}/contact | contact-email). No usar para contactos completos con orden (add_account_contact). Requiere confirm: true.",
     shape: {
@@ -394,7 +402,7 @@ export function registerCoreGapTools(server: McpServer, client: GavrielClient, r
   });
   write({
     name: "update_account_user",
-    title: "Actualizar usuario de cuenta (ESCRITURA)",
+    title: "Actualizar usuario de cuenta",
     description: "Usar cuando haya que modificar un usuario de cuenta (PATCH /account-users/{id}); fields es un objeto con los campos a cambiar (ver list_account_users). Requiere confirm: true.",
     shape: { accountUserId: id("ID del usuario de cuenta"), fields: z.record(z.string(), z.unknown()).describe("Campos a modificar (no incluir id/account)") },
     op: (a) => ({ method: "PATCH", path: `/account-users/${seg(a.accountUserId)}`, body: a.fields }),
@@ -411,7 +419,7 @@ export function registerCoreGapTools(server: McpServer, client: GavrielClient, r
   // ── Escrituras: archivos ──────────────────────────────────────────
   write({
     name: "link_file_to_ticket",
-    title: "Asociar archivo a ticket (ESCRITURA)",
+    title: "Asociar archivo a ticket",
     description: "Usar cuando un archivo ya subido deba quedar asociado a un ticket (PATCH /file-storage/{id}). No sube archivos (upload no soportado). Requiere confirm: true.",
     shape: { fileId: id("ID del archivo"), ticketId: id("ID del ticket") },
     op: (a) => ({ method: "PATCH", path: `/file-storage/${seg(a.fileId)}`, body: { ticketId: a.ticketId } }),
@@ -444,7 +452,7 @@ export function registerCoreGapTools(server: McpServer, client: GavrielClient, r
   });
   write({
     name: "set_activity_deleted",
-    title: "Borrado lógico / restaurar actividad (ESCRITURA)",
+    title: "Borrado lógico / restaurar actividad",
     description: "Usar cuando haya que ocultar una actividad (action=soft-delete) o recuperarla (action=restore), de forma reversible. No usar para borrado definitivo (delete_activity). Requiere confirm: true.",
     shape: { activityId: id("ID de la actividad"), action: z.enum(["soft-delete", "restore"]).describe("Acción") },
     op: (a) => ({ method: "PATCH", path: `/activities/${seg(a.activityId)}/${a.action}` }),
@@ -462,7 +470,7 @@ export function registerCoreGapTools(server: McpServer, client: GavrielClient, r
   });
   write({
     name: "mark_event_app_updates_seen",
-    title: "Marcar novedades de app como vistas (ESCRITURA)",
+    title: "Marcar novedades de app como vistas",
     description: "Usar cuando haya que marcar como vistas las novedades (fotos/nota/ubicación) de la app ciudadana de un evento (POST /events/{id}/app-updates/seen). Requiere confirm: true.",
     shape: { eventId: id("ID del evento") },
     op: (a) => ({ method: "POST", path: `/events/${seg(a.eventId)}/app-updates/seen` }),
@@ -484,7 +492,7 @@ export function registerCoreGapTools(server: McpServer, client: GavrielClient, r
   });
   write({
     name: "create_service",
-    title: "Crear servicio (ESCRITURA)",
+    title: "Crear servicio",
     description: "Usar cuando haya que crear un servicio técnico (POST /services) para una cuenta. No usar para agendarlo (schedule_service) ni modificarlo (update_service). Requiere confirm: true.",
     shape: {
       accountId: id("ID de la cuenta"),
@@ -499,7 +507,7 @@ export function registerCoreGapTools(server: McpServer, client: GavrielClient, r
   });
   write({
     name: "set_technician_slot_config",
-    title: "Configurar slots de técnico (ESCRITURA)",
+    title: "Configurar slots de técnico",
     description:
       "Usar cuando haya que reemplazar la grilla semanal de slots de un técnico (PUT /technician-slot-configs). REEMPLAZA todos los workingSlots: leer antes con get_technician_slot_configs. dayOfWeek 0-6, startMinute = minutos desde 00:00. Requiere confirm: true.",
     shape: {

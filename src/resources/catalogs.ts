@@ -1,6 +1,7 @@
 import type { GavrielClient } from "../gavrielClient.js";
 import type { McpServer } from "@modelcontextprotocol/server";
 import type { Role } from "../tools/roles.js";
+import { ensureOk } from "../tools/shared.js";
 
 const TTL_MS = 60 * 60 * 1000; // 1h
 
@@ -69,7 +70,8 @@ export function registerCatalogResources(server: McpServer, client: GavrielClien
         if (!p) {
           p = client
             .get(path, { limit: 200 })
-            .then(({ data }) => {
+            .then((res) => {
+              const data = ensureOk(res, `catálogo ${path}`);
               const compacted = isEventsTypes ? compactEventsTypes(data) : data;
               cache.set(path, { expiresAt: Date.now() + TTL_MS, data: compacted });
               return compacted;
@@ -77,13 +79,9 @@ export function registerCatalogResources(server: McpServer, client: GavrielClien
             .finally(() => inFlight.delete(path));
           inFlight.set(path, p);
         }
-        try {
-          const data = await p;
-          return { contents: [{ uri, mimeType: "application/json", text: JSON.stringify(data) }] };
-        } catch (e) {
-          const errorData = { error: (e as Error).message, path };
-          return { contents: [{ uri, mimeType: "application/json", text: JSON.stringify(errorData) }] };
-        }
+        // Si falla, la excepción se propaga: el cliente recibe un error JSON-RPC con la causa.
+        const data = await p;
+        return { contents: [{ uri, mimeType: "application/json", text: JSON.stringify(data) }] };
       },
     );
   }

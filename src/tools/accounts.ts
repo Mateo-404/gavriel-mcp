@@ -1,5 +1,5 @@
 import type { GavrielClient } from "../gavrielClient.js";
-import { ok, err, paginationSchema, okStructured, okTruncated, truncateSchema, selectFields, normalizeAccountNumber, buildBody, wrapReadOnly, forwardParams, fieldsSchema } from "./shared.js";
+import { ok, err, paginationSchema, okStructured, okTruncated, truncateSchema, selectFields, normalizeAccountNumber, buildBody, wrapReadOnly, forwardParams, fieldsSchema, idSchema } from "./shared.js";
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/server";
 import { requireConfirm, confirmSchema, runBatch, destructiveGuard, okOrInput, seg } from "./writeHelpers.js";
@@ -47,8 +47,8 @@ export function registerAccountTools(server: McpServer, client: GavrielClient, r
           const detail = (res.data as { message?: unknown })?.message ?? JSON.stringify(res.data);
           if (looksLikeAccountNumber) {
             return err(
-              `No se encontró la cuenta "${args.id}" (se intentó como número y como ID interno). ` +
-                `Verificá con search_accounts o list_accounts (search: "${args.id}"). Detalle: ${String(detail).slice(0, 200)}`,
+              `No se encontró la cuenta "${seg(args.id)}" (se intentó como número y como ID interno). ` +
+                `Verificá con search_accounts o list_accounts (search: "${seg(args.id)}"). Detalle: ${String(detail).slice(0, 200)}`,
             );
           }
           return err(`GET /accounts/${seg(id)} -> ${res.status}: ${String(detail).slice(0, 200)}`);
@@ -78,8 +78,8 @@ export function registerAccountTools(server: McpServer, client: GavrielClient, r
       } catch (e) {
         if (looksLikeAccountNumber) {
           return err(
-            `No se pudo resolver la cuenta "${args.id}" (se intentó como número y como ID interno). ` +
-              `Verificá con search_accounts o list_accounts (search: "${args.id}"). Detalle: ${(e as Error).message}`,
+            `No se pudo resolver la cuenta "${seg(args.id)}" (se intentó como número y como ID interno). ` +
+              `Verificá con search_accounts o list_accounts (search: "${seg(args.id)}"). Detalle: ${(e as Error).message}`,
           );
         }
         return err((e as Error).message);
@@ -118,11 +118,11 @@ export function registerAccountTools(server: McpServer, client: GavrielClient, r
   registerTool(
     server, role, "full", "update_account",
     {
-      title: "Actualizar cuenta (ESCRITURA)",
+      title: "Actualizar cuenta",
       description:
         "PATCH /accounts/{id} (solo envía los provistos). Campos confirmados. Requiere confirm: true.",
       inputSchema: {
-        id: z.string(),
+        id: idSchema,
         ...Object.fromEntries(
           ACCOUNT_FIELDS.map((f) => [f, z.string().nullish()]),
         ),
@@ -141,13 +141,13 @@ export function registerAccountTools(server: McpServer, client: GavrielClient, r
   );
 
   registerTool(
-    server, role, "full", "add_account_note",
+    server, role, "lite", "add_account_note",
     {
-      title: "Agregar nota a cuenta (ESCRITURA)",
+      title: "Agregar nota a cuenta",
       description:
         "POST /accounts/{id}/notes. type: bitacora (log), temporal (con rango de fechas) o fija. Requiere confirm: true.",
       inputSchema: {
-        accountId: z.string(),
+        accountId: idSchema,
         type: z.enum(["bitacora", "temporal", "fija"]).describe("Tipo de nota"),
         content: z.string().min(1),
         validFrom: z.iso.datetime({ offset: true }).optional().describe("ISO datetime, solo para tipo temporal"),
@@ -172,12 +172,12 @@ export function registerAccountTools(server: McpServer, client: GavrielClient, r
   registerTool(
     server, role, "full", "bulk_add_account_note",
     {
-      title: "Agregar nota a varias cuentas (ESCRITURA MASIVA)",
+      title: "Agregar nota a varias cuentas",
       description:
         "POST /accounts/{id}/notes a cada cuenta de la lista con el mismo cuerpo. " +
         "Sin confirm muestra el preview; con confirm ejecuta los POST en lote.",
       inputSchema: {
-        accountIds: z.array(z.string()).min(1).max(100).describe("IDs de las cuentas destino"),
+        accountIds: z.array(idSchema).min(1).max(100).describe("IDs de las cuentas destino"),
         type: z.enum(["bitacora", "temporal", "fija"]).describe("Tipo de nota"),
         content: z.string().min(1),
         validFrom: z.iso.datetime({ offset: true }).optional().describe("ISO datetime, solo para tipo temporal"),
@@ -210,11 +210,11 @@ export function registerAccountTools(server: McpServer, client: GavrielClient, r
   registerTool(
     server, role, "full", "update_account_note",
     {
-      title: "Actualizar nota de cuenta (ESCRITURA)",
+      title: "Actualizar nota de cuenta",
       description: "PATCH /accounts/{id}/notes/{noteId}. Requiere confirm: true.",
       inputSchema: {
-        accountId: z.string(),
-        noteId: z.string(),
+        accountId: idSchema,
+        noteId: idSchema,
         content: z.string().optional(),
         validFrom: z.string().optional(),
         validUntil: z.string().optional(),
@@ -235,11 +235,11 @@ export function registerAccountTools(server: McpServer, client: GavrielClient, r
   registerTool(
     server, role, "full", "delete_account_note",
     {
-      title: "Eliminar nota de cuenta (ESCRITURA)",
+      title: "Eliminar nota de cuenta",
       description: "DELETE /accounts/{id}/notes/{noteId}. Requiere confirm: true.",
       inputSchema: {
-        accountId: z.string(),
-        noteId: z.string(),
+        accountId: idSchema,
+        noteId: idSchema,
         confirm: confirmSchema,
       },
       annotations: { destructiveHint: true },
@@ -260,7 +260,7 @@ export function registerAccountTools(server: McpServer, client: GavrielClient, r
     "list_account_devices",
     {
       title: "Listar dispositivos de cuenta",
-      description: "Dispositivos de una cuenta.",
+      description: "Usar cuando necesitás los dispositivos instalados en una cuenta (filtrables por marca/modelo). Para un panorama completo ver get_account_dashboard.",
       inputSchema: z.object({
               id: z.string(),
               brandId: z.string().optional().describe("Filtrar por marca"),
@@ -289,7 +289,7 @@ export function registerAccountTools(server: McpServer, client: GavrielClient, r
     "list_account_partitions",
     {
       title: "Listar particiones de cuenta",
-      description: "Particiones de una cuenta.",
+      description: "Usar cuando necesitás las particiones de una cuenta (zonas agrupadas por área).",
       inputSchema: z.object({
               id: z.string(),
               truncate: truncateSchema,
@@ -311,7 +311,7 @@ export function registerAccountTools(server: McpServer, client: GavrielClient, r
     "list_account_users",
     {
       title: "Listar usuarios de cuenta",
-      description: "Usuarios de una cuenta.",
+      description: "Usar cuando necesitás los usuarios de panel/app asociados a una cuenta.",
       inputSchema: z.object({
               id: z.string(),
               truncate: truncateSchema,
@@ -333,7 +333,7 @@ export function registerAccountTools(server: McpServer, client: GavrielClient, r
     "list_account_contacts",
     {
       title: "Listar contactos de cuenta",
-      description: "Contactos de una cuenta.",
+      description: "Usar cuando necesitás los contactos de emergencia de una cuenta, en su orden de llamado.",
       inputSchema: z.object({
               accountId: z.string(),
               truncate: truncateSchema,
@@ -356,7 +356,7 @@ export function registerAccountTools(server: McpServer, client: GavrielClient, r
     "list_useful_contacts",
     {
       title: "Listar contactos útiles",
-      description: "Contactos útiles (por jurisdicción opcional).",
+      description: "Usar cuando necesitás teléfonos útiles (policía, bomberos, etc.), opcionalmente por jurisdicción.",
       inputSchema: z.object({
               jurisdictionId: z.string().optional().describe("Filtra por jurisdicción si viene"),
               truncate: truncateSchema,
@@ -381,7 +381,7 @@ export function registerAccountTools(server: McpServer, client: GavrielClient, r
     "list_account_zones",
     {
       title: "Listar zonas de cuenta",
-      description: "Zonas de una cuenta.",
+      description: "Usar cuando necesitás las zonas de alarma configuradas en una cuenta.",
       inputSchema: z.object({
               id: z.string(),
               truncate: truncateSchema,
@@ -402,12 +402,12 @@ export function registerAccountTools(server: McpServer, client: GavrielClient, r
   registerTool(
     server, role, "full", "add_account_contact",
     {
-      title: "Agregar contacto a cuenta (ESCRITURA)",
+      title: "Agregar contacto a cuenta",
       description:
         "POST /account-contacts. `order` = posición del contacto (menor = primero). " +
         "Si la posición está rodeada de orders contiguos, llamá antes reorder_account_contacts para dejar lugar. Requiere confirm: true.",
       inputSchema: {
-        accountId: z.string(),
+        accountId: idSchema,
         name: z.string().min(1),
         phone: z.string().optional(),
         email: z.string().optional(),
@@ -434,12 +434,12 @@ export function registerAccountTools(server: McpServer, client: GavrielClient, r
   registerTool(
     server, role, "full", "update_account_contact",
     {
-      title: "Actualizar contacto de cuenta (ESCRITURA)",
+      title: "Actualizar contacto de cuenta",
       description:
         "PATCH /account-contacts/{id}. `order` = posición/prioridad del contacto (menor = primero). " +
         "Para mover varios o insertar en una posición usá reorder_account_contacts, que correja el resto automáticamente. Requiere confirm: true.",
       inputSchema: {
-        contactId: z.string(),
+        contactId: idSchema,
         name: z.string().optional(),
         phone: z.string().optional(),
         email: z.string().optional(),
@@ -462,7 +462,7 @@ export function registerAccountTools(server: McpServer, client: GavrielClient, r
   registerTool(
     server, role, "full", "reorder_account_contacts",
     {
-      title: "Reordenar contactos de cuenta (ESCRITURA)",
+      title: "Reordenar contactos de cuenta",
       description:
         "Fija el orden final de TODOS los contactos de la cuenta según la secuencia pedida " +
         "(orderedContactIds[0] = posición 1). Espacia las posiciones de a 10 para dejar lugar a " +
@@ -470,9 +470,9 @@ export function registerAccountTools(server: McpServer, client: GavrielClient, r
         "Para insertar un contacto nuevo en la posición k: pasá la secuencia completa deseada acá " +
         "y después crealo con add_account_contact usando un order intermedio libre. Requiere confirm: true.",
       inputSchema: {
-        accountId: z.string(),
+        accountId: idSchema,
         orderedContactIds: z
-          .array(z.string())
+          .array(idSchema)
           .min(1)
           .max(200)
           .describe("IDs de contactos en el orden final deseado (índice 0 = posición 1). Debe incluir TODOS los contactos actuales."),
@@ -548,7 +548,7 @@ export function registerAccountTools(server: McpServer, client: GavrielClient, r
       const resultados: Array<{ contactId: string; ok: boolean; status?: number; error?: string }> = [];
       for (const fase of fases) {
         for (const move of fase) {
-          const path = `/account-contacts/${move.contactId}`;
+          const path = `/account-contacts/${seg(move.contactId)}`;
           try {
             const r = (await requireConfirm(
               true,

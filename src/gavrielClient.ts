@@ -1,6 +1,7 @@
 import type { Config } from "./config.js";
 import { readTrustedToken, saveTrustedToken, clearTrustedToken } from "./secrets.js";
 import { logPerf } from "./auditLog.js";
+import { secondsLeft } from "./totp.js";
 
 // ponytail: el backend de Gavriel es lento en consultas sin filtrar (events llegó
 // a 60s+). Timeout global 90s; si una tool puntual necesita más, se filtra mejor
@@ -18,11 +19,25 @@ const WRITE_SERIAL_PREFIXES = ["/account-contacts"];
 const BREAKER_THRESHOLD = 5;
 const BREAKER_OPEN_MS = 30_000;
 const NET_RETRY_CODES = /^(ECONNRESET|EPIPE|ETIMEDOUT|UND_ERR_)/;
+// Login colgado: sin timeout, loginShared quedaba pendiente para siempre.
+const LOGIN_TIMEOUT_MS = 30_000;
+// Tras un login fallido se re-lanza el mismo error en vez de re-postear (evita bloqueo de cuenta).
+const LOGIN_FAIL_MEMORY_MS = 30_000;
+const CACHE_MAX = 500;
+// Re-lecturas de verificación post-escritura no se frenan por el breaker durante este lapso.
+const WRITE_GRACE_MS = 15_000;
 
 export interface GetOptions {
   /** Cachea la respuesta 200 durante `ttl` ms (opt-in). */
   ttl?: number;
   signal?: AbortSignal;
+  /** Re-lecturas de verificación post-escritura: ignoran el circuit breaker. */
+  bypassBreaker?: boolean;
+}
+
+// Libera el body de una respuesta que se descarta (reintentos) para no retener sockets.
+function drain(res: Response): void {
+  res.body?.cancel().catch(() => {});
 }
 
 // Retry-After en segundos o fecha HTTP -> ms (null si no viene o es inválido).
@@ -85,7 +100,10 @@ export class GavrielClient {
   private jwt: JwtState = { token: null, expiresAt: null };
   private userEmail: string | null = null;
   private config: Config;
-  private loginInFlight: Promise<string> | null = null;
+  private loginInFlight: Promise<{ token: string; expiresAt: number | null }> | null = null;
+  private loginFailure: { at: number; err: unknown } | null = null;
+  private invalidGen = 0;
+  private lastWriteDoneAt = 0;
   private lastLoginAt = 0;
   private readonly writeConcurrency: number;
   private writeInFlight = 0;
@@ -120,19 +138,30 @@ export class GavrielClient {
 
   // Logins concurrentes (p.ej. varios 401 a la vez) comparten uno solo.
   login(): Promise<void> {
-    this.loginShared ??= this.loginOnce().finally(() => {
-      this.loginShared = null;
-    });
+    const f = this.loginFailure;
+    if (f && Date.now() - f.at < LOGIN_FAIL_MEMORY_MS) return Promise.reject(f.err);
+    this.loginShared ??= this.loginOnce()
+      .then(
+        () => {
+          this.loginFailure = null;
+        },
+        (err) => {
+          this.loginFailure = { at: Date.now(), err };
+          throw err;
+        },
+      )
+      .finally(() => {
+        this.loginShared = null;
+      });
     return this.loginShared;
   }
 
   private async loginOnce(): Promise<void> {
-    // Resetea la expiración previa: el header x-token-expires-at que doLogin
-    // pueda traer es la fuente más precisa; decodeExp del JWT es fallback.
-    this.jwt.expiresAt = null;
-    const token = await this.doLogin();
+    // El header x-token-expires-at que trae doLogin es la fuente más precisa;
+    // decodeExp del JWT es fallback. El estado solo se pisa tras un login exitoso.
+    const { token, expiresAt } = await this.doLogin();
     this.jwt.token = token;
-    this.jwt.expiresAt ??= decodeExp(token);
+    this.jwt.expiresAt = expiresAt ?? decodeExp(token);
     this.userEmail = this.config.GAVRIEL_EMAIL;
     this.lastLoginAt = Date.now();
     console.error(
@@ -140,27 +169,31 @@ export class GavrielClient {
     );
   }
 
-  private async doLogin(): Promise<string> {
+  private async doLogin(): Promise<{ token: string; expiresAt: number | null }> {
     if (this.loginInFlight) return this.loginInFlight;
     this.loginInFlight = (async () => {
       const email = this.config.GAVRIEL_EMAIL;
       const base: Record<string, string> = { email, password: this.config.GAVRIEL_PASSWORD };
 
-      const trusted = readTrustedToken(email);
+      const strict = Boolean(this.config.strictProfile);
+      const trusted = readTrustedToken(email, strict);
       if (trusted) base.trustedDeviceToken = trusted;
 
       let res = await this.postLogin(base);
       if (!res.ok) {
         const msg = res.message;
         // El trusted token expiró: limpiarlo y exigir el código 2FA de nuevo.
-        if (msg.includes("token de dispositivo expiró")) {
-          clearTrustedToken(email);
+        const trustedExpired = msg.includes("token de dispositivo expiró");
+        if (trustedExpired) {
+          clearTrustedToken(email, strict);
         }
         const needs2fa =
+          trustedExpired ||
           msg.includes("dos factores") ||
           msg.includes("código de autenticación de dos factores");
         if (needs2fa) {
-          const code = (await this.getTwoFactorCode?.()) || process.env.GAVRIEL_2FA_CODE;
+          const fromGetter = await this.getTwoFactorCode?.();
+          const code = fromGetter || process.env.GAVRIEL_2FA_CODE;
           if (!code) {
             throw new Error(
               "El usuario tiene 2FA activo y este dispositivo no está confiado. " +
@@ -171,6 +204,15 @@ export class GavrielClient {
           }
           console.error("[gavrielClient] 2FA requerido, reintento con código");
           res = await this.postLogin({ ...base, twoFactorCode: code, trustedDeviceToken: undefined });
+          if (!res.ok && fromGetter && /dos factores|código/.test(res.message)) {
+            // Código rechazado (p.ej. ventana TOTP vencida): esperar la próxima y reintentar una vez.
+            await sleep(secondsLeft() * 1000 + 500);
+            const next = await this.getTwoFactorCode?.();
+            if (next && next !== code) {
+              console.error("[gavrielClient] código 2FA rechazado, reintento con la ventana siguiente");
+              res = await this.postLogin({ ...base, twoFactorCode: next, trustedDeviceToken: undefined });
+            }
+          }
           if (!res.ok) {
             if (res.message.includes("dos factores") || res.message.includes("código")) {
               throw new Error(`Código 2FA rechazado: ${res.message}`);
@@ -188,12 +230,13 @@ export class GavrielClient {
       }
       if (data.trusted_device_token) saveTrustedToken(email, data.trusted_device_token);
       this.userEmail = data.user?.email ?? email;
+      let expiresAt: number | null = null;
       const xExpires = res.headers.get("x-token-expires-at");
       if (xExpires) {
         const t = Date.parse(xExpires);
-        if (!Number.isNaN(t)) this.jwt.expiresAt = t;
+        if (!Number.isNaN(t)) expiresAt = t;
       }
-      return data.access_token;
+      return { token: data.access_token, expiresAt };
     })().finally(() => {
       this.loginInFlight = null;
     });
@@ -211,6 +254,7 @@ export class GavrielClient {
       method: "POST",
       headers: { "Content-Type": "application/json", Accept: "application/json" },
       body: JSON.stringify(clean),
+      signal: AbortSignal.timeout(LOGIN_TIMEOUT_MS),
     });
     const text = await res.text().catch(() => "");
     let data: unknown;
@@ -234,9 +278,15 @@ export class GavrielClient {
         this.jwt.expiresAt - Date.now() < REFRESH_MARGIN_SECONDS * 1000
       ) {
         console.error("[gavrielClient] JWT próximo a expirar, re-login");
-        await this.login();
+        try {
+          await this.login();
+        } catch (err) {
+          // Si el JWT actual sigue vigente, usarlo: el refresh es proactivo.
+          if (this.jwt.expiresAt <= Date.now()) throw err;
+          console.error(`[gavrielClient] re-login falló, sigo con el JWT vigente: ${(err as Error).message}`);
+        }
       }
-      return this.jwt.token;
+      return this.jwt.token as string;
     }
     await this.login();
     return this.jwt.token as string;
@@ -266,7 +316,8 @@ export class GavrielClient {
     _netRetried = false,
   ): Promise<{ status: number; data: unknown; headers: Headers }> {
     const token = await this.ensureToken();
-    const url = path.startsWith("http") ? path : `${this.baseUrl}${path.startsWith("/") ? path : `/${path}`}`;
+    // Siempre base + path: nunca mandar el bearer a un host arbitrario.
+    const url = `${this.baseUrl}${path.startsWith("/") ? path : `/${path}`}`;
     const timeout = AbortSignal.timeout(REQUEST_TIMEOUT_MS);
     const sig = signal ? AbortSignal.any([timeout, signal]) : timeout;
     const again = (att: number, auth: boolean, net: boolean) =>
@@ -291,15 +342,18 @@ export class GavrielClient {
         await sleep(retryDelayMs(0, null), signal);
         return again(_attempt, _authRetried, true);
       }
-      throw new Error(`Error de red hacia ${method} ${path}: ${(err as Error).message}`);
+      throw Object.assign(new Error(`Error de red hacia ${method} ${path}: ${(err as Error).message}`), {
+        breaker: !signal?.aborted,
+      });
     }
 
     if (res.status === 401 && !_authRetried) {
       // Otro request ya renovó el token mientras este volaba: reintentar con el nuevo.
+      drain(res);
       if (this.jwt.token && this.jwt.token !== token) return again(_attempt, true, _netRetried);
       const sinceLogin = Date.now() - this.lastLoginAt;
       if (sinceLogin < LOGIN_RETRY_GUARD_MS) {
-        if (this.jwt.token === token) this.jwt.token = null;
+        // No se anula el token: si no, cada llamada siguiente reloguearía (una por tool call).
         throw new Error(
           `401 en ${method} ${path}: el JWT se renovó hace ${Math.round(sinceLogin / 1000)}s y fue rechazado igual. No reintento el login para no bloquear la cuenta; revisá credenciales/permisos.`,
         );
@@ -314,6 +368,7 @@ export class GavrielClient {
     // duplicar la operación si el backend la aplicó antes de fallar la respuesta.
     if (method === "GET" && (res.status === 429 || res.status >= 500) && _attempt < 2) {
       const delay = retryDelayMs(_attempt, res.headers.get("retry-after"));
+      drain(res);
       console.error(`[gavrielClient] ${res.status}, backoff ${Math.round(delay)}ms`);
       await sleep(delay, signal);
       return again(_attempt + 1, _authRetried, _netRetried);
@@ -327,7 +382,9 @@ export class GavrielClient {
     try {
       text = await res.text();
     } catch (err) {
-      throw new Error(`Error de red leyendo el body de ${method} ${path}: ${(err as Error).message}`);
+      throw Object.assign(new Error(`Error de red leyendo el body de ${method} ${path}: ${(err as Error).message}`), {
+        breaker: !signal?.aborted,
+      });
     }
     let data: unknown;
     try {
@@ -368,38 +425,57 @@ export class GavrielClient {
 
     if (opts.ttl) {
       const hit = this.cache.get(full);
-      if (hit && hit.exp > Date.now()) return { status: hit.status, data: hit.data as T };
+      if (hit && hit.exp > Date.now()) return { status: hit.status, data: structuredClone(hit.data) as T };
     }
-    if (Date.now() < this.breakerOpenUntil) {
+    const grace = opts.bypassBreaker || Date.now() - this.lastWriteDoneAt < WRITE_GRACE_MS;
+    if (!grace && Date.now() < this.breakerOpenUntil) {
       throw new Error(`Circuit breaker abierto: el backend falló ${BREAKER_THRESHOLD} veces seguidas; reintentar en unos segundos.`);
     }
 
     // Dedupe: GETs idénticos concurrentes comparten un solo request (salvo con signal propio).
+    // Todos reciben copias: el caller puede mutar el resultado sin contaminar a los demás ni al cache.
     const shared = opts.signal ? undefined : this.getInFlight.get(full);
-    if (shared) return (await shared) as { status: number; data: T };
+    if (shared) {
+      const r = await shared;
+      return { status: r.status, data: structuredClone(r.data) as T };
+    }
 
+    const gen = this.invalidGen; // si una escritura invalida mientras vuela, no se cachea
     const p = (async () => {
       let res: { status: number; data: unknown };
       try {
         res = await this.request("GET", full, undefined, opts.signal);
       } catch (e) {
-        if (!opts.signal?.aborted) this.noteGetFailure();
+        if ((e as { breaker?: boolean }).breaker) this.noteGetFailure();
         throw e;
       }
       if (res.status >= 500) this.noteGetFailure();
       else this.getFailures = 0;
-      if (opts.ttl && res.status === 200) {
-        this.cache.set(full, { exp: Date.now() + opts.ttl, status: res.status, data: res.data });
+      // Nunca se cachean bodies no-JSON/truncados (string): serían basura servida hasta el ttl.
+      if (opts.ttl && res.status === 200 && typeof res.data !== "string" && gen === this.invalidGen) {
+        this.cacheSet(full, { exp: Date.now() + opts.ttl, status: res.status, data: structuredClone(res.data) });
       }
       return res;
     })();
-    if (opts.signal) return (await p) as { status: number; data: T };
+    if (opts.signal) {
+      const r = await p;
+      return { status: r.status, data: r.data as T };
+    }
     this.getInFlight.set(full, p);
     try {
-      return (await p) as { status: number; data: T };
+      const r = await p;
+      return { status: r.status, data: structuredClone(r.data) as T };
     } finally {
-      this.getInFlight.delete(full);
+      if (this.getInFlight.get(full) === p) this.getInFlight.delete(full);
     }
+  }
+
+  // Cache acotado: barre vencidas en cada set y, si sigue lleno, descarta las más viejas.
+  private cacheSet(k: string, v: { exp: number; status: number; data: unknown }): void {
+    const now = Date.now();
+    for (const [kk, vv] of this.cache) if (vv.exp <= now) this.cache.delete(kk);
+    while (this.cache.size >= CACHE_MAX) this.cache.delete(this.cache.keys().next().value as string);
+    this.cache.set(k, v);
   }
 
   private noteGetFailure(): void {
@@ -409,13 +485,18 @@ export class GavrielClient {
     }
   }
 
-  // Una escritura exitosa invalida las entradas cuyo path comparte prefijo (en cualquier sentido).
+  // Una escritura (exitosa o que pudo aplicarse: 5xx/timeout) invalida cache y GETs en vuelo
+  // cuyo path comparte prefijo (en cualquier sentido); invalidGen impide que un GET ya
+  // iniciado repueble el cache con datos previos a la escritura.
   private invalidate(path: string): void {
+    this.invalidGen++;
     const w = path.split("?")[0];
-    for (const k of this.cache.keys()) {
+    const hit = (k: string) => {
       const kp = k.split("?")[0];
-      if (kp.startsWith(w) || w.startsWith(kp)) this.cache.delete(k);
-    }
+      return kp.startsWith(w) || w.startsWith(kp);
+    };
+    for (const k of [...this.cache.keys()]) if (hit(k)) this.cache.delete(k);
+    for (const k of [...this.getInFlight.keys()]) if (hit(k)) this.getInFlight.delete(k);
   }
 
   // Escrituras: semáforo global (GAVRIEL_MCP_WRITE_CONCURRENCY, default 5) +
@@ -427,13 +508,14 @@ export class GavrielClient {
       this.writeInFlight++;
       return;
     }
+    // El slot se transfiere directo desde releaseWriteSlot (writeInFlight no baja ni sube).
     await new Promise<void>((resolve) => this.writeWaiters.push(resolve));
-    this.writeInFlight++;
   }
 
   private releaseWriteSlot(): void {
-    this.writeInFlight--;
-    this.writeWaiters.shift()?.();
+    const next = this.writeWaiters.shift();
+    if (next) next();
+    else this.writeInFlight--;
   }
 
   private serialKeyFor(path: string): string | null {
@@ -467,36 +549,41 @@ export class GavrielClient {
     }
   }
 
-  async post<T = unknown>(path: string, body?: unknown, signal?: AbortSignal): Promise<{ status: number; data: T }> {
+  // Escritura con invalidación: también si pudo aplicarse (5xx / error o timeout), no en 4xx.
+  private write<T>(
+    method: "POST" | "PATCH" | "PUT" | "DELETE",
+    path: string,
+    body?: unknown,
+    signal?: AbortSignal,
+  ): Promise<{ status: number; data: T }> {
     return this.runWrite(path, async () => {
-      const res = await this.request("POST", path, body, signal);
-      if (res.status < 400) this.invalidate(path);
-      return { status: res.status, data: res.data as T };
+      try {
+        const res = await this.request(method, path, body, signal);
+        if (res.status < 400 || res.status >= 500) this.invalidate(path);
+        return { status: res.status, data: res.data as T };
+      } catch (e) {
+        this.invalidate(path);
+        throw e;
+      } finally {
+        this.lastWriteDoneAt = Date.now();
+      }
     });
   }
 
-  async patch<T = unknown>(path: string, body?: unknown, signal?: AbortSignal): Promise<{ status: number; data: T }> {
-    return this.runWrite(path, async () => {
-      const res = await this.request("PATCH", path, body, signal);
-      if (res.status < 400) this.invalidate(path);
-      return { status: res.status, data: res.data as T };
-    });
+  post<T = unknown>(path: string, body?: unknown, signal?: AbortSignal): Promise<{ status: number; data: T }> {
+    return this.write("POST", path, body, signal);
   }
 
-  async put<T = unknown>(path: string, body?: unknown, signal?: AbortSignal): Promise<{ status: number; data: T }> {
-    return this.runWrite(path, async () => {
-      const res = await this.request("PUT", path, body, signal);
-      if (res.status < 400) this.invalidate(path);
-      return { status: res.status, data: res.data as T };
-    });
+  patch<T = unknown>(path: string, body?: unknown, signal?: AbortSignal): Promise<{ status: number; data: T }> {
+    return this.write("PATCH", path, body, signal);
   }
 
-  async delete<T = unknown>(path: string, signal?: AbortSignal): Promise<{ status: number; data: T }> {
-    return this.runWrite(path, async () => {
-      const res = await this.request("DELETE", path, undefined, signal);
-      if (res.status < 400) this.invalidate(path);
-      return { status: res.status, data: res.data as T };
-    });
+  put<T = unknown>(path: string, body?: unknown, signal?: AbortSignal): Promise<{ status: number; data: T }> {
+    return this.write("PUT", path, body, signal);
+  }
+
+  delete<T = unknown>(path: string, signal?: AbortSignal): Promise<{ status: number; data: T }> {
+    return this.write("DELETE", path, undefined, signal);
   }
 }
 

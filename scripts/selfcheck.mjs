@@ -10,11 +10,11 @@ import { tmpdir } from "node:os";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { setLogDir, redact, flushLogs } from "../dist/auditLog.js";
-import { requireConfirm, runBatch } from "../dist/tools/writeHelpers.js";
+import { requireConfirm, runBatch, destructiveGuard, isDestructive, seg } from "../dist/tools/writeHelpers.js";
 import { buildQueryString, GavrielClient, retryDelayMs } from "../dist/gavrielClient.js";
 import { isAllowed, normalizePath, sanitizeQuery, READ_PREFIXES } from "../dist/tools/rawGet.js";
-import { hasRole, registerTool } from "../dist/tools/roles.js";
-import { ok, okTruncated } from "../dist/tools/shared.js";
+import { hasRole, registerTool, withDefaultAnnotations } from "../dist/tools/roles.js";
+import { ok, okTruncated, totalOf, selectFields, buildBody } from "../dist/tools/shared.js";
 
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
 
@@ -630,6 +630,70 @@ t("shared: okTruncated corta en ítems y devuelve JSON válido", () => {
   assert.match(parsed._truncado, /de 50 ítems/);
   assert.ok(r.content[0].text.length <= 500 + 0 || parsed.data.length === 1);
   JSON.parse(okTruncated({ big: "y".repeat(5000) }, 1000).content[0].text);
+});
+
+// --- hardening: ids, totales, envelope, roles lite, destructivas fail-closed ---
+t("totalOf: meta.pagination.total > meta.total > total > data/array length", () => {
+  assert.equal(totalOf({ data: [1], meta: { pagination: { total: 99 }, total: 5 }, total: 3 }), 99);
+  assert.equal(totalOf({ data: [1], meta: { total: 5 }, total: 3 }), 5);
+  assert.equal(totalOf({ data: [1, 2], total: 3 }), 3);
+  assert.equal(totalOf({ data: [1, 2] }), 2);
+  assert.equal(totalOf([1, 2, 3]), 3);
+  assert.equal(totalOf(null), 0);
+});
+t("selectFields: envelope {data,meta} proyecta cada ítem y conserva meta", () => {
+  const r = selectFields({ data: [{ id: 1, x: 2 }], meta: { pagination: { total: 1 } } }, ["id"]);
+  assert.deepEqual(r, { data: [{ id: 1 }], meta: { pagination: { total: 1 } } });
+  assert.deepEqual(selectFields({ id: 1, x: 2 }, ["x"]), { x: 2 });
+});
+t("buildBody: null explícito solo en campos nullable", () => {
+  const a = { accountId: null, title: null };
+  assert.deepEqual(buildBody(a, { optional: ["accountId", "title"], nullable: ["accountId"] }), { accountId: null });
+});
+t("seg: codifica separadores de path", () => {
+  assert.equal(seg("1/../../users/x"), "1%2F..%2F..%2Fusers%2Fx");
+});
+t("destructivas: fail-closed (guard sin isDestructive lanza; force lo permite)", () => {
+  const exec = { tool: "x", method: "POST", path: "/x", params: { eventIds: ["a", "b"] } };
+  assert.throws(() => destructiveGuard("close_nada_raro", exec), /isDestructive/);
+  assert.ok(destructiveGuard("close_nada_raro", exec, undefined, { force: true }));
+  assert.ok(isDestructive("mark_events_processed") && isDestructive("create_bulk_interventions") && isDestructive("close_ticket"));
+  assert.throws(() => withDefaultAnnotations("tool_rara", { annotations: { destructiveHint: true } }), /destructiveHint/);
+  assert.equal(withDefaultAnnotations("delete_x", {}).annotations.destructiveHint, true);
+});
+
+tAsync("tools e2e: seg en paths, idSchema en escrituras, roles lite/readonly", async () => {
+  const { buildServer } = await import("../dist/server.js");
+  const { InMemoryTransport } = await import("@modelcontextprotocol/server");
+  const { Client } = await import("@modelcontextprotocol/client");
+  const paths = [];
+  const rec = { email: "t@e.com", async get(p) { paths.push(p); return { status: 200, data: { id: "1" } }; } };
+  const open = async (role) => {
+    const [a, b] = InMemoryTransport.createLinkedPair();
+    const c = new Client({ name: "sc", version: "0" });
+    await buildServer(rec, role).connect(a);
+    await c.connect(b);
+    return c;
+  };
+  const evil = "1/../../users/x";
+  const full = await open("full");
+  await full.callTool({ name: "get_ticket", arguments: { id: evil } });
+  assert.ok(paths.every((p) => !p.includes("/../")) && paths.some((p) => p.includes("1%2F..%2F..%2Fusers%2Fx")), paths.join(","));
+  const bad = await full.callTool({ name: "update_ticket", arguments: { ticketId: evil, title: "x" } });
+  assert.equal(bad.isError, true, "update_ticket debe rechazar ids con /");
+  const many = await full.callTool({ name: "mark_events_processed", arguments: { eventIds: Array.from({ length: 51 }, (_, i) => String(i)) } });
+  assert.equal(many.isError, true, "mark_events_processed máx 50");
+  const full_names = (await full.listTools()).tools.map((x) => x.name);
+  assert.ok(full_names.includes("update_account"));
+  await full.close();
+  const lite = (await (await open("lite")).listTools()).tools.map((x) => x.name);
+  for (const n of ["create_ticket", "update_ticket", "close_ticket", "add_ticket_activity", "create_intervention", "close_intervention", "set_intervention_observation", "add_account_note", "conversation_claim", "conversation_release", "conversation_mark_read"])
+    assert.ok(lite.includes(n), `lite debe incluir ${n}`);
+  for (const n of ["update_account", "delete_account_note", "bulk_close_tickets", "create_bulk_interventions"])
+    assert.ok(!lite.includes(n), `lite no debe incluir ${n}`);
+  const ro = (await (await open("readonly")).listTools()).tools.map((x) => x.name);
+  for (const w of WRITE_TOOLS) assert.ok(!ro.includes(w), `readonly no debe incluir ${w}`);
+  assert.ok(lite.length > ro.length && full_names.length > lite.length);
 });
 
 rmSync(secretsTmp, { recursive: true, force: true });

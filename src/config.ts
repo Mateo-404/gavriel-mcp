@@ -1,9 +1,11 @@
 import { fileURLToPath } from "node:url";
+import { readFileSync } from "node:fs";
+import * as util from "node:util";
 import { homedir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { z } from "zod";
 import { resolvePassword } from "./secrets.js";
-import { loadStore } from "./profiles.js";
+import { loadStore, getProfile, validateProfileName, type ProfileStore } from "./profiles.js";
 
 function isSecureBase(v: string): boolean {
   try {
@@ -13,6 +15,8 @@ function isSecureBase(v: string): boolean {
     return false;
   }
 }
+
+const DEFAULT_API_BASE = "https://app.gavriel.com.ar/api";
 
 const envSchema = z.object({
   GAVRIEL_EMAIL: z.string().min(1, "GAVRIEL_EMAIL es requerido"),
@@ -32,7 +36,7 @@ const envSchema = z.object({
     .string()
     .url("GAVRIEL_API_BASE debe ser una URL válida")
     .refine(isSecureBase, "GAVRIEL_API_BASE debe usar https (http solo para localhost/127.0.0.1)")
-    .default("https://app.gavriel.com.ar/api"),
+    .default(DEFAULT_API_BASE),
   GAVRIEL_MCP_LOG_DIR: z.string().optional(),
   // Roles: readonly (solo lectura) < lite (lectura + core writes) < full (todo).
   GAVRIEL_MCP_ROLE: z.enum(["readonly", "lite", "full"]).default("full"),
@@ -44,27 +48,47 @@ const envSchema = z.object({
 
 export type Config = Omit<z.infer<typeof envSchema>, "GAVRIEL_PASSWORD"> & {
   GAVRIEL_PASSWORD: string;
+  /** Config nacida de un perfil: secretos solo de su propio email (sin fallbacks globales). */
+  strictProfile?: boolean;
 };
 
-function loadDotEnv(): void {
+// Claves que vinieron del archivo .env (no del entorno real): se usan para no confiar ciegamente en ellas.
+const dotEnvKeys = new Set<string>();
+
+// Directorio del módulo; también funciona empaquetado a CJS (SEA), donde import.meta.url no existe.
+function moduleDir(): string {
   try {
-    process.loadEnvFile?.();
-    return;
+    if (import.meta.url) return dirname(fileURLToPath(import.meta.url));
   } catch {
-    // no .env in cwd, try alongside the built dist/
+    // bundle CJS: import.meta no está definido
   }
+  if (typeof __dirname !== "undefined") return __dirname;
+  return dirname(process.argv[1] ?? process.execPath);
+}
+
+// Solo el .env junto a la raíz del proyecto/dist (nunca el del cwd: un repo ajeno podría
+// plantar uno). Un valor del archivo jamás pisa una variable ya definida en el entorno real.
+function loadDotEnv(): void {
+  const parseEnv = (util as { parseEnv?: (c: string) => Record<string, string | undefined> }).parseEnv;
+  if (!parseEnv) return; // Node < 20.12
+  let text: string;
   try {
-    // raíz del proyecto (src/ o dist/); fileURLToPath maneja espacios y rutas de Windows
-    process.loadEnvFile?.(fileURLToPath(new URL("../.env", import.meta.url)));
+    text = readFileSync(join(moduleDir(), "..", ".env"), "utf8");
   } catch {
-    // no .env found anywhere, env vars del sistema alcanzan
+    return; // sin .env, alcanzan las variables del sistema
+  }
+  for (const [k, v] of Object.entries(parseEnv(text))) {
+    if (v === undefined || process.env[k] !== undefined) continue;
+    process.env[k] = v;
+    dotEnvKeys.add(k);
   }
 }
 
+// Strings vacíos (VAR=) se tratan como no definidos para que apliquen los defaults/optional de zod.
 function readEnv(): Record<string, string | undefined> {
   const out: Record<string, string | undefined> = {};
   for (const key of Object.keys(envSchema.shape)) {
-    out[key] = process.env[key];
+    out[key] = process.env[key] || undefined;
   }
   return out;
 }
@@ -73,14 +97,34 @@ function readEnv(): Record<string, string | undefined> {
 export function loadConfig(opts: { profile?: string } = {}): Config {
   loadDotEnv();
   const env = readEnv();
-  const name = opts.profile ?? process.env.GAVRIEL_PROFILE ?? (env.GAVRIEL_EMAIL ? undefined : loadStore().active ?? undefined);
-  const profile = name ? loadStore().profiles[name] : undefined;
+  const explicit = opts.profile ?? (process.env.GAVRIEL_PROFILE || undefined);
+  let store: ProfileStore | undefined;
+  const getStore = () => (store ??= loadStore());
+  const name = explicit ?? (env.GAVRIEL_EMAIL ? undefined : getStore().active ?? undefined);
+  if (name) validateProfileName(name);
+  const profile = name ? getProfile(getStore(), name) : undefined;
   if (name && !profile) throw new Error(`El perfil "${name}" no existe (ver: gavriel accounts list).`);
   if (profile) {
     env.GAVRIEL_EMAIL = profile.email;
     if (profile.apiBase) env.GAVRIEL_API_BASE = profile.apiBase;
     if (profile.role) env.GAVRIEL_MCP_ROLE = profile.role;
     if (profile.toolsets) process.env.GAVRIEL_MCP_TOOLSETS ??= profile.toolsets;
+  }
+  // Un .env hostil podría apuntar la API a un host propio y recibir email/password en el login.
+  // Una base distinta de la default que venga del .env se rechaza salvo opt-in explícito en el
+  // entorno real (GAVRIEL_ALLOW_CUSTOM_API_BASE=1; el .env no puede habilitarse a sí mismo).
+  const base = env.GAVRIEL_API_BASE?.replace(/\/+$/, "");
+  if (
+    !profile?.apiBase &&
+    base &&
+    base !== DEFAULT_API_BASE &&
+    dotEnvKeys.has("GAVRIEL_API_BASE") &&
+    !(process.env.GAVRIEL_ALLOW_CUSTOM_API_BASE === "1" && !dotEnvKeys.has("GAVRIEL_ALLOW_CUSTOM_API_BASE"))
+  ) {
+    throw new Error(
+      `GAVRIEL_API_BASE=${base} viene de un archivo .env y no es la API oficial. ` +
+        "Definila en el entorno real o exportá GAVRIEL_ALLOW_CUSTOM_API_BASE=1 para permitirla.",
+    );
   }
   const parsed = envSchema.safeParse(env);
   if (!parsed.success) {
@@ -100,7 +144,7 @@ export function loadConfig(opts: { profile?: string } = {}): Config {
         : "No se encontró el password de Gavriel en el almacén seguro ni en GAVRIEL_PASSWORD (ver SECURITY.md).",
     );
   }
-  return { ...parsed.data, GAVRIEL_PASSWORD: password };
+  return { ...parsed.data, GAVRIEL_PASSWORD: password, strictProfile: Boolean(profile) };
 }
 
 export function logDir(config: Config): string {

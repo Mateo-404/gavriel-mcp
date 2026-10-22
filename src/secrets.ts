@@ -35,8 +35,14 @@ function dpapiFile(account: string): string {
   return join(base, SERVICE, "secrets", `${id}.dpapi`);
 }
 
+// Ruta absoluta: evita que un powershell.exe plantado en el PATH/cwd reciba los secretos.
+function powershellExe(): string {
+  const abs = join(process.env.SystemRoot || "C:\\Windows", "System32", "WindowsPowerShell", "v1.0", "powershell.exe");
+  return existsSync(abs) ? abs : "powershell.exe";
+}
+
 function powershell(script: string, input: string): string | null {
-  const r = spawnSync("powershell.exe", [...PS_ARGS, script], {
+  const r = spawnSync(powershellExe(), [...PS_ARGS, script], {
     input,
     timeout: POWERSHELL_TIMEOUT_MS,
     windowsHide: true,
@@ -68,7 +74,17 @@ function hasSecretTool(): boolean {
   return secretToolOK;
 }
 
+// Cache por proceso (cada lookup spawnea un proceso bloqueante); store/clear la invalidan.
+const lookupCache = new Map<string, string | null>();
+
 export function keyringLookup(account: string): string | null {
+  if (lookupCache.has(account)) return lookupCache.get(account) ?? null;
+  const v = keyringLookupRaw(account);
+  lookupCache.set(account, v);
+  return v;
+}
+
+function keyringLookupRaw(account: string): string | null {
   if (IS_WIN) {
     try {
       const blob = readFileSync(dpapiFile(account), "utf8");
@@ -92,6 +108,7 @@ export function keyringLookup(account: string): string | null {
 }
 
 export function keyringStore(account: string, value: string): boolean {
+  lookupCache.delete(account);
   if (IS_WIN) {
     try {
       const blob = powershell(PS_PROTECT, value);
@@ -118,6 +135,7 @@ export function keyringStore(account: string, value: string): boolean {
 }
 
 export function keyringClear(account: string): void {
+  lookupCache.delete(account);
   if (IS_WIN) {
     try {
       if (existsSync(dpapiFile(account))) rmSync(dpapiFile(account));
@@ -164,15 +182,31 @@ export function secretBackend(): "dpapi" | "secret-tool" | "none" {
   return hasSecretTool() ? "secret-tool" : "none";
 }
 
+let warnedGlobalPassword = false;
+function warnGlobalPasswordOnce(email: string): void {
+  if (warnedGlobalPassword) return;
+  warnedGlobalPassword = true;
+  console.error(
+    `[gavriel-mcp] warning: no hay password guardado para ${email}; se usa el password global del keyring, que puede ser de otra cuenta. ` +
+      "Guardá uno por cuenta (gavriel login).",
+  );
+}
+
 // strict (modo perfil): solo la clave de ese email, sin caer a la global ni a env/archivos de otra cuenta.
 export function resolvePassword(email?: string, strict = false): string | null {
   if (strict && email) return keyringLookup(passwordAccount(email));
-  const fromKeyring = (email && keyringLookup(passwordAccount(email))) || keyringLookup("password");
-  if (fromKeyring) return fromKeyring;
+  const scoped = email ? keyringLookup(passwordAccount(email)) : null;
+  if (scoped) return scoped;
+  const fromKeyring = keyringLookup("password");
+  if (fromKeyring) {
+    if (email) warnGlobalPasswordOnce(email);
+    return fromKeyring;
+  }
   if (process.env.GAVRIEL_PASSWORD) return process.env.GAVRIEL_PASSWORD;
   if (!plaintextAllowed()) return null;
   try {
-    const fromLegacy = readFileSync(LEGACY_PASSWORD_FILE, "utf8");
+    // solo el salto de línea final: los espacios pueden ser parte del password
+    const fromLegacy = readFileSync(LEGACY_PASSWORD_FILE, "utf8").replace(/\r?\n$/, "");
     if (fromLegacy) {
       console.error(
         "[gavriel-mcp] warning: usando password del archivo legacy (~/.secrets/gavriel-password, modo menos seguro). " +
@@ -217,12 +251,15 @@ function tokenKeyringAccount(email: string): string {
   return `${LEGACY_KEYRING_TOKEN_ACCOUNT}:${email.toLowerCase().trim()}`;
 }
 
-export function readTrustedToken(email: string): string | null {
+// strict (modo perfil): solo la clave de ese email; sin caer a la clave sin scope ni a GAVRIEL_TRUSTED_DEVICE_TOKEN.
+export function readTrustedToken(email: string, strict = false): string | null {
   const scoped = keyringLookup(tokenKeyringAccount(email));
   if (scoped) return scoped;
-  const unscoped = keyringLookup(LEGACY_KEYRING_TOKEN_ACCOUNT);
-  if (unscoped) return unscoped;
-  if (process.env.GAVRIEL_TRUSTED_DEVICE_TOKEN) return process.env.GAVRIEL_TRUSTED_DEVICE_TOKEN;
+  if (!strict) {
+    const unscoped = keyringLookup(LEGACY_KEYRING_TOKEN_ACCOUNT);
+    if (unscoped) return unscoped;
+    if (process.env.GAVRIEL_TRUSTED_DEVICE_TOKEN) return process.env.GAVRIEL_TRUSTED_DEVICE_TOKEN;
+  }
   const legacy = readLegacyTokens()[email.toLowerCase().trim()];
   if (legacy) {
     console.error(
@@ -244,9 +281,9 @@ export function saveTrustedToken(email: string, token: string): void {
   writeLegacyTokens(all);
 }
 
-export function clearTrustedToken(email: string): void {
+export function clearTrustedToken(email: string, strict = false): void {
   keyringClear(tokenKeyringAccount(email));
-  keyringClear(LEGACY_KEYRING_TOKEN_ACCOUNT); // limpia también la clave pre-scoping
+  if (!strict) keyringClear(LEGACY_KEYRING_TOKEN_ACCOUNT); // limpia también la clave pre-scoping (nunca en modo perfil)
   const all = readLegacyTokens();
   delete all[email.toLowerCase().trim()];
   writeLegacyTokens(all);

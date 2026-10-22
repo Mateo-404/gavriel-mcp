@@ -1,5 +1,5 @@
 import type { GavrielClient } from "../gavrielClient.js";
-import { ok, buildBody } from "./shared.js";
+import { ok, buildBody, idSchema } from "./shared.js";
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/server";
 import { requireConfirm, confirmSchema, seg, destructiveGuard, okOrInput } from "./writeHelpers.js";
@@ -10,7 +10,7 @@ export function registerDeviceTools(server: McpServer, client: GavrielClient, ro
   registerTool(
     server, role, "full", "create_device_brand",
     {
-      title: "Crear marca de dispositivo (ESCRITURA)",
+      title: "Crear marca de dispositivo",
       description: "POST /device-brands. Requiere confirm: true.",
       inputSchema: {
         name: z.string().min(1),
@@ -32,10 +32,10 @@ export function registerDeviceTools(server: McpServer, client: GavrielClient, ro
   registerTool(
     server, role, "full", "update_device_brand",
     {
-      title: "Actualizar marca de dispositivo (ESCRITURA)",
+      title: "Actualizar marca de dispositivo",
       description: "PATCH /device-brands/{id}. Requiere confirm: true.",
       inputSchema: {
-        brandId: z.string(),
+        brandId: idSchema,
         name: z.string().optional(),
         description: z.string().optional(),
         confirm: confirmSchema,
@@ -55,9 +55,9 @@ export function registerDeviceTools(server: McpServer, client: GavrielClient, ro
   registerTool(
     server, role, "full", "delete_device_brand",
     {
-      title: "Eliminar marca de dispositivo (ESCRITURA)",
+      title: "Eliminar marca de dispositivo",
       description: "DELETE /device-brands/{id}. Requiere confirm: true.",
-      inputSchema: { brandId: z.string(), confirm: confirmSchema },
+      inputSchema: { brandId: idSchema, confirm: confirmSchema },
       annotations: { destructiveHint: true },
     },
     async (args, ctx) => {
@@ -70,13 +70,13 @@ export function registerDeviceTools(server: McpServer, client: GavrielClient, ro
   registerTool(
     server, role, "full", "create_device_model",
     {
-      title: "Crear modelo de dispositivo (ESCRITURA)",
+      title: "Crear modelo de dispositivo",
       description: "POST /device-models. Requiere confirm: true.",
       inputSchema: {
         name: z.string().min(1),
         description: z.string().optional(),
         isActive: z.boolean().optional().describe("Default: true"),
-        deviceBrandId: z.string().describe("ID de la marca"),
+        deviceBrandId: idSchema.describe("ID de la marca"),
         confirm: confirmSchema,
       },
     },
@@ -97,10 +97,10 @@ export function registerDeviceTools(server: McpServer, client: GavrielClient, ro
   registerTool(
     server, role, "full", "update_device_model",
     {
-      title: "Actualizar modelo de dispositivo (ESCRITURA)",
+      title: "Actualizar modelo de dispositivo",
       description: "PATCH /device-models/{id}. Requiere confirm: true.",
       inputSchema: {
-        modelId: z.string(),
+        modelId: idSchema,
         name: z.string().optional(),
         description: z.string().optional(),
         isActive: z.boolean().optional(),
@@ -121,9 +121,9 @@ export function registerDeviceTools(server: McpServer, client: GavrielClient, ro
   registerTool(
     server, role, "full", "delete_device_model",
     {
-      title: "Eliminar modelo de dispositivo (ESCRITURA)",
+      title: "Eliminar modelo de dispositivo",
       description: "DELETE /device-models/{id}. Requiere confirm: true.",
-      inputSchema: { modelId: z.string(), confirm: confirmSchema },
+      inputSchema: { modelId: idSchema, confirm: confirmSchema },
       annotations: { destructiveHint: true },
     },
     async (args, ctx) => {
@@ -136,23 +136,23 @@ export function registerDeviceTools(server: McpServer, client: GavrielClient, ro
   registerTool(
     server, role, "full", "create_device",
     {
-      title: "Crear dispositivo en cuenta (ESCRITURA)",
+      title: "Crear dispositivo en cuenta",
       description: "POST /accounts/{accountId}/devices. Requiere confirm: true.",
       inputSchema: {
-        accountId: z.string(),
+        accountId: idSchema,
         serialNumber: z.string().min(1).optional().describe("Omitir si el equipo no tiene serie"),
-        deviceBrandId: z.string(),
-        deviceModelId: z.string().optional().describe("Omitir si el modelo no existe en el catálogo"),
+        deviceBrandId: idSchema,
+        deviceModelId: idSchema.optional().describe("Omitir si el modelo no existe en el catálogo"),
         chip1: z.string().optional(),
-        deviceConnectionTypeId: z.string().optional(),
+        deviceConnectionTypeId: idSchema.optional(),
         alertType: z.string().optional().describe("Sonora | Silenciosa"),
         ownershipType: z.enum(["alquiler", "comodato"]).optional(),
         chip2: z.string().optional(),
         imei: z.string().optional(),
-        zoneId: z.string().optional(),
-        deviceKindId: z.string().optional(),
-        deviceTaxonomyId: z.string().optional(),
-        cloudDeviceId: z.string().optional(),
+        zoneId: idSchema.optional(),
+        deviceKindId: idSchema.optional(),
+        deviceTaxonomyId: idSchema.optional(),
+        cloudDeviceId: idSchema.optional(),
         cloudChannelNo: z.number().int().optional(),
         hppDeviceCategory: z.string().optional(),
         hppDeviceSubCategory: z.string().optional(),
@@ -178,25 +178,25 @@ export function registerDeviceTools(server: McpServer, client: GavrielClient, ro
   registerTool(
     server, role, "full", "update_device",
     {
-      title: "Actualizar dispositivo (ESCRITURA)",
+      title: "Actualizar dispositivo",
       description: "PATCH /accounts/{accountId}/devices/{deviceId}. Requiere confirm: true.",
       inputSchema: {
-        accountId: z.string(),
-        deviceId: z.string(),
+        accountId: idSchema,
+        deviceId: idSchema,
         serialNumber: z.string().optional(),
         chip1: z.string().optional(),
-        deviceConnectionTypeId: z.string().optional(),
-        deviceModelId: z.string().optional(),
+        deviceConnectionTypeId: idSchema.optional(),
+        deviceModelId: idSchema.optional(),
         clearChip1: z.boolean().optional().describe("true = enviar chip1: null"),
         clearChip2: z.boolean().optional().describe("true = enviar chip2: null"),
         alertType: z.string().optional().describe("Sonora | Silenciosa"),
         ownershipType: z.enum(["alquiler", "comodato"]).optional(),
         chip2: z.string().optional(),
         imei: z.string().optional(),
-        zoneId: z.string().optional(),
-        deviceKindId: z.string().optional(),
-        deviceTaxonomyId: z.string().optional(),
-        cloudDeviceId: z.string().optional(),
+        zoneId: idSchema.optional(),
+        deviceKindId: idSchema.optional(),
+        deviceTaxonomyId: idSchema.optional(),
+        cloudDeviceId: idSchema.optional(),
         cloudChannelNo: z.number().int().optional(),
         hppDeviceCategory: z.string().optional(),
         hppDeviceSubCategory: z.string().optional(),
@@ -223,9 +223,9 @@ export function registerDeviceTools(server: McpServer, client: GavrielClient, ro
   registerTool(
     server, role, "full", "delete_device",
     {
-      title: "Eliminar dispositivo (ESCRITURA)",
+      title: "Eliminar dispositivo",
       description: "DELETE /accounts/{accountId}/devices/{deviceId}. Requiere confirm: true.",
-      inputSchema: { accountId: z.string(), deviceId: z.string(), confirm: confirmSchema },
+      inputSchema: { accountId: idSchema, deviceId: idSchema, confirm: confirmSchema },
       annotations: { destructiveHint: true },
     },
     async (args, ctx) => {
@@ -237,10 +237,10 @@ export function registerDeviceTools(server: McpServer, client: GavrielClient, ro
   registerTool(
     server, role, "full", "create_account_user",
     {
-      title: "Crear usuario de alarma en cuenta existente (ESCRITURA)",
+      title: "Crear usuario de alarma en cuenta existente",
       description: "POST /account-users. Asigna un usuario de la alarma (código + nombre) a una cuenta que YA existe. Requiere confirm: true.",
       inputSchema: {
-        accountId: z.string(),
+        accountId: idSchema,
         code: z.string().min(1).describe("Número/código del usuario en el panel"),
         name: z.string().min(1),
         description: z.string().optional(),
@@ -269,17 +269,17 @@ export function registerDeviceTools(server: McpServer, client: GavrielClient, ro
     connectionType: z.string().optional(),
     serialNumber: z.string().optional(),
     alertType: z.string().optional().describe("Sonora | Silenciosa"),
-    deviceBrandId: z.string().optional(),
-    deviceModelId: z.string().optional(),
+    deviceBrandId: idSchema.optional(),
+    deviceModelId: idSchema.optional(),
   };
   const zoneKeys = Object.keys(zoneFields);
 
   registerTool(
     server, role, "full", "create_zone",
     {
-      title: "Crear zona en cuenta existente (ESCRITURA)",
+      title: "Crear zona en cuenta existente",
       description: "POST /zones. Crea una zona en una cuenta que YA existe. Requiere confirm: true.",
-      inputSchema: { accountId: z.string(), ...zoneFields, confirm: confirmSchema },
+      inputSchema: { accountId: idSchema, ...zoneFields, confirm: confirmSchema },
     },
     async (args) => {
       const body = buildBody(args as Record<string, unknown>, { required: ["accountId", "code", "name"], optional: zoneKeys.filter((k) => k !== "code" && k !== "name") });
@@ -295,10 +295,10 @@ export function registerDeviceTools(server: McpServer, client: GavrielClient, ro
   registerTool(
     server, role, "full", "update_zone",
     {
-      title: "Actualizar zona (ESCRITURA)",
+      title: "Actualizar zona",
       description: "PATCH /zones/{zoneId}. Requiere confirm: true.",
       inputSchema: {
-        zoneId: z.string(),
+        zoneId: idSchema,
         code: z.string().optional(),
         name: z.string().optional(),
         ...Object.fromEntries(Object.entries(zoneFields).filter(([k]) => k !== "code" && k !== "name")),
@@ -322,8 +322,8 @@ export function registerDeviceTools(server: McpServer, client: GavrielClient, ro
       title: "Lookup nube Hikvision por serie (consulta)",
       description: "POST /accounts/{accountId}/devices/hik-cloud-lookup. Devuelve cloudDeviceId, deviceTaxonomyId y categoría HPP. Requiere confirm: true.",
       inputSchema: {
-        accountId: z.string(),
-        deviceBrandId: z.string(),
+        accountId: idSchema,
+        deviceBrandId: idSchema,
         serialNumber: z.string().min(1),
         confirm: confirmSchema,
       },

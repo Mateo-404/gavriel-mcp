@@ -1,11 +1,11 @@
-import { loadConfig } from "../config.js";
+import { loadConfig, type Config } from "../config.js";
 import { GavrielClient } from "../gavrielClient.js";
-import { configDir, loadStore, saveStore, validateProfileName, type Profile } from "../profiles.js";
+import { configDir, loadStore, saveStore, validateProfileName, type Profile, type ProfileStore } from "../profiles.js";
 import {
   clearPassword, clearTotpSeed, clearTrustedToken, keyringLookup, passwordAccount, readTotpSeed, readTrustedToken,
   saveTotpSeed, secretBackend, storePassword,
 } from "../secrets.js";
-import { parseSeedInput, secondsLeft, totp } from "../totp.js";
+import { parseSeedInput, secondsLeft, totp, totpFresh } from "../totp.js";
 import { ask, askHidden, confirm, printJson, printTable, rowsOf } from "./io.js";
 import { mcpInstall } from "./mcpInstall.js";
 
@@ -20,9 +20,12 @@ export const OPTIONS = {
   name: { type: "string" },
   status: { type: "string" },
   limit: { type: "string" },
+  "server-path": { type: "string" },
   json: { type: "boolean" },
   all: { type: "boolean" },
   purge: { type: "boolean" },
+  online: { type: "boolean" },
+  force: { type: "boolean" },
   yes: { type: "boolean", short: "y" },
   "dry-run": { type: "boolean" },
   help: { type: "boolean", short: "h" },
@@ -34,70 +37,128 @@ export interface Ctx {
   args: string[]; // posicionales tras el subcomando
 }
 
+const DEFAULT_API = "https://app.gavriel.com.ar/api";
+const TRUSTED_HOSTS = ["app.gavriel.com.ar"];
+const ROLES = ["readonly", "lite", "full"];
+const TOOLSET_NAMES = ["core", "notifications", "video", "telephony", "infrastructure", "coreGaps", "composites", "all"];
+const RESERVED = ["__proto__", "constructor", "prototype"];
+
 const str = (v: unknown): string | undefined => (typeof v === "string" && v ? v : undefined);
 
+// Los perfiles vienen de JSON: nunca consultar `profiles[name]` a secas (constructor, __proto__...).
+const has = (store: ProfileStore, name: string): boolean => Object.hasOwn(store.profiles, name);
+
+export function checkName(name: string): void {
+  validateProfileName(name);
+  if (RESERVED.includes(name)) throw new Error(`Nombre reservado: "${name}"`);
+}
+
+export function parseLimit(v: string | undefined, def = 20): number {
+  if (v === undefined) return def;
+  const n = Number(v);
+  if (!/^\d+$/.test(v) || n < 1 || n > 200) throw new Error("--limit debe ser un entero entre 1 y 200");
+  return n;
+}
+
+function optRole(ctx: Ctx): Profile["role"] | undefined {
+  const r = str(ctx.values.role);
+  if (r !== undefined && !ROLES.includes(r)) throw new Error(`--role debe ser ${ROLES.join("|")}`);
+  return r as Profile["role"] | undefined;
+}
+
+function optToolsets(ctx: Ctx): string | undefined {
+  const t = str(ctx.values.toolsets);
+  if (t === undefined) return undefined;
+  const parts = t.split(",").map((x) => x.trim());
+  const bad = parts.filter((x) => !TOOLSET_NAMES.includes(x));
+  if (bad.length > 0) throw new Error(`--toolsets inválido (${bad.join(", ") || "vacío"}). Válidos: ${TOOLSET_NAMES.join(", ")}`);
+  return parts.join(",");
+}
+
+function optApiBase(ctx: Ctx): string | undefined {
+  const v = str(ctx.values["api-base"]);
+  if (v === undefined) return undefined;
+  let u: URL;
+  try {
+    u = new URL(v);
+  } catch {
+    throw new Error("--api-base no es una URL válida");
+  }
+  const local = u.hostname === "localhost" || u.hostname === "127.0.0.1" || u.hostname === "[::1]";
+  if (u.protocol !== "https:" && !(u.protocol === "http:" && local)) throw new Error("--api-base debe usar https (http solo para localhost)");
+  if (!local && !TRUSTED_HOSTS.includes(u.hostname)) {
+    console.error(`ADVERTENCIA: ${u.hostname} no es un host conocido de Gavriel (${TRUSTED_HOSTS.join(", ")}); tus credenciales se enviarán allí.`);
+  }
+  return v;
+}
+
 function profileName(ctx: Ctx): string {
-  const name = str(ctx.values.profile) ?? process.env.GAVRIEL_PROFILE ?? loadStore().active ?? undefined;
+  const name = str(ctx.values.profile) ?? str(process.env.GAVRIEL_PROFILE) ?? loadStore().active ?? undefined;
   if (!name) throw new Error("No hay perfil activo. Ejecutá `gavriel login` o usá --profile.");
   return name;
 }
 
 function profileOf(name: string): Profile {
-  const p = loadStore().profiles[name];
+  const store = loadStore();
+  const p = has(store, name) ? store.profiles[name] : undefined;
   if (!p) throw new Error(`El perfil "${name}" no existe (gavriel profile list).`);
   return p;
 }
 
 // Código 2FA: --code, semilla TOTP guardada, o prompt si hay terminal.
+function twoFactor(ctx: Ctx, email: string): () => Promise<string | undefined> {
+  return async () => {
+    const given = str(ctx.values.code);
+    if (given) return given;
+    const seed = readTotpSeed(email);
+    if (seed) return totpFresh(seed);
+    return process.stdin.isTTY ? await ask("Código 2FA de 6 dígitos: ") : undefined;
+  };
+}
+
 function makeClient(ctx: Ctx, name: string): GavrielClient {
   const config = loadConfig({ profile: name });
-  return new GavrielClient(config, {
-    getTwoFactorCode: async () => {
-      const given = str(ctx.values.code);
-      if (given) return given;
-      const seed = readTotpSeed(config.GAVRIEL_EMAIL);
-      if (seed) return totp(seed);
-      return process.stdin.isTTY ? await ask("Código 2FA de 6 dígitos: ") : undefined;
-    },
-  });
+  return new GavrielClient(config, { getTwoFactorCode: twoFactor(ctx, config.GAVRIEL_EMAIL) });
 }
 
 const fmtExp = (ms: number | null): string => (ms ? new Date(ms).toISOString() : "desconocido");
 
 // ── login / renew / logout ────────────────────────────────────────────────
+// Nombre por defecto desde el local-part del email: sin puntos/guiones iniciales y nunca vacío.
+export function deriveProfileName(email: string): string {
+  const n = email.split("@")[0].replace(/[^\w.-]/g, "_").replace(/^[.-]+/, "").slice(0, 40);
+  return n || "perfil";
+}
+
 export async function login(ctx: Ctx): Promise<void> {
+  const apiBase = optApiBase(ctx);
+  const role = optRole(ctx);
+  const toolsets = optToolsets(ctx);
   const email = str(ctx.values.email) ?? (await ask("Email: "));
-  if (!email) throw new Error("Email requerido");
-  const name = str(ctx.values.profile) ?? email.split("@")[0].replace(/[^\w.-]/g, "_").slice(0, 40);
-  validateProfileName(name);
+  if (!/^[^\s@]+@[^\s@]+$/.test(email)) throw new Error("Email inválido");
+  const explicit = str(ctx.values.profile);
+  const name = explicit ?? deriveProfileName(email);
+  checkName(name);
   const store = loadStore();
-  const isNew = !store.profiles[name];
+  const prev = has(store, name) ? store.profiles[name] : undefined;
+  if (prev && !explicit && prev.email.toLowerCase() !== email.toLowerCase()) {
+    throw new Error(`El perfil "${name}" ya existe con otro email (${prev.email}). Usá --profile <nombre> para elegir o reemplazar uno.`);
+  }
   const password = await askHidden("Password: ");
   if (!password) throw new Error("Password requerido");
+  // Primero se autentica con el password candidato (sin persistirlo); solo si anda se guarda todo.
+  const config = {
+    GAVRIEL_EMAIL: email, GAVRIEL_PASSWORD: password, GAVRIEL_API_BASE: apiBase ?? prev?.apiBase ?? DEFAULT_API,
+    GAVRIEL_MCP_ROLE: role ?? prev?.role ?? "full", GAVRIEL_MCP_WRITE_CONCURRENCY: 5, GAVRIEL_MCP_DESTRUCTIVE_APPROVAL: "elicitation", strictProfile: true,
+  } as Config;
+  const client = new GavrielClient(config, { getTwoFactorCode: twoFactor(ctx, email) });
+  await client.login();
   if (!storePassword(email, password)) {
     throw new Error("No hay almacén seguro disponible (Windows: DPAPI; Linux: libsecret-tools). No se guardó nada.");
   }
-  const prev = store.profiles[name];
-  store.profiles[name] = {
-    ...prev, email, ...(str(ctx.values["api-base"]) && { apiBase: str(ctx.values["api-base"]) }),
-    ...(str(ctx.values.role) && { role: str(ctx.values.role) as Profile["role"] }),
-    ...(str(ctx.values.toolsets) && { toolsets: str(ctx.values.toolsets) }),
-  };
+  store.profiles[name] = { ...prev, email, ...(apiBase && { apiBase }), ...(role && { role }), ...(toolsets && { toolsets }) };
   store.active = name;
   saveStore(store);
-  const client = makeClient(ctx, name);
-  try {
-    await client.login();
-  } catch (err) {
-    // Credenciales malas en un perfil nuevo: no dejar basura. Un 2FA fallido sí conserva todo para reintentar.
-    if (isNew && String((err as Error).message).startsWith("Login falló")) {
-      clearPassword(email);
-      delete store.profiles[name];
-      store.active = Object.keys(store.profiles)[0] ?? null;
-      saveStore(store);
-    }
-    throw err;
-  }
   console.log(`Sesión iniciada como ${email} (perfil "${name}", vence ${fmtExp(client.tokenExpiresAt)}).`);
 }
 
@@ -106,7 +167,7 @@ export async function renew(ctx: Ctx): Promise<void> {
   if (names.length === 0) throw new Error("No hay perfiles.");
   for (const name of names) {
     const { email } = profileOf(name);
-    clearTrustedToken(email);
+    clearTrustedToken(email, true);
     await makeClient(ctx, name).login();
     console.log(`[${name}] dispositivo confiable renovado.`);
   }
@@ -117,7 +178,7 @@ export async function logout(ctx: Ctx): Promise<void> {
   const names = ctx.values.all ? Object.keys(store.profiles) : [profileName(ctx)];
   for (const name of names) {
     const { email } = profileOf(name);
-    clearTrustedToken(email);
+    clearTrustedToken(email, true);
     if (ctx.values.purge) {
       clearPassword(email);
       clearTotpSeed(email);
@@ -142,28 +203,27 @@ export async function profile(ctx: Ctx): Promise<void> {
     }
     case "add": {
       if (!a) throw new Error("Uso: gavriel profile add <nombre> --email <email>");
-      validateProfileName(a);
+      checkName(a);
       const email = str(ctx.values.email);
       if (!email) throw new Error("Falta --email");
-      store.profiles[a] = {
-        email, ...(str(ctx.values["api-base"]) && { apiBase: str(ctx.values["api-base"]) }),
-        ...(str(ctx.values.role) && { role: str(ctx.values.role) as Profile["role"] }),
-        ...(str(ctx.values.toolsets) && { toolsets: str(ctx.values.toolsets) }),
-      };
+      const apiBase = optApiBase(ctx);
+      const role = optRole(ctx);
+      const toolsets = optToolsets(ctx);
+      store.profiles[a] = { email, ...(apiBase && { apiBase }), ...(role && { role }), ...(toolsets && { toolsets }) };
       store.active ??= a;
       saveStore(store);
       return console.log(`Perfil "${a}" creado. Ejecutá: gavriel login --profile ${a} --email ${email}`);
     }
     case "use":
-      if (!a || !store.profiles[a]) throw new Error(`El perfil "${a ?? ""}" no existe.`);
+      if (!a || !has(store, a)) throw new Error(`El perfil "${a ?? ""}" no existe.`);
       store.active = a;
       saveStore(store);
       return console.log(`Perfil activo: ${a}`);
     case "remove": {
-      if (!a || !store.profiles[a]) throw new Error(`El perfil "${a ?? ""}" no existe.`);
+      if (!a || !has(store, a)) throw new Error(`El perfil "${a ?? ""}" no existe.`);
       if (ctx.values.purge) {
         const { email } = store.profiles[a];
-        clearTrustedToken(email);
+        clearTrustedToken(email, true);
         clearPassword(email);
         clearTotpSeed(email);
       }
@@ -173,9 +233,9 @@ export async function profile(ctx: Ctx): Promise<void> {
       return console.log(`Perfil "${a}" eliminado${ctx.values.purge ? " junto con sus secretos" : ""}.`);
     }
     case "rename": {
-      if (!a || !b || !store.profiles[a]) throw new Error("Uso: gavriel profile rename <viejo> <nuevo>");
-      validateProfileName(b);
-      if (store.profiles[b]) throw new Error(`Ya existe "${b}".`);
+      if (!a || !b || !has(store, a)) throw new Error("Uso: gavriel profile rename <viejo> <nuevo>");
+      checkName(b);
+      if (has(store, b)) throw new Error(`Ya existe "${b}".`);
       store.profiles[b] = store.profiles[a];
       delete store.profiles[a];
       if (store.active === a) store.active = b;
@@ -229,39 +289,38 @@ export async function doctor(ctx: Ctx): Promise<void> {
     if (!ok) failed = true;
     console.log(`${ok ? "OK  " : "FALLA"} ${label}${detail ? ` — ${detail}` : ""}`);
   };
-  const backend = secretBackend();
-  check(backend !== "none", "Almacén seguro", backend);
-  console.log(`     config: ${configDir()}`);
-  let name: string;
   try {
-    name = profileName(ctx);
-  } catch (e) {
-    check(false, "Perfil", (e as Error).message);
-    process.exitCode = 1;
-    return;
-  }
-  const p = profileOf(name);
-  const config = loadConfigSafe(name);
-  const base = config?.GAVRIEL_API_BASE ?? p.apiBase ?? "https://app.gavriel.com.ar/api";
-  check(true, "Perfil", `${name} <${p.email}>`);
-  check(base.startsWith("https://"), "API base con https", base);
-  check(Boolean(keyringLookup(passwordAccount(p.email))), "Password guardado");
-  check(Boolean(readTrustedToken(p.email)), "Dispositivo confiable", "se renueva con `gavriel renew`");
-  console.log(`     semilla TOTP: ${readTotpSeed(p.email) ? "guardada" : "no guardada"}`);
-  try {
-    await fetch(base, { method: "HEAD", signal: AbortSignal.timeout(8000) });
-    check(true, "API alcanzable");
-  } catch (e) {
-    check(false, "API alcanzable", (e as Error).message);
-  }
-  if (config) {
+    const backend = secretBackend();
+    check(backend !== "none", "Almacén seguro", backend);
+    console.log(`     config: ${configDir()}`);
+    const name = profileName(ctx);
+    const p = profileOf(name);
+    const config = loadConfigSafe(name);
+    const base = config?.GAVRIEL_API_BASE ?? p.apiBase ?? DEFAULT_API;
+    check(true, "Perfil", `${name} <${p.email}>`);
+    check(/^https:\/\/|^http:\/\/(localhost|127\.0\.0\.1)[:/]/.test(base), "API base con https", base);
+    check(Boolean(keyringLookup(passwordAccount(p.email))), "Password guardado");
+    check(Boolean(readTrustedToken(p.email, true)), "Dispositivo confiable", "se renueva con `gavriel renew`");
+    console.log(`     semilla TOTP: ${readTotpSeed(p.email) ? "guardada" : "no guardada"}`);
     try {
-      const client = makeClient(ctx, name);
-      await client.login();
-      check(true, "Sesión", `JWT vence ${fmtExp(client.tokenExpiresAt)}`);
+      await fetch(base, { method: "HEAD", signal: AbortSignal.timeout(8000) });
+      check(true, "API alcanzable");
     } catch (e) {
-      check(false, "Sesión", (e as Error).message);
+      check(false, "API alcanzable", (e as Error).message);
     }
+    if (!config) console.log("     Sesión: omitida (sin password)");
+    else if (!ctx.values.online) console.log("     Sesión: omitida (use --online)");
+    else {
+      try {
+        const client = makeClient(ctx, name);
+        await client.login();
+        check(true, "Sesión", `JWT vence ${fmtExp(client.tokenExpiresAt)}`);
+      } catch (e) {
+        check(false, "Sesión", (e as Error).message);
+      }
+    }
+  } catch (e) {
+    check(false, "Diagnóstico", (e as Error).message);
   }
   if (failed) process.exitCode = 1;
 }
@@ -276,14 +335,21 @@ function loadConfigSafe(name: string): ReturnType<typeof loadConfig> | null {
 
 // ── mcp install ───────────────────────────────────────────────────────────
 export async function mcp(ctx: Ctx): Promise<void> {
-  if (ctx.args[0] !== "install") throw new Error("Uso: gavriel mcp install [--client desktop|code] [--profile] [--role] [--toolsets] [--dry-run]");
+  if (ctx.args[0] !== "install") {
+    throw new Error("Uso: gavriel mcp install [--client desktop|code] [--role r] [--toolsets t] [--force] [--server-path ruta] [--dry-run] [-y]");
+  }
   const client = str(ctx.values.client) ?? "desktop";
   if (client !== "desktop" && client !== "code") throw new Error("--client debe ser desktop o code");
+  const entryName = str(ctx.values.name) ?? "gavriel";
+  checkName(entryName);
+  const role = optRole(ctx);
+  const toolsets = optToolsets(ctx);
   const name = profileName(ctx);
   const p = profileOf(name);
   await mcpInstall({
-    client, name: str(ctx.values.name) ?? "gavriel", profile: name, role: str(ctx.values.role) ?? p.role,
-    toolsets: str(ctx.values.toolsets) ?? p.toolsets, dryRun: Boolean(ctx.values["dry-run"]), yes: Boolean(ctx.values.yes),
+    client, name: entryName, profile: name, role: role ?? p.role, toolsets: toolsets ?? p.toolsets,
+    dryRun: Boolean(ctx.values["dry-run"]), yes: Boolean(ctx.values.yes), force: Boolean(ctx.values.force),
+    serverPath: str(ctx.values["server-path"]),
   });
 }
 
@@ -295,7 +361,7 @@ function show(ctx: Ctx, data: unknown): void {
 }
 
 export async function tickets(ctx: Ctx): Promise<void> {
-  const params: Record<string, unknown> = { limit: Number(str(ctx.values.limit) ?? 20) };
+  const params: Record<string, unknown> = { limit: parseLimit(str(ctx.values.limit)) };
   if (str(ctx.values.status)) params.status = str(ctx.values.status);
   show(ctx, (await makeClient(ctx, profileName(ctx)).get("/tickets", params)).data);
 }
@@ -307,8 +373,9 @@ export async function events(ctx: Ctx): Promise<void> {
 
 export async function accounts(ctx: Ctx): Promise<void> {
   const [sub, q] = ctx.args;
+  const limit = parseLimit(str(ctx.values.limit));
   const client = makeClient(ctx, profileName(ctx));
-  if (sub === "search" && q) return show(ctx, (await client.get("/accounts", { search: q, limit: Number(str(ctx.values.limit) ?? 20) })).data);
+  if (sub === "search" && q) return show(ctx, (await client.get("/accounts", { search: q, limit })).data);
   if (sub === "get" && q) {
     if (!/^[\w-]+$/.test(q)) throw new Error("Identificador inválido");
     return printJson((await client.get(`/accounts/${encodeURIComponent(q)}`)).data);

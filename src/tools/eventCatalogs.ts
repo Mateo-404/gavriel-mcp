@@ -1,5 +1,5 @@
 import type { GavrielClient } from "../gavrielClient.js";
-import { ok, buildBody, wrapReadOnly, okTruncated } from "./shared.js";
+import { ok, buildBody, wrapReadOnly, okTruncated, idSchema } from "./shared.js";
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/server";
 import { requireConfirm, confirmSchema, seg, destructiveGuard, okOrInput } from "./writeHelpers.js";
@@ -12,7 +12,7 @@ export function registerEventCatalogTools(server: McpServer, client: GavrielClie
   registerTool(
     server, role, "full", "create_event_type",
     {
-      title: "Crear tipo de evento (ESCRITURA)",
+      title: "Crear tipo de evento",
       description: "POST /events-types. Requiere confirm: true.",
       inputSchema: {
         name: z.string().min(1).describe("Nombre corto del tipo (ej: JDS)"),
@@ -43,10 +43,10 @@ export function registerEventCatalogTools(server: McpServer, client: GavrielClie
   registerTool(
     server, role, "full", "update_event_type",
     {
-      title: "Actualizar tipo de evento (ESCRITURA)",
+      title: "Actualizar tipo de evento",
       description: "PATCH /events-types/{id}. Requiere confirm: true.",
       inputSchema: {
-        eventTypeId: z.string(),
+        eventTypeId: idSchema,
         name: z.string().optional(),
         title: z.string().optional(),
         description: z.string().optional(),
@@ -74,9 +74,9 @@ export function registerEventCatalogTools(server: McpServer, client: GavrielClie
   registerTool(
     server, role, "full", "delete_event_type",
     {
-      title: "Eliminar tipo de evento (ESCRITURA)",
+      title: "Eliminar tipo de evento",
       description: "DELETE /events-types/{id}. Requiere confirm: true.",
-      inputSchema: { eventTypeId: z.string(), confirm: confirmSchema },
+      inputSchema: { eventTypeId: idSchema, confirm: confirmSchema },
       annotations: { destructiveHint: true },
     },
     async (args, ctx) => {
@@ -88,7 +88,7 @@ export function registerEventCatalogTools(server: McpServer, client: GavrielClie
   registerTool(
     server, role, "full", "create_event_code",
     {
-      title: "Crear código de evento (ESCRITURA)",
+      title: "Crear código de evento",
       description: "POST /events-codes. Requiere confirm: true.",
       inputSchema: {
         code: z.string().min(1).describe("Código del evento (ej: GTGEO)"),
@@ -96,8 +96,8 @@ export function registerEventCatalogTools(server: McpServer, client: GavrielClie
         title: z.string().optional().describe("Título alternativo"),
         description: z.string().optional(),
         dataType: z.string().optional().describe("Tipo de dato (Zone, Alarm, etc.)"),
-        eventsTypeId: z.string().describe("ID del tipo de evento asociado"),
-        eventsFormatId: z.string().describe("ID del formato/protocolo"),
+        eventsTypeId: idSchema.describe("ID del tipo de evento asociado"),
+        eventsFormatId: idSchema.describe("ID del formato/protocolo"),
         confirm: confirmSchema,
       },
     },
@@ -118,16 +118,16 @@ export function registerEventCatalogTools(server: McpServer, client: GavrielClie
   registerTool(
     server, role, "full", "update_event_code",
     {
-      title: "Actualizar código de evento (ESCRITURA)",
+      title: "Actualizar código de evento",
       description: "PATCH /events-codes/{id}. Requiere confirm: true.",
       inputSchema: {
-        eventCodeId: z.string(),
+        eventCodeId: idSchema,
         code: z.string().optional(),
         name: z.string().optional(),
         title: z.string().optional(),
         description: z.string().optional(),
         dataType: z.string().optional(),
-        eventsTypeId: z.string().optional(),
+        eventsTypeId: idSchema.optional(),
         confirm: confirmSchema,
       },
     },
@@ -147,9 +147,9 @@ export function registerEventCatalogTools(server: McpServer, client: GavrielClie
   registerTool(
     server, role, "full", "delete_event_code",
     {
-      title: "Eliminar código de evento (ESCRITURA)",
+      title: "Eliminar código de evento",
       description: "DELETE /events-codes/{id}. Requiere confirm: true.",
-      inputSchema: { eventCodeId: z.string(), confirm: confirmSchema },
+      inputSchema: { eventCodeId: idSchema, confirm: confirmSchema },
       annotations: { destructiveHint: true },
     },
     async (args, ctx) => {
@@ -161,7 +161,7 @@ export function registerEventCatalogTools(server: McpServer, client: GavrielClie
   registerTool(
     server, role, "full", "bulk_create_event_codes",
     {
-      title: "Crear múltiples códigos de evento (ESCRITURA)",
+      title: "Crear múltiples códigos de evento",
       description:
         "Crea N códigos de evento secuencialmente (POST /events-codes). Devuelve resumen de éxitos/errores. Requiere confirm: true.",
       inputSchema: {
@@ -171,8 +171,8 @@ export function registerEventCatalogTools(server: McpServer, client: GavrielClie
           title: z.string().optional(),
           description: z.string().optional(),
           dataType: z.string().optional(),
-          eventsTypeId: z.string(),
-          eventsFormatId: z.string(),
+          eventsTypeId: idSchema,
+          eventsFormatId: idSchema,
         })).min(1).max(50).describe("Array de códigos a crear"),
         confirm: confirmSchema,
       },

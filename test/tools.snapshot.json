@@ -46,7 +46,8 @@
       "type": "object",
       "properties": {
         "accountId": {
-          "type": "string"
+          "type": "string",
+          "pattern": "^[\\w-]+$"
         },
         "name": {
           "type": "string",
@@ -85,7 +86,8 @@
       "type": "object",
       "properties": {
         "accountId": {
-          "type": "string"
+          "type": "string",
+          "pattern": "^[\\w-]+$"
         },
         "type": {
           "type": "string",
@@ -181,7 +183,8 @@
       "type": "object",
       "properties": {
         "companyId": {
-          "type": "string"
+          "type": "string",
+          "pattern": "^[\\w-]+$"
         },
         "date": {
           "type": "string",
@@ -284,7 +287,8 @@
       "type": "object",
       "properties": {
         "userId": {
-          "type": "string"
+          "type": "string",
+          "pattern": "^[\\w-]+$"
         },
         "from": {
           "type": "string",
@@ -322,7 +326,8 @@
       "type": "object",
       "properties": {
         "ticketId": {
-          "type": "string"
+          "type": "string",
+          "pattern": "^[\\w-]+$"
         },
         "title": {
           "type": "string",
@@ -346,7 +351,8 @@
         "assignedUserId": {
           "anyOf": [
             {
-              "type": "string"
+              "type": "string",
+              "pattern": "^[\\w-]+$"
             },
             {
               "type": "null"
@@ -496,7 +502,8 @@
           "maxItems": 100,
           "type": "array",
           "items": {
-            "type": "string"
+            "type": "string",
+            "pattern": "^[\\w-]+$"
           },
           "description": "IDs de las cuentas destino"
         },
@@ -602,10 +609,12 @@
                 "type": "string"
               },
               "eventsTypeId": {
-                "type": "string"
+                "type": "string",
+                "pattern": "^[\\w-]+$"
               },
               "eventsFormatId": {
-                "type": "string"
+                "type": "string",
+                "pattern": "^[\\w-]+$"
               }
             },
             "required": [
@@ -636,6 +645,7 @@
       "properties": {
         "accountId": {
           "type": "string",
+          "pattern": "^[\\w-]+$",
           "description": "ID de la cuenta"
         },
         "port": {
@@ -656,6 +666,11 @@
           "format": "date-time",
           "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
         },
+        "onlyPending": {
+          "default": true,
+          "description": "Solo eventos pendientes (default true)",
+          "type": "boolean"
+        },
         "targetStatus": {
           "default": "processed",
           "description": "Estado a asignar",
@@ -675,6 +690,15 @@
           "type": "integer",
           "minimum": 1,
           "maximum": 200
+        },
+        "eventIds": {
+          "description": "IDs devueltos por el preview; obligatorio con confirm:true",
+          "maxItems": 200,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[\\w-]+$"
+          }
         },
         "confirm": {
           "default": false,
@@ -818,11 +842,13 @@
       "type": "object",
       "properties": {
         "interventionId": {
-          "type": "string"
+          "type": "string",
+          "pattern": "^[\\w-]+$"
         },
         "categoryId": {
           "description": "Categoría de cierre",
-          "type": "string"
+          "type": "string",
+          "pattern": "^[\\w-]+$"
         },
         "resolution": {
           "description": "Resolución / motivo del cierre",
@@ -846,7 +872,8 @@
       "type": "object",
       "properties": {
         "ticketId": {
-          "type": "string"
+          "type": "string",
+          "pattern": "^[\\w-]+$"
         },
         "resolution": {
           "type": "string",
@@ -871,7 +898,8 @@
       "type": "object",
       "properties": {
         "conversationId": {
-          "type": "string"
+          "type": "string",
+          "pattern": "^[\\w-]+$"
         },
         "confirm": {
           "default": false,
@@ -891,7 +919,8 @@
       "type": "object",
       "properties": {
         "conversationId": {
-          "type": "string"
+          "type": "string",
+          "pattern": "^[\\w-]+$"
         },
         "confirm": {
           "default": false,
@@ -911,7 +940,8 @@
       "type": "object",
       "properties": {
         "conversationId": {
-          "type": "string"
+          "type": "string",
+          "pattern": "^[\\w-]+$"
         },
         "confirm": {
           "default": false,
@@ -931,7 +961,8 @@
       "type": "object",
       "properties": {
         "conversationId": {
-          "type": "string"
+          "type": "string",
+          "pattern": "^[\\w-]+$"
         },
         "status": {
           "type": "string",
@@ -995,11 +1026,11 @@
         },
         "latitude": {
           "description": "latitude",
-          "type": "string"
+          "type": "number"
         },
         "longitude": {
           "description": "longitude",
-          "type": "string"
+          "type": "number"
         },
         "serviceDate": {
           "description": "serviceDate",
@@ -1036,7 +1067,8 @@
       "type": "object",
       "properties": {
         "accountId": {
-          "type": "string"
+          "type": "string",
+          "pattern": "^[\\w-]+$"
         },
         "code": {
           "type": "string",
@@ -1119,14 +1151,17 @@
       "properties": {
         "accountIds": {
           "minItems": 1,
+          "maxItems": 50,
           "type": "array",
           "items": {
-            "type": "string"
+            "type": "string",
+            "pattern": "^[\\w-]+$"
           },
           "description": "IDs de cuentas"
         },
         "assignedUserId": {
           "type": "string",
+          "pattern": "^[\\w-]+$",
           "description": "Usuario asignado"
         },
         "reason": {
@@ -1136,7 +1171,8 @@
         },
         "eventTypeId": {
           "description": "ID del tipo de evento a procesar",
-          "type": "string"
+          "type": "string",
+          "pattern": "^[\\w-]+$"
         },
         "confirm": {
           "default": false,
@@ -1298,7 +1334,8 @@
       "type": "object",
       "properties": {
         "accountId": {
-          "type": "string"
+          "type": "string",
+          "pattern": "^[\\w-]+$"
         },
         "serialNumber": {
           "description": "Omitir si el equipo no tiene serie",
@@ -1306,17 +1343,20 @@
           "minLength": 1
         },
         "deviceBrandId": {
-          "type": "string"
+          "type": "string",
+          "pattern": "^[\\w-]+$"
         },
         "deviceModelId": {
           "description": "Omitir si el modelo no existe en el catálogo",
-          "type": "string"
+          "type": "string",
+          "pattern": "^[\\w-]+$"
         },
         "chip1": {
           "type": "string"
         },
         "deviceConnectionTypeId": {
-          "type": "string"
+          "type": "string",
+          "pattern": "^[\\w-]+$"
         },
         "alertType": {
           "description": "Sonora | Silenciosa",
@@ -1336,16 +1376,20 @@
           "type": "string"
         },
         "zoneId": {
-          "type": "string"
+          "type": "string",
+          "pattern": "^[\\w-]+$"
         },
         "deviceKindId": {
-          "type": "string"
+          "type": "string",
+          "pattern": "^[\\w-]+$"
         },
         "deviceTaxonomyId": {
-          "type": "string"
+          "type": "string",
+          "pattern": "^[\\w-]+$"
         },
         "cloudDeviceId": {
-          "type": "string"
+          "type": "string",
+          "pattern": "^[\\w-]+$"
         },
         "cloudChannelNo": {
           "type": "integer",
@@ -1420,6 +1464,7 @@
         },
         "deviceBrandId": {
           "type": "string",
+          "pattern": "^[\\w-]+$",
           "description": "ID de la marca"
         },
         "confirm": {
@@ -1463,10 +1508,12 @@
         },
         "eventsTypeId": {
           "type": "string",
+          "pattern": "^[\\w-]+$",
           "description": "ID del tipo de evento asociado"
         },
         "eventsFormatId": {
           "type": "string",
+          "pattern": "^[\\w-]+$",
           "description": "ID del formato/protocolo"
         },
         "confirm": {
@@ -1571,11 +1618,13 @@
       "properties": {
         "accountId": {
           "type": "string",
+          "pattern": "^[\\w-]+$",
           "description": "ID de la cuenta a intervenir"
         },
         "assignedUserId": {
           "description": "Usuario asignado. Si se omite, la API puede requerirlo — el frontend siempre lo envía.",
-          "type": "string"
+          "type": "string",
+          "pattern": "^[\\w-]+$"
         },
         "currentStatus": {
           "default": "in_progress",
@@ -1937,7 +1986,8 @@
         "accountId": {
           "anyOf": [
             {
-              "type": "string"
+              "type": "string",
+              "pattern": "^[\\w-]+$"
             },
             {
               "type": "null"
@@ -1947,7 +1997,8 @@
         "categoryId": {
           "anyOf": [
             {
-              "type": "string"
+              "type": "string",
+              "pattern": "^[\\w-]+$"
             },
             {
               "type": "null"
@@ -1957,7 +2008,8 @@
         "assignedUserId": {
           "anyOf": [
             {
-              "type": "string"
+              "type": "string",
+              "pattern": "^[\\w-]+$"
             },
             {
               "type": "null"
@@ -2118,7 +2170,8 @@
       "type": "object",
       "properties": {
         "accountId": {
-          "type": "string"
+          "type": "string",
+          "pattern": "^[\\w-]+$"
         },
         "code": {
           "type": "string",
@@ -2146,10 +2199,12 @@
           "type": "string"
         },
         "deviceBrandId": {
-          "type": "string"
+          "type": "string",
+          "pattern": "^[\\w-]+$"
         },
         "deviceModelId": {
-          "type": "string"
+          "type": "string",
+          "pattern": "^[\\w-]+$"
         },
         "confirm": {
           "default": false,
@@ -2215,10 +2270,12 @@
       "type": "object",
       "properties": {
         "accountId": {
-          "type": "string"
+          "type": "string",
+          "pattern": "^[\\w-]+$"
         },
         "noteId": {
-          "type": "string"
+          "type": "string",
+          "pattern": "^[\\w-]+$"
         },
         "confirm": {
           "default": false,
@@ -2410,10 +2467,12 @@
       "type": "object",
       "properties": {
         "accountId": {
-          "type": "string"
+          "type": "string",
+          "pattern": "^[\\w-]+$"
         },
         "deviceId": {
-          "type": "string"
+          "type": "string",
+          "pattern": "^[\\w-]+$"
         },
         "confirm": {
           "default": false,
@@ -2434,7 +2493,8 @@
       "type": "object",
       "properties": {
         "brandId": {
-          "type": "string"
+          "type": "string",
+          "pattern": "^[\\w-]+$"
         },
         "confirm": {
           "default": false,
@@ -2454,7 +2514,8 @@
       "type": "object",
       "properties": {
         "modelId": {
-          "type": "string"
+          "type": "string",
+          "pattern": "^[\\w-]+$"
         },
         "confirm": {
           "default": false,
@@ -2474,7 +2535,8 @@
       "type": "object",
       "properties": {
         "eventCodeId": {
-          "type": "string"
+          "type": "string",
+          "pattern": "^[\\w-]+$"
         },
         "confirm": {
           "default": false,
@@ -2516,7 +2578,8 @@
       "type": "object",
       "properties": {
         "eventTypeId": {
-          "type": "string"
+          "type": "string",
+          "pattern": "^[\\w-]+$"
         },
         "confirm": {
           "default": false,
@@ -3769,10 +3832,12 @@
       "type": "object",
       "properties": {
         "accountId": {
-          "type": "string"
+          "type": "string",
+          "pattern": "^[\\w-]+$"
         },
         "deviceBrandId": {
-          "type": "string"
+          "type": "string",
+          "pattern": "^[\\w-]+$"
         },
         "serialNumber": {
           "type": "string",
@@ -5383,7 +5448,8 @@
       "type": "object",
       "properties": {
         "activityId": {
-          "type": "string"
+          "type": "string",
+          "pattern": "^[\\w-]+$"
         },
         "readAt": {
           "description": "ISO datetime de lectura (si no viene, usa la fecha actual)",
@@ -5409,7 +5475,8 @@
       "type": "object",
       "properties": {
         "activityId": {
-          "type": "string"
+          "type": "string",
+          "pattern": "^[\\w-]+$"
         },
         "confirm": {
           "default": false,
@@ -5452,11 +5519,13 @@
       "properties": {
         "eventIds": {
           "minItems": 1,
+          "maxItems": 50,
           "type": "array",
           "items": {
-            "type": "string"
+            "type": "string",
+            "pattern": "^[\\w-]+$"
           },
-          "description": "IDs de los eventos a marcar"
+          "description": "IDs de los eventos a marcar (máx 50)"
         },
         "status": {
           "default": "processed",
@@ -5665,14 +5734,16 @@
       "type": "object",
       "properties": {
         "accountId": {
-          "type": "string"
+          "type": "string",
+          "pattern": "^[\\w-]+$"
         },
         "orderedContactIds": {
           "minItems": 1,
           "maxItems": 200,
           "type": "array",
           "items": {
-            "type": "string"
+            "type": "string",
+            "pattern": "^[\\w-]+$"
           },
           "description": "IDs de contactos en el orden final deseado (índice 0 = posición 1). Debe incluir TODOS los contactos actuales."
         },
@@ -5822,7 +5893,8 @@
       "type": "object",
       "properties": {
         "serviceId": {
-          "type": "string"
+          "type": "string",
+          "pattern": "^[\\w-]+$"
         },
         "scheduledDate": {
           "type": "string",
@@ -5836,7 +5908,8 @@
         },
         "assignedUserId": {
           "description": "Técnico asignado",
-          "type": "string"
+          "type": "string",
+          "pattern": "^[\\w-]+$"
         },
         "confirm": {
           "default": false,
@@ -5988,7 +6061,8 @@
       "type": "object",
       "properties": {
         "conversationId": {
-          "type": "string"
+          "type": "string",
+          "pattern": "^[\\w-]+$"
         },
         "body": {
           "type": "string",
@@ -6093,7 +6167,8 @@
       "type": "object",
       "properties": {
         "interventionId": {
-          "type": "string"
+          "type": "string",
+          "pattern": "^[\\w-]+$"
         },
         "observationComment": {
           "type": "string"
@@ -6222,8 +6297,14 @@
           "minimum": 0
         },
         "priority": {
-          "description": "Prioridad (valores en gavriel://catalog/)",
-          "type": "string"
+          "description": "Prioridad",
+          "type": "string",
+          "enum": [
+            "low",
+            "medium",
+            "high",
+            "critical"
+          ]
         },
         "limit": {
           "default": 20,
@@ -6324,7 +6405,8 @@
       "type": "object",
       "properties": {
         "id": {
-          "type": "string"
+          "type": "string",
+          "pattern": "^[\\w-]+$"
         },
         "accountNumber": {
           "anyOf": [
@@ -6494,7 +6576,8 @@
       "type": "object",
       "properties": {
         "contactId": {
-          "type": "string"
+          "type": "string",
+          "pattern": "^[\\w-]+$"
         },
         "name": {
           "type": "string"
@@ -6532,10 +6615,12 @@
       "type": "object",
       "properties": {
         "accountId": {
-          "type": "string"
+          "type": "string",
+          "pattern": "^[\\w-]+$"
         },
         "noteId": {
-          "type": "string"
+          "type": "string",
+          "pattern": "^[\\w-]+$"
         },
         "content": {
           "type": "string"
@@ -6596,7 +6681,8 @@
       "type": "object",
       "properties": {
         "activityId": {
-          "type": "string"
+          "type": "string",
+          "pattern": "^[\\w-]+$"
         },
         "title": {
           "type": "string"
@@ -6618,7 +6704,8 @@
         "assignedUserId": {
           "anyOf": [
             {
-              "type": "string"
+              "type": "string",
+              "pattern": "^[\\w-]+$"
             },
             {
               "type": "null"
@@ -6628,7 +6715,8 @@
         "ticketId": {
           "anyOf": [
             {
-              "type": "string"
+              "type": "string",
+              "pattern": "^[\\w-]+$"
             },
             {
               "type": "null"
@@ -6856,10 +6944,12 @@
       "type": "object",
       "properties": {
         "accountId": {
-          "type": "string"
+          "type": "string",
+          "pattern": "^[\\w-]+$"
         },
         "deviceId": {
-          "type": "string"
+          "type": "string",
+          "pattern": "^[\\w-]+$"
         },
         "serialNumber": {
           "type": "string"
@@ -6868,10 +6958,12 @@
           "type": "string"
         },
         "deviceConnectionTypeId": {
-          "type": "string"
+          "type": "string",
+          "pattern": "^[\\w-]+$"
         },
         "deviceModelId": {
-          "type": "string"
+          "type": "string",
+          "pattern": "^[\\w-]+$"
         },
         "clearChip1": {
           "description": "true = enviar chip1: null",
@@ -6899,16 +6991,20 @@
           "type": "string"
         },
         "zoneId": {
-          "type": "string"
+          "type": "string",
+          "pattern": "^[\\w-]+$"
         },
         "deviceKindId": {
-          "type": "string"
+          "type": "string",
+          "pattern": "^[\\w-]+$"
         },
         "deviceTaxonomyId": {
-          "type": "string"
+          "type": "string",
+          "pattern": "^[\\w-]+$"
         },
         "cloudDeviceId": {
-          "type": "string"
+          "type": "string",
+          "pattern": "^[\\w-]+$"
         },
         "cloudChannelNo": {
           "type": "integer",
@@ -6947,7 +7043,8 @@
       "type": "object",
       "properties": {
         "brandId": {
-          "type": "string"
+          "type": "string",
+          "pattern": "^[\\w-]+$"
         },
         "name": {
           "type": "string"
@@ -6973,7 +7070,8 @@
       "type": "object",
       "properties": {
         "modelId": {
-          "type": "string"
+          "type": "string",
+          "pattern": "^[\\w-]+$"
         },
         "name": {
           "type": "string"
@@ -7002,7 +7100,8 @@
       "type": "object",
       "properties": {
         "eventCodeId": {
-          "type": "string"
+          "type": "string",
+          "pattern": "^[\\w-]+$"
         },
         "code": {
           "type": "string"
@@ -7020,7 +7119,8 @@
           "type": "string"
         },
         "eventsTypeId": {
-          "type": "string"
+          "type": "string",
+          "pattern": "^[\\w-]+$"
         },
         "confirm": {
           "default": false,
@@ -7074,7 +7174,8 @@
       "type": "object",
       "properties": {
         "eventTypeId": {
-          "type": "string"
+          "type": "string",
+          "pattern": "^[\\w-]+$"
         },
         "name": {
           "type": "string"
@@ -7223,10 +7324,12 @@
       "type": "object",
       "properties": {
         "serviceId": {
-          "type": "string"
+          "type": "string",
+          "pattern": "^[\\w-]+$"
         },
         "accountId": {
-          "type": "string"
+          "type": "string",
+          "pattern": "^[\\w-]+$"
         },
         "type": {
           "type": "string"
@@ -7241,10 +7344,12 @@
           "type": "string"
         },
         "assignedUserId": {
-          "type": "string"
+          "type": "string",
+          "pattern": "^[\\w-]+$"
         },
         "categoryId": {
-          "type": "string"
+          "type": "string",
+          "pattern": "^[\\w-]+$"
         },
         "confirm": {
           "default": false,
@@ -7264,7 +7369,8 @@
       "type": "object",
       "properties": {
         "ticketId": {
-          "type": "string"
+          "type": "string",
+          "pattern": "^[\\w-]+$"
         },
         "title": {
           "type": "string"
@@ -7291,9 +7397,11 @@
           ]
         },
         "accountId": {
+          "description": "null = desvincular cuenta",
           "anyOf": [
             {
-              "type": "string"
+              "type": "string",
+              "pattern": "^[\\w-]+$"
             },
             {
               "type": "null"
@@ -7303,7 +7411,8 @@
         "categoryId": {
           "anyOf": [
             {
-              "type": "string"
+              "type": "string",
+              "pattern": "^[\\w-]+$"
             },
             {
               "type": "null"
@@ -7313,7 +7422,8 @@
         "assignedUserId": {
           "anyOf": [
             {
-              "type": "string"
+              "type": "string",
+              "pattern": "^[\\w-]+$"
             },
             {
               "type": "null"
@@ -7446,7 +7556,8 @@
       "type": "object",
       "properties": {
         "zoneId": {
-          "type": "string"
+          "type": "string",
+          "pattern": "^[\\w-]+$"
         },
         "code": {
           "type": "string"
@@ -7471,10 +7582,12 @@
           "type": "string"
         },
         "deviceBrandId": {
-          "type": "string"
+          "type": "string",
+          "pattern": "^[\\w-]+$"
         },
         "deviceModelId": {
-          "type": "string"
+          "type": "string",
+          "pattern": "^[\\w-]+$"
         },
         "confirm": {
           "default": false,

@@ -1,7 +1,8 @@
 name: Release
 
 # Build native single-executable binaries (Node.js SEA) for each platform and
-# attach them to the GitHub Release created from the pushed tag.
+# attach them to the GitHub Release created from the pushed tag. Two binaries
+# per platform: gavriel-mcp-<plat>-<arch> (MCP server) and gavriel-<plat>-<arch> (CLI).
 #
 # No third-party RUNTIME deps: SEA embeds Node natively. esbuild + postject
 # are build-time only (postject is a Node.js-org tool, not shipped in the
@@ -21,12 +22,14 @@ jobs:
       contents: read
     steps:
       - uses: actions/checkout@v7
-      - name: Check package.json version and CHANGELOG entry
+      - name: Check tag, package.json, manifest.json and CHANGELOG
         shell: bash
         run: |
           v="${GITHUB_REF_NAME#v}"
           pv=$(node -p "require('./package.json').version")
+          mv=$(node -p "require('./manifest.json').version")
           [ "$v" = "$pv" ] || { echo "tag $v != package.json $pv"; exit 1; }
+          [ "$v" = "$mv" ] || { echo "tag $v != manifest.json $mv"; exit 1; }
           grep -qF "## [$v]" CHANGELOG.md || { echo "CHANGELOG.md sin entrada para $v"; exit 1; }
 
   build:
@@ -35,6 +38,8 @@ jobs:
     runs-on: ${{ matrix.os }}
     permissions:
       contents: read
+      id-token: write # attest-build-provenance
+      attestations: write
     strategy:
       fail-fast: false
       matrix:
@@ -63,20 +68,26 @@ jobs:
         run: pnpm install --frozen-lockfile
       - name: Build
         run: pnpm build
-      - name: Build single-executable binary (Node SEA)
+      - name: Build single-executable binaries (Node SEA)
         run: pnpm build:bin
       - name: Checksum
         shell: bash
         run: |
           cd bin
-          for f in gavriel-mcp-*; do
-            sha256sum "$f" > "$f.sha256"
+          # gavriel-* cubre gavriel-mcp-<plat>-<arch> y gavriel-<plat>-<arch>
+          for f in gavriel-*; do
+            case "$f" in *.sha256) continue ;; esac
+            if command -v sha256sum >/dev/null; then sha256sum "$f" > "$f.sha256"; else shasum -a 256 "$f" > "$f.sha256"; fi
           done
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: bin/gavriel-*
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: gavriel-mcp-${{ matrix.platform }}-${{ matrix.arch }}
-          path: bin/gavriel-mcp-*
+          name: gavriel-${{ matrix.platform }}-${{ matrix.arch }}
+          path: bin/gavriel-*
           if-no-files-found: error
 
   release:
@@ -95,6 +106,6 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release create "${GITHUB_REF_NAME}" artifacts/* \
+          gh release create "${GITHUB_REF_NAME}" artifacts/* --repo "${GITHUB_REPOSITORY}" \
             --title "${GITHUB_REF_NAME}" \
             --generate-notes

@@ -1,7 +1,6 @@
 import type { McpServer } from "@modelcontextprotocol/server";
 import type { GavrielClient } from "../gavrielClient.js";
 
-export const PENDING_URI = "gavriel://events/pending";
 const MIN_SEC = 30;
 const MAX_BACKOFF_MS = 10 * 60_000;
 
@@ -42,6 +41,7 @@ async function fetchPending(client: GavrielClient): Promise<PendingEvent[]> {
 export function startPoller(server: McpServer, client: GavrielClient): (() => void) | null {
   const sec = parsePollSec(process.env.GAVRIEL_POLL_SEC);
   if (!sec) return null;
+  if (process.env.NODE_TEST_CONTEXT || process.env.NODE_ENV === "test") return null; // nunca bajo tests
   let seen: Set<string> | null = null; // el primer ciclo solo siembra, no alerta
   let failures = 0;
   let stopped = false;
@@ -53,7 +53,6 @@ export function startPoller(server: McpServer, client: GavrielClient): (() => vo
       const fresh = diffNewEvents(seen ?? new Set(), events);
       if (seen && fresh.length) {
         await server.sendLoggingMessage({ level: "warning", logger: "gavriel", data: { newPendingEvents: fresh.length, events: fresh.slice(0, 10) } });
-        await server.server.sendResourceUpdated({ uri: PENDING_URI }).catch(() => {});
       }
       seen = new Set(events.map((e) => e.id));
       failures = 0;
