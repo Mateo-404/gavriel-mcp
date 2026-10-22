@@ -22,11 +22,12 @@ import { registerVideoTools } from "./tools/video.js";
 import { registerTelephonyAndOpsTools } from "./tools/telephonyAndOps.js";
 import { registerInfrastructureTools } from "./tools/infrastructure.js";
 import { registerCoreGapTools } from "./tools/coreGaps.js";
+import { registerDeviceBatchTools } from "./tools/devicesBatch.js";
 import { registerCompositeTools } from "./tools/composites.js";
 import { registerCatalogResources } from "./resources/catalogs.js";
 import { registerEntityResources } from "./resources/entities.js";
 import { registerPrompts } from "./prompts/index.js";
-import type { Role } from "./tools/roles.js";
+import { strictInput, type Role } from "./tools/roles.js";
 
 declare const __GAVRIEL_VERSION__: string | undefined;
 const VERSION = typeof __GAVRIEL_VERSION__ !== "undefined" ? __GAVRIEL_VERSION__ : "dev";
@@ -63,7 +64,7 @@ const TOOLSETS: Record<string, Reg[]> = {
   video: [registerVideoTools],
   telephony: [registerTelephonyAndOpsTools],
   infrastructure: [registerInfrastructureTools],
-  coreGaps: [registerCoreGapTools],
+  coreGaps: [registerCoreGapTools, registerDeviceBatchTools],
   composites: [registerCompositeTools],
 };
 
@@ -84,7 +85,11 @@ export function buildServer(client: GavrielClient, role: Role = "full"): McpServ
   // Cuenta las tools registradas (el SDK no expone el total) para avisar si la selección quedó vacía.
   let tools = 0;
   const origRegister = server.registerTool.bind(server) as (...a: unknown[]) => unknown;
-  (server as unknown as { registerTool: unknown }).registerTool = (...a: unknown[]) => { tools++; return origRegister(...a); };
+  (server as unknown as { registerTool: unknown }).registerTool = (name: unknown, config: { inputSchema?: unknown }, ...rest: unknown[]) => {
+    tools++;
+    if (config?.inputSchema) config = { ...config, inputSchema: strictInput(config.inputSchema) };
+    return origRegister(name, config, ...rest);
+  };
   for (const name of selectedToolsets()) for (const reg of TOOLSETS[name]) reg(server, client, role);
   for (const reg of ALWAYS) reg(server, client, role);
   if (tools === 0) console.error(`[gavriel-mcp] ADVERTENCIA: 0 tools registradas (toolsets=${process.env.GAVRIEL_MCP_TOOLSETS ?? "all"}, role=${role}).`);

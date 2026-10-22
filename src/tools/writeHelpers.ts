@@ -255,8 +255,14 @@ export function buildPreview(exec: WriteExecution): unknown {
       "Escritura NO ejecutada. Revisá el detalle y llamá de nuevo con `confirm: true` si querés ejecutarla.",
     metodo: exec.method,
     path: exec.path,
-    body: exec.params,
+    body: redactSecrets(exec.params),
   };
+}
+
+// Preview: oculta solo el código de verificación live view (el resto de params se muestra tal cual).
+function redactSecrets(p: unknown): unknown {
+  if (!p || typeof p !== "object" || Array.isArray(p) || !("cloudLiveViewVerification" in p)) return p;
+  return { ...p, cloudLiveViewVerification: "[REDACTED]" };
 }
 
 function summarize(data: unknown, maxLen = 1000): unknown {

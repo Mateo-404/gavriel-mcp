@@ -31,6 +31,11 @@ real Claude/Codex/OpenCode files) and is skipped when `bin/` is missing; the Pow
 * **Keep PR scope small.** One tool / one change per PR whenever possible.
 * **No third-party runtime dependencies without review.** If a new feature introduces a `dependency`, justify it in the PR. Build-time dependencies (esbuild, postject, tsx, typescript) are already approved.
 
+## After rebuilding
+
+* Restart or reconnect the MCP client session after every rebuild: clients cache the tool schemas per session, so a stale session keeps sending the old parameters.
+* Unknown arguments now fail loudly (inputs are strict, with a "did you mean" hint such as `confrim` -> `confirm`) instead of being silently dropped. A rejected call with a new parameter usually means the session is stale.
+
 ## Security
 
 * Never commit secrets. The Gavriel token lives in the system keyring

@@ -249,6 +249,17 @@ the secret:
 > OpenCode config can still use `{file:~/.secrets/gavriel-password}`
 > as it does today.
 
+## Devices, zones and catalogs
+
+- `create_device` / `update_device`: the whole backend form (`zoneId`, `deviceModelId`, `deviceConnectionTypeId`, `deviceKindId`, `alertType` Sonora|Silenciosa, `ownershipType` alquiler|comodato, `chip1`, `chip2`, `imei`, `moduleBrand`, `moduleModel`, `cloudDeviceId`, `hctCameraResourceId`, `cloudChannelNo`, `deviceTaxonomyId`, `hppDeviceCategory`, `hppDeviceSubCategory`, `cloudLiveViewVerification`). Serial and model are optional for accessories without serial (sirens, remotes). `update_device`/`update_zone` take `clear: ["chip2", ...]` to empty a field (only editable fields are accepted).
+- `cloudLiveViewVerification` is a secret: it is masked in the confirm preview and in `writes.log`.
+- Link a device to its zone with `zoneId` on the device, or from the zone side with `update_zone` (`serialNumber`, `deviceModelId`, `deviceBrandId`).
+- `hik_cloud_lookup` (POST, queries Hik-Partner Pro) returns `cloudDeviceId` and the taxonomy; when the taxonomy does not exist in Gavriel's catalog it adds a `warnings` note: use `list_catalog` kind `device-taxonomies` or the generic taxonomy of the category (creating the missing taxonomies, e.g. hik_2_20 / hik_3_14, is backend data).
+- `bulk_upsert_account_devices`: repeatable load of up to 50 devices into ONE account. Creates the ones that do not exist and updates (matching by `serialNumber`) only the fields that changed. Without `confirm` it returns a single preview (create/update/no-op counts and bodies); with `confirm: true` it returns `{summary, results}`. It needs the human approval like every `bulk_*` tool.
+- `search_accounts` / `list_accounts` accept `exact: true`; `list_account_zones` omits the embedded account unless `include: ["account"]` or `full: true`; `list_account_devices` is lean unless `full: true` or `fields`.
+- Catalogs for device loads: `list_catalog` kinds `device-taxonomies`, `device-kinds` (served by `/device-kinds/active`), `device-connection-types`, `device-brands`, `device-models`.
+- Unknown tool arguments are rejected (`Argumentos desconocidos: "confrim" (¿quisiste decir "confirm"?)`). After rebuilding the server, reconnect the MCP client session: clients cache tool schemas per session (see CONTRIBUTING).
+
 ## Toolsets
 
 `GAVRIEL_MCP_TOOLSETS` (comma-separated, default `all`) selects which tool modules are registered. Groups: `core` (tickets, events, accounts, interventions, activities, conversations, search, dashboards, batch, health, audit, get, services, org, monitoring, devices, event catalogs, catalog/entity resources, prompts), `notifications`, `video`, `telephony`, `infrastructure`, `coreGaps`, `composites`. Unknown names abort startup with the list of valid ones.

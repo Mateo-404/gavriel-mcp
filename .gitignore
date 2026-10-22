@@ -84,3 +84,6 @@ ehthumbs.db
 analysis/
 # caché que PowerShell puede crear en el cwd cuando LOCALAPPDATA es relativo/vacío (tests aislados)
 /Microsoft/
+
+# directorios temporales de tests (proyectos aislados dentro del repo)
+/.tmp-*/

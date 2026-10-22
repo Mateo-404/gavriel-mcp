@@ -23,11 +23,20 @@ function plaintextAllowed(): boolean {
 // shortcut: DPAPI ata el blob al usuario de Windows; no hay backend macOS (la CLI
 // `security` solo acepta el secreto por argv, visible en la lista de procesos).
 const PS_ARGS = ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command"];
+// DPAPI directo vía .NET (ProtectedData), sin los cmdlets ConvertTo/From-SecureString: esos viven en el módulo
+// Microsoft.PowerShell.Security, que en el runner de GitHub no cargaba con el entorno aislado de los tests.
+// El formato es idéntico al de ConvertFrom-SecureString (hex de un blob DPAPI de UTF-16, CurrentUser), así que los
+// secretos ya guardados siguen siendo legibles y viceversa.
+const PS_DPAPI = "Add-Type -AssemblyName System.Security; $scope=[System.Security.Cryptography.DataProtectionScope]::CurrentUser; ";
 const PS_PROTECT =
-  "$p=[Console]::In.ReadToEnd(); ConvertTo-SecureString -String $p -AsPlainText -Force | ConvertFrom-SecureString";
+  `${PS_DPAPI}$p=[Console]::In.ReadToEnd(); ` +
+  "$e=[System.Security.Cryptography.ProtectedData]::Protect([Text.Encoding]::Unicode.GetBytes($p),$null,$scope); " +
+  "[Console]::Out.Write(([BitConverter]::ToString($e) -replace '-','').ToLower())";
 const PS_UNPROTECT =
-  "$b=[Console]::In.ReadToEnd().Trim(); $s=ConvertTo-SecureString -String $b; " +
-  "[Runtime.InteropServices.Marshal]::PtrToStringBSTR([Runtime.InteropServices.Marshal]::SecureStringToBSTR($s))";
+  `${PS_DPAPI}$h=[Console]::In.ReadToEnd().Trim(); ` +
+  "$b=[byte[]]@(for($i=0;$i -lt $h.Length;$i+=2){[Convert]::ToByte($h.Substring($i,2),16)}); " +
+  "$d=[System.Security.Cryptography.ProtectedData]::Unprotect($b,$null,$scope); " +
+  "[Console]::Out.Write([Text.Encoding]::Unicode.GetString($d))";
 
 function dpapiFile(account: string): string {
   const base = process.env.APPDATA || join(homedir(), "AppData", "Roaming");

@@ -1,5 +1,5 @@
 import type { GavrielClient } from "../gavrielClient.js";
-import { ok, wrapReadOnly, ensureOk, itemsOf } from "./shared.js";
+import { ok, wrapReadOnly, ensureOk, itemsOf, normalizeAccountNumber } from "./shared.js";
 import { TICKET_STATUSES, TICKET_PRIORITIES } from "./shared.js";
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/server";
@@ -18,12 +18,17 @@ export function registerSearchTools(server: McpServer, client: GavrielClient): v
       inputSchema: z.object({
               query: z.string().min(1).describe("Texto de búsqueda (nombre o código de cuenta)"),
               limit: z.number().int().min(1).max(25).default(10).describe("Máximo de resultados (default 10, máx 25)"),
+              exact: z.boolean().optional().describe("true = solo cuentas cuyo accountNumber es exactamente query (acepta número sin ceros, se normaliza a 10 dígitos). Evita que 3150 devuelva 31501234…"),
             }),
       annotations: { readOnlyHint: true },
     },
     wrapReadOnly(async (args, ctx) => {
-      const res = await client.get("/accounts", { search: args.query, limit: args.limit }, { signal: ctx.mcpReq.signal });
-      const list = itemsOf(ensureOk(res, "search_accounts"));
+      // La API no tiene filtro exacto (bundle: solo search/limit/page): se busca por el número
+      // normalizado (padded, casi sin falsos positivos) y se filtra del lado cliente.
+      const q = args.exact ? normalizeAccountNumber(args.query) : args.query;
+      const res = await client.get("/accounts", { search: q, limit: args.limit }, { signal: ctx.mcpReq.signal });
+      let list = itemsOf(ensureOk(res, "search_accounts"));
+      if (args.exact) list = list.filter((r) => normalizeAccountNumber(String(r.accountNumber ?? "")) === q);
       const results = list.map((r) => {
         return { id: r.id, accountNumber: r.accountNumber, name: r.name };
       });

@@ -520,7 +520,7 @@ tKeyring("secrets: password usa el keyring si está disponible, aunque haya env 
   assert.equal(result, "keyring-pass");
 });
 
-t("secrets: sin keyring, password usa la env var antes que el archivo legacy", () => {
+tKeyring("secrets: sin keyring, password usa la env var antes que el archivo legacy", () => {
   const home = makeHome({ ".secrets/gavriel-password": "legacy-pass" });
   const state = join(secretsTmp, "state-2.json");
   const result = runProbe("password", null, {
@@ -530,14 +530,14 @@ t("secrets: sin keyring, password usa la env var antes que el archivo legacy", (
   assert.equal(result, "env-pass");
 });
 
-t("secrets: sin keyring ni env, password cae al archivo legacy", () => {
+tKeyring("secrets: sin keyring ni env, password cae al archivo legacy", () => {
   const home = makeHome({ ".secrets/gavriel-password": "legacy-pass" });
   const state = join(secretsTmp, "state-3.json");
   const result = runProbe("password", null, { home, keyringAvailable: false, keyringState: state });
   assert.equal(result, "legacy-pass");
 });
 
-t("secrets: sin ninguna fuente, password resuelve null", () => {
+tKeyring("secrets: sin ninguna fuente, password resuelve null", () => {
   const home = makeHome({});
   const state = join(secretsTmp, "state-4.json");
   const result = runProbe("password", null, { home, keyringAvailable: false, keyringState: state });
@@ -557,7 +557,7 @@ tKeyring("secrets: trusted_device_token respeta el mismo orden (keyring > env > 
   assert.equal(result, "keyring-token");
 });
 
-t("secrets: token legacy normaliza el email (case/espacios) al leer", () => {
+tKeyring("secrets: token legacy normaliza el email (case/espacios) al leer", () => {
   const home = makeHome({
     ".local/share/gavriel-mcp/trusted-device.json": JSON.stringify({ [SECRETS_EMAIL]: "legacy-token" }),
   });
@@ -582,7 +582,7 @@ tKeyring("secrets: saveTrustedToken escribe al keyring cuando está disponible (
   assert.throws(() => readFileSync(legacyPath, "utf8"), "no debería haber tocado el archivo legacy");
 });
 
-t("secrets: saveTrustedToken cae al archivo legacy sin keyring, y clearTrustedToken lo borra", () => {
+tKeyring("secrets: saveTrustedToken cae al archivo legacy sin keyring, y clearTrustedToken lo borra", () => {
   const home = makeHome({});
   const state = join(secretsTmp, "state-8.json");
   runProbe("save-token", SECRETS_EMAIL, {
@@ -694,6 +694,18 @@ tAsync("tools e2e: seg en paths, idSchema en escrituras, roles lite/readonly", a
   const ro = (await (await open("readonly")).listTools()).tools.map((x) => x.name);
   for (const w of WRITE_TOOLS) assert.ok(!ro.includes(w), `readonly no debe incluir ${w}`);
   assert.ok(lite.length > ro.length && full_names.length > lite.length);
+});
+
+await tAsync("devices: preview oculta cloudLiveViewVerification (no el resto)", async () => {
+  const r = await requireConfirm(false, { tool: "update_device", method: "PATCH", path: "/accounts/1/devices/2", params: { chip2: null, cloudLiveViewVerification: "SECRET9", clearCloudLiveViewSecret: true } }, mockClient, async () => { throw new Error("no debería ejecutar"); });
+  assert.equal(r.body.cloudLiveViewVerification, "[REDACTED]");
+  assert.equal(r.body.chip2, null);
+  assert.equal(r.body.clearCloudLiveViewSecret, true);
+  assert.ok(!JSON.stringify(r).includes("SECRET9"));
+});
+
+t("devices: buildBody solo envía null en campos nullable (clear[])", () => {
+  assert.deepEqual(buildBody({ chip2: null, imei: null, serialNumber: "S" }, { optional: ["chip2", "imei", "serialNumber"], nullable: ["chip2"] }), { chip2: null, serialNumber: "S" });
 });
 
 rmSync(secretsTmp, { recursive: true, force: true });

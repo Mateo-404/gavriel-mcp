@@ -1,5 +1,5 @@
 import type { GavrielClient } from "../gavrielClient.js";
-import { ok, buildBody, idSchema } from "./shared.js";
+import { ok, err, buildBody, idSchema } from "./shared.js";
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/server";
 import { requireConfirm, confirmSchema, seg, destructiveGuard, okOrInput } from "./writeHelpers.js";
@@ -133,39 +133,48 @@ export function registerDeviceTools(server: McpServer, client: GavrielClient, ro
   );
 
   // --- Devices (per account) ---
+  const deviceFields = {
+    serialNumber: z.string().min(1).optional().describe("Omitir si el equipo no tiene serie (sirenas, controles)"),
+    zoneId: idSchema.optional().describe("Vincula el equipo a una zona"),
+    deviceModelId: idSchema.optional().describe("Omitir si el modelo no existe en el catálogo"),
+    deviceConnectionTypeId: idSchema.optional(),
+    deviceKindId: idSchema.optional(),
+    alertType: z.enum(["Sonora", "Silenciosa"]).optional(),
+    ownershipType: z.enum(["alquiler", "comodato"]).optional(),
+    chip1: z.string().optional(),
+    chip2: z.string().optional(),
+    imei: z.string().optional(),
+    moduleBrand: z.string().optional(),
+    moduleModel: z.string().optional(),
+    cloudDeviceId: idSchema.optional(),
+    hctCameraResourceId: z.string().optional(),
+    cloudChannelNo: z.number().int().optional(),
+    deviceTaxonomyId: idSchema.optional(),
+    hppDeviceCategory: z.string().optional(),
+    hppDeviceSubCategory: z.string().optional(),
+    cloudLiveViewVerification: z.string().optional().describe("SECRETO: código de verificación de cámara/DVR (cifrado en Gavriel; se oculta en preview y logs)"),
+    clearCloudLiveViewSecret: z.boolean().optional().describe("true = borrar el código guardado"),
+  };
+  const deviceKeys = Object.keys(deviceFields);
+  // Campos que clear[] puede poner en null (el secreto se borra con clearCloudLiveViewSecret).
+  const deviceClearable = deviceKeys.filter((k) => k !== "cloudLiveViewVerification" && k !== "clearCloudLiveViewSecret");
+
+  /** Valida clear[] contra la whitelist; devuelve el error o null. */
+  const checkClear = (clear: string[] | undefined, allowed: readonly string[]) => {
+    const bad = (clear ?? []).filter((k) => !allowed.includes(k));
+    return bad.length ? err(`clear: campos no permitidos: ${bad.join(", ")}. Permitidos: ${allowed.join(", ")}`) : null;
+  };
+  const clearField = z.array(z.string()).optional().describe('Nombres de campos a vaciar (se envían como null), p.ej. ["chip2"]. Solo campos editables de la tool.');
+
   registerTool(
     server, role, "full", "create_device",
     {
       title: "Crear dispositivo en cuenta",
-      description: "POST /accounts/{accountId}/devices. Requiere confirm: true.",
-      inputSchema: {
-        accountId: idSchema,
-        serialNumber: z.string().min(1).optional().describe("Omitir si el equipo no tiene serie"),
-        deviceBrandId: idSchema,
-        deviceModelId: idSchema.optional().describe("Omitir si el modelo no existe en el catálogo"),
-        chip1: z.string().optional(),
-        deviceConnectionTypeId: idSchema.optional(),
-        alertType: z.string().optional().describe("Sonora | Silenciosa"),
-        ownershipType: z.enum(["alquiler", "comodato"]).optional(),
-        chip2: z.string().optional(),
-        imei: z.string().optional(),
-        zoneId: idSchema.optional(),
-        deviceKindId: idSchema.optional(),
-        deviceTaxonomyId: idSchema.optional(),
-        cloudDeviceId: idSchema.optional(),
-        cloudChannelNo: z.number().int().optional(),
-        hppDeviceCategory: z.string().optional(),
-        hppDeviceSubCategory: z.string().optional(),
-        cloudLiveViewVerification: z.string().optional().describe("Código de verificación live view (se guarda cifrado en Gavriel)"),
-        clearCloudLiveViewSecret: z.boolean().optional(),
-        confirm: confirmSchema,
-      },
+      description: "POST /accounts/{accountId}/devices. Usar cuando haya que dar de alta un equipo (panel, sirena, cámara, DVR) en una cuenta. Solo deviceBrandId es obligatorio: serialNumber y deviceModelId son opcionales (accesorios sin serie). No usar para editar un equipo existente (update_device). cloudLiveViewVerification es secreto y se oculta en preview/logs. Requiere confirm: true.",
+      inputSchema: { accountId: idSchema, deviceBrandId: idSchema, ...deviceFields, confirm: confirmSchema },
     },
     async (args) => {
-      const body = buildBody(args as Record<string, unknown>, {
-        required: ["deviceBrandId"],
-        optional: ["serialNumber", "deviceModelId", "chip1", "deviceConnectionTypeId", "alertType", "ownershipType", "chip2", "imei", "zoneId", "deviceKindId", "deviceTaxonomyId", "cloudDeviceId", "cloudChannelNo", "hppDeviceCategory", "hppDeviceSubCategory", "cloudLiveViewVerification", "clearCloudLiveViewSecret"],
-      });
+      const body = buildBody(args as Record<string, unknown>, { required: ["deviceBrandId"], optional: deviceKeys });
       return requireConfirm(
         args.confirm,
         { tool: "create_device", method: "POST", path: `/accounts/${seg(args.accountId)}/devices`, params: body },
@@ -179,38 +188,22 @@ export function registerDeviceTools(server: McpServer, client: GavrielClient, ro
     server, role, "full", "update_device",
     {
       title: "Actualizar dispositivo",
-      description: "PATCH /accounts/{accountId}/devices/{deviceId}. Requiere confirm: true.",
+      description: 'PATCH /accounts/{accountId}/devices/{deviceId}. Usar cuando haya que cambiar o vaciar campos de un equipo existente (serie, modelo, chips, zona, datos nube). Para vaciar un campo usar clear: ["chip2"] (envía null); el secreto live view se borra con clearCloudLiveViewSecret. No usar para crear (create_device) ni borrar (delete_device). Requiere confirm: true.',
       inputSchema: {
         accountId: idSchema,
         deviceId: idSchema,
-        serialNumber: z.string().optional(),
-        chip1: z.string().optional(),
-        deviceConnectionTypeId: idSchema.optional(),
-        deviceModelId: idSchema.optional(),
-        clearChip1: z.boolean().optional().describe("true = enviar chip1: null"),
-        clearChip2: z.boolean().optional().describe("true = enviar chip2: null"),
-        alertType: z.string().optional().describe("Sonora | Silenciosa"),
-        ownershipType: z.enum(["alquiler", "comodato"]).optional(),
-        chip2: z.string().optional(),
-        imei: z.string().optional(),
-        zoneId: idSchema.optional(),
-        deviceKindId: idSchema.optional(),
-        deviceTaxonomyId: idSchema.optional(),
-        cloudDeviceId: idSchema.optional(),
-        cloudChannelNo: z.number().int().optional(),
-        hppDeviceCategory: z.string().optional(),
-        hppDeviceSubCategory: z.string().optional(),
-        cloudLiveViewVerification: z.string().optional().describe("Código de verificación live view (se guarda cifrado en Gavriel)"),
-        clearCloudLiveViewSecret: z.boolean().optional(),
+        ...deviceFields,
+        clear: clearField,
+        clearChip1: z.boolean().optional().describe('Obsoleto: usar clear:["chip1"]'),
+        clearChip2: z.boolean().optional().describe('Obsoleto: usar clear:["chip2"]'),
         confirm: confirmSchema,
       },
     },
     async (args) => {
-      const body = buildBody(args as Record<string, unknown>, {
-        optional: ["serialNumber", "chip1", "deviceConnectionTypeId", "deviceModelId", "alertType", "ownershipType", "chip2", "imei", "zoneId", "deviceKindId", "deviceTaxonomyId", "cloudDeviceId", "cloudChannelNo", "hppDeviceCategory", "hppDeviceSubCategory", "cloudLiveViewVerification", "clearCloudLiveViewSecret"],
-      });
-      if (args.clearChip1) body.chip1 = null;
-      if (args.clearChip2) body.chip2 = null;
+      const clear = [...(args.clear ?? []), ...(args.clearChip1 ? ["chip1"] : []), ...(args.clearChip2 ? ["chip2"] : [])];
+      const bad = checkClear(clear, deviceClearable);
+      if (bad) return bad;
+      const body = buildBody({ ...args, ...Object.fromEntries(clear.map((k) => [k, null])) } as Record<string, unknown>, { optional: deviceKeys, nullable: clear });
       return requireConfirm(
         args.confirm,
         { tool: "update_device", method: "PATCH", path: `/accounts/${seg(args.accountId)}/devices/${seg(args.deviceId)}`, params: body },
@@ -278,7 +271,7 @@ export function registerDeviceTools(server: McpServer, client: GavrielClient, ro
     server, role, "full", "create_zone",
     {
       title: "Crear zona en cuenta existente",
-      description: "POST /zones. Crea una zona en una cuenta que YA existe. Requiere confirm: true.",
+      description: "POST /zones. Usar cuando haya que crear una zona en una cuenta que YA existe, opcionalmente con su equipo (serialNumber, deviceBrandId, deviceModelId). No usar para cuentas nuevas. Requiere confirm: true.",
       inputSchema: { accountId: idSchema, ...zoneFields, confirm: confirmSchema },
     },
     async (args) => {
@@ -296,17 +289,21 @@ export function registerDeviceTools(server: McpServer, client: GavrielClient, ro
     server, role, "full", "update_zone",
     {
       title: "Actualizar zona",
-      description: "PATCH /zones/{zoneId}. Requiere confirm: true.",
+      description: "PATCH /zones/{zoneId}. Usar cuando haya que editar una zona o vincularle un equipo (serialNumber, deviceBrandId, deviceModelId); clear:[...] vacía campos (null). No usar para crear zonas (create_zone). Requiere confirm: true.",
       inputSchema: {
         zoneId: idSchema,
         code: z.string().optional(),
         name: z.string().optional(),
         ...Object.fromEntries(Object.entries(zoneFields).filter(([k]) => k !== "code" && k !== "name")),
+        clear: clearField,
         confirm: confirmSchema,
       },
     },
     async (args) => {
-      const body = buildBody(args as Record<string, unknown>, { optional: zoneKeys });
+      const bad = checkClear(args.clear, zoneKeys.filter((k) => k !== "code" && k !== "name"));
+      if (bad) return bad;
+      const clear = args.clear ?? [];
+      const body = buildBody({ ...args, ...Object.fromEntries(clear.map((k) => [k, null])) } as Record<string, unknown>, { optional: zoneKeys, nullable: clear });
       return requireConfirm(
         args.confirm,
         { tool: "update_zone", method: "PATCH", path: `/zones/${seg(args.zoneId)}`, params: body },
@@ -320,7 +317,7 @@ export function registerDeviceTools(server: McpServer, client: GavrielClient, ro
     server, role, "full", "hik_cloud_lookup",
     {
       title: "Lookup nube Hikvision por serie (consulta)",
-      description: "POST /accounts/{accountId}/devices/hik-cloud-lookup. Devuelve cloudDeviceId, deviceTaxonomyId y categoría HPP. Requiere confirm: true.",
+      description: "POST /accounts/{accountId}/devices/hik-cloud-lookup. Usar cuando haya que obtener cloudDeviceId, deviceTaxonomyId y categoría HPP de un equipo Hikvision por serie. Es un POST que consulta Hik-Partner Pro (efecto de solo lectura, pero llama a un servicio externo). Si la respuesta no trae deviceTaxonomyId se agrega `warnings`. No usar para modificar equipos. Requiere confirm: true.",
       inputSchema: {
         accountId: idSchema,
         deviceBrandId: idSchema,
@@ -337,7 +334,19 @@ export function registerDeviceTools(server: McpServer, client: GavrielClient, ro
         { tool: "hik_cloud_lookup", method: "POST", path, params: body },
         client,
         () => client.post(path, body),
-      ).then(ok);
+      ).then((r) => ok(withTaxonomyWarning(r)));
     },
   );
+}
+
+/** Lookup encontrado pero sin deviceTaxonomyId: avisa (issue #31, faltan taxonomías en el catálogo del backend). */
+export function withTaxonomyWarning(r: unknown): unknown {
+  const res = r as { data?: Record<string, unknown> } | null;
+  const d = res?.data;
+  if (!d || typeof d !== "object" || d.found !== true || d.deviceTaxonomyId) return r;
+  const warnings = [
+    `La taxonomía no existe en el catálogo (categoría: ${d.deviceCategory ?? "?"}, subcategoría: ${d.deviceSubCategory ?? "?"}). ` +
+    "Consultar list_catalog kind device-taxonomies y usar una taxonomía genérica de la categoría; hppDeviceCategory/hppDeviceSubCategory se pueden enviar igual.",
+  ];
+  return { ...res, warnings };
 }

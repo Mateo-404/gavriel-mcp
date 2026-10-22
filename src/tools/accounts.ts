@@ -11,6 +11,26 @@ const ACCOUNT_FIELDS = [
   "companyTechnicalId", "companyMonitoringId", "jurisdictionId",
 ] as const;
 
+const asArray = (d: unknown): unknown[] =>
+  Array.isArray(d) ? d : Array.isArray((d as { data?: unknown })?.data) ? (d as { data: unknown[] }).data : [];
+
+// Claves escalares útiles de un dispositivo; los objetos anidados se reducen a {id,name}.
+const DEVICE_LEAN_KEYS = [
+  "id", "serialNumber", "deviceBrandId", "deviceModelId", "deviceKindId", "deviceConnectionTypeId", "deviceTaxonomyId",
+  "zoneId", "chip1", "chip2", "imei", "alertType", "ownershipType", "cloudDeviceId", "cloudChannelNo", "status",
+] as const;
+const DEVICE_NESTED = ["deviceBrand", "deviceModel", "deviceKind", "deviceConnectionType", "zone"] as const;
+
+export function leanDevice(d: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const k of DEVICE_LEAN_KEYS) if (d[k] !== undefined) out[k] = d[k];
+  for (const k of DEVICE_NESTED) {
+    const n = d[k] as Record<string, unknown> | null | undefined;
+    if (n && typeof n === "object") out[k] = { id: n.id, name: n.name ?? n.code };
+  }
+  return out;
+}
+
 export function registerAccountTools(server: McpServer, client: GavrielClient, role: Role): void {
   server.registerTool(
     "get_account",
@@ -99,6 +119,7 @@ export function registerAccountTools(server: McpServer, client: GavrielClient, r
               search: z.string().optional().describe("Búsqueda libre (nombre/código)"),
               name: z.string().optional().describe("Filtro por nombre de cuenta"),
               code: z.string().optional().describe("Filtro por código de cuenta"),
+              exact: z.boolean().optional().describe("true = deja solo cuentas cuyo accountNumber es exactamente code (o search si no hay code); acepta número sin ceros"),
               truncate: truncateSchema,
               fields: fieldsSchema,
             }),
@@ -108,6 +129,12 @@ export function registerAccountTools(server: McpServer, client: GavrielClient, r
       const params: Record<string, unknown> = { page: args.page, limit: args.limit, ...forwardParams(args as Record<string, unknown>, ["search", "name", "code"]) };
       const res = await client.get("/accounts", params, { signal: ctx.mcpReq.signal });
       let data = res.data;
+      const target = args.code ?? args.search;
+      if (args.exact && target) {
+        const want = normalizeAccountNumber(target);
+        const hit = (a: unknown) => normalizeAccountNumber(String((a as { accountNumber?: unknown }).accountNumber ?? "")) === want;
+        data = Array.isArray(data) ? data.filter(hit) : { ...(data as object), data: asArray(data).filter(hit) };
+      }
       if (args.fields && Array.isArray(data)) {
         data = data.map((item) => selectFields(item as Record<string, unknown>, args.fields as string[]));
       }
@@ -260,12 +287,13 @@ export function registerAccountTools(server: McpServer, client: GavrielClient, r
     "list_account_devices",
     {
       title: "Listar dispositivos de cuenta",
-      description: "Usar cuando necesitás los dispositivos instalados en una cuenta (filtrables por marca/modelo). Para un panorama completo ver get_account_dashboard.",
+      description: "Usar cuando necesitás los dispositivos instalados en una cuenta (filtrables por marca/modelo). Por defecto devuelve una proyección liviana (ids, serie, marca/modelo/tipo {id,name}, zona, chips, imei, ids cloud, estado); `fields` elige claves exactas y `full: true` devuelve todo. Para un panorama completo ver get_account_dashboard.",
       inputSchema: z.object({
               id: z.string(),
               brandId: z.string().optional().describe("Filtrar por marca"),
               modelId: z.string().optional().describe("Filtrar por modelo"),
               status: z.string().optional().describe("Filtrar por estado"),
+              full: z.boolean().optional().describe("true = objetos completos sin proyección"),
               truncate: truncateSchema,
               fields: fieldsSchema,
             }),
@@ -278,8 +306,10 @@ export function registerAccountTools(server: McpServer, client: GavrielClient, r
       if (args.status) params.status = args.status;
       const res = await client.get(`/accounts/${seg(args.id)}/devices`, Object.keys(params).length ? params : undefined, { signal: ctx.mcpReq.signal });
       let data = res.data;
-      if (args.fields && Array.isArray(data)) {
-        data = data.map((item) => selectFields(item as Record<string, unknown>, args.fields as string[]));
+      if (Array.isArray(data)) {
+        data = args.fields
+          ? data.map((item) => selectFields(item as Record<string, unknown>, args.fields as string[]))
+          : args.full ? data : data.map((item) => leanDevice(item as Record<string, unknown>));
       }
       return okTruncated(data, args.truncate);
     }),
@@ -381,9 +411,11 @@ export function registerAccountTools(server: McpServer, client: GavrielClient, r
     "list_account_zones",
     {
       title: "Listar zonas de cuenta",
-      description: "Usar cuando necesitás las zonas de alarma configuradas en una cuenta.",
+      description: "Usar cuando necesitás las zonas de alarma configuradas en una cuenta. Por defecto cada zona viene sin el objeto `account` anidado (repetido en todas); pedilo con include:[\"account\"] o full:true.",
       inputSchema: z.object({
               id: z.string(),
+              include: z.array(z.enum(["account"])).optional().describe("Secciones anidadas a conservar (default: ninguna)"),
+              full: z.boolean().optional().describe("true = zonas completas, con account anidado"),
               truncate: truncateSchema,
               fields: fieldsSchema,
             }),
@@ -392,6 +424,9 @@ export function registerAccountTools(server: McpServer, client: GavrielClient, r
     wrapReadOnly(async (args, ctx) => {
       const res = await client.get(`/zones/account/${seg(args.id)}`, undefined, { signal: ctx.mcpReq.signal });
       let data = res.data;
+      if (Array.isArray(data) && !args.full && !args.include?.includes("account")) {
+        data = data.map((z) => { const { account: _a, ...rest } = z as Record<string, unknown>; return rest; });
+      }
       if (args.fields && Array.isArray(data)) {
         data = data.map((item) => selectFields(item as Record<string, unknown>, args.fields as string[]));
       }

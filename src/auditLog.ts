@@ -28,6 +28,7 @@ const SENSITIVE_SUBSTR = /password|passwd|token|secret|authorization|cookie|apik
 const SENSITIVE_WORDS = new Set(["pass", "pwd", "jwt", "otp", "seed", "2fa", "pin"]);
 const SENSITIVE_KEY = {
   test(k: string): boolean {
+    if (k === "clearCloudLiveViewSecret") return false; // flag booleano, no el secreto
     const words = k.replace(/([a-z0-9])([A-Z])/g, "$1_$2").toLowerCase().split(/[^a-z0-9]+/);
     return SENSITIVE_SUBSTR.test(words.join("")) || words.some((w) => SENSITIVE_WORDS.has(w));
   },

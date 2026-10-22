@@ -6,7 +6,7 @@ import type {
   ServerContext,
   CallToolResult,
 } from "@modelcontextprotocol/server";
-import type { z } from "zod";
+import { z } from "zod";
 import { isDestructive } from "./writeHelpers.js";
 
 // Rol del server (GAVRIEL_MCP_ROLE).
@@ -94,4 +94,38 @@ export function withDefaultAnnotations<C extends ToolConfigBase>(name: string, c
       ...a,
     },
   };
+}
+
+function lev(a: string, b: string): number {
+  let prev = Array.from({ length: b.length + 1 }, (_, j) => j);
+  for (let i = 1; i <= a.length; i++) {
+    const cur = [i];
+    for (let j = 1; j <= b.length; j++) {
+      cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+    }
+    prev = cur;
+  }
+  return prev[b.length];
+}
+
+// Rechaza argumentos desconocidos (un cliente con schemas viejos cacheados descartaba params nuevos en silencio).
+// Acepta raw shape o z.object; cualquier otro schema pasa sin tocar.
+export function strictInput(schema: unknown): unknown {
+  let obj: z.ZodObject | undefined;
+  if (schema instanceof z.ZodObject) obj = schema;
+  else if (
+    schema && typeof schema === "object" && !("~standard" in schema) &&
+    Object.values(schema).every((v) => v instanceof z.ZodType)
+  ) obj = z.object(schema as RawShape);
+  if (!obj) return schema;
+  const known = Object.keys(obj.shape);
+  const error = (iss: { code: string; keys?: string[] }) => {
+    if (iss.code !== "unrecognized_keys") return undefined;
+    const parts = (iss.keys ?? []).map((k) => {
+      const near = known.find((n) => lev(k.toLowerCase(), n.toLowerCase()) <= 2);
+      return near ? `"${k}" (¿quisiste decir "${near}"?)` : `"${k}"`;
+    });
+    return `Argumentos desconocidos: ${parts.join(", ")}. Parámetros válidos: ${known.join(", ")}. Si recién reconstruiste el server, reiniciá la sesión del cliente MCP (schemas cacheados).`;
+  };
+  return obj.clone({ ...obj._zod.def, catchall: z.never(), error } as never);
 }

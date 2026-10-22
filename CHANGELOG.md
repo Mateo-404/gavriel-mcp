@@ -9,11 +9,18 @@ tag `vX.Y.Z`.
 ## [Unreleased]
 
 ### Changed
+- Windows DPAPI now uses .NET `ProtectedData` directly (same blob format as `ConvertFrom-SecureString`, existing secrets stay readable); the PowerShell security module could not be loaded on the GitHub runner, which broke the Windows CI.
 - Dependencies at latest: zod 4.6.7, @types/node 26.6.5, tsx 4.23.15, Biome 2.6.2 and mcpb 2.1.2 as pinned devDependencies, pnpm 12.14.0. SDK 2.3.1, TypeScript 7.0.2, esbuild 0.28.2 were already current.
 - Node >=24 (LTS); CI matrix Node 24 and 26; upload-artifact v7, download-artifact v8, attest-build-provenance v4. Lint is now blocking in CI.
 - Date-time inputs use a lightweight `isoDateTime` schema (zod 4.6 injected a ~250-char regex per field into `tools/list`).
 
 ### Added
+- Devices and zones: `create_device`/`update_device` accept the full backend form (zoneId, deviceKindId, alertType, ownershipType, chips, imei, moduleBrand/Model, cloud and Hik ids, taxonomy, camera verification code); serial and model are optional for accessories; `clear: string[]` empties fields (validated against a whitelist); `cloudLiveViewVerification` is redacted in previews and logs (#24, #25, #27).
+- `hik_cloud_lookup` warns when the Hik taxonomy is missing from the catalog and points to the generic one (#26, #31).
+- `bulk_upsert_account_devices`: repeatable load of up to 50 devices into one account with a single preview (#30).
+- `search_accounts`/`list_accounts` `exact`, lean `list_account_zones` and `list_account_devices` by default (`full: true` for everything) (#30).
+- Every tool now rejects unknown arguments with a "did you mean" hint, so a stale client schema fails loudly instead of dropping parameters (#29).
+- `list_catalog` `device-kinds` uses `/device-kinds/active` (plain `/device-kinds` is 404) (#28).
 - Installers: `gavriel install` / `uninstall` (self-install the single executable to a per-user folder, user PATH on Windows, optional MCP registration), `scripts/install.mjs` (from source: `pnpm run install:cli|install:mcp|uninstall:cli`), `scripts/install.ps1` and `scripts/install.sh` (download from the release and verify SHA-256).
 - One executable is now CLI + MCP server: `gavriel mcp serve` (`src/serve.ts`); `gavriel-mcp` keeps working.
 - MCP registration for **Codex** (`~/.codex/config.toml`) and **OpenCode** (`opencode.json`) besides Claude Desktop and Claude Code: `gavriel mcp install --client desktop|code|codex|opencode|all`, plus `gavriel mcp uninstall`.

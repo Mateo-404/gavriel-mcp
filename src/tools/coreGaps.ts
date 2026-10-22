@@ -19,7 +19,7 @@ const CATALOGS = {
   "device-connection-types": { path: "/device-connection-types", paged: true, active: true, write: ["name", "code", "description", "isActive"] },
   "device-brands": { path: "/device-brands", paged: true, active: true },
   "device-models": { path: "/device-models", paged: true },
-  "device-kinds": { path: "/device-kinds", active: true },
+  "device-kinds": { path: "/device-kinds/active" }, // /device-kinds a secas responde 404: solo existe /active (issue #28)
   "device-taxonomies": { path: "/device-taxonomies" },
   "events-formats": { path: "/events-formats", paged: true },
   states: { path: "/states" },
@@ -96,7 +96,7 @@ export function registerCoreGapTools(server: McpServer, client: GavrielClient, r
       ...paginationSchema,
       catalog: z.enum(READ_CATALOGS).describe("Catálogo a listar"),
       search: z.string().optional().describe("Filtro por nombre (solo catálogos paginados)"),
-      active: z.boolean().optional().describe("Solo activos (intervention-categories, device-connection-types, device-brands, device-kinds)"),
+      active: z.boolean().optional().describe("Solo activos (intervention-categories, device-connection-types, device-brands; device-kinds ya es solo activos)"),
       stateId: z.string().optional().describe("Requerido para cities"),
       brandId: id("Marca (solo device-models)").optional(),
       truncate: truncateSchema,
