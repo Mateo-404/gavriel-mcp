@@ -1,5 +1,5 @@
 import type { GavrielClient } from "../gavrielClient.js";
-import { ok, okTruncated, truncateSchema, selectFields, wrapReadOnly, buildBody, fieldsSchema, idSchema } from "./shared.js";
+import { ok, okTruncated, truncateSchema, selectFields, wrapReadOnly, buildBody, fieldsSchema, idSchema, ensureOk } from "./shared.js";
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/server";
 import { requireConfirm, confirmSchema, seg } from "./writeHelpers.js";
@@ -18,7 +18,7 @@ export function registerServiceTools(server: McpServer, client: GavrielClient, r
     },
     wrapReadOnly(async (args) => {
       const res = await client.get("/services/panel");
-      return okTruncated(res.data, args.truncate);
+      return okTruncated(ensureOk(res), args.truncate);
     }),
   );
 
@@ -34,7 +34,7 @@ export function registerServiceTools(server: McpServer, client: GavrielClient, r
     },
     wrapReadOnly(async (args) => {
       const res = await client.get("/services/panel/summary");
-      return okTruncated(res.data, args.truncate);
+      return okTruncated(ensureOk(res), args.truncate);
     }),
   );
 
@@ -56,7 +56,7 @@ export function registerServiceTools(server: McpServer, client: GavrielClient, r
         userId: args.userId,
         date: args.date,
       });
-      return okTruncated(selectFields(res.data as Record<string, unknown>, args.fields), args.truncate);
+      return okTruncated(selectFields(ensureOk(res) as Record<string, unknown>, args.fields), args.truncate);
     }),
   );
 
@@ -73,7 +73,7 @@ export function registerServiceTools(server: McpServer, client: GavrielClient, r
     },
     wrapReadOnly(async (args) => {
       const res = await client.get(`/services/${seg(args.id)}`);
-      return ok(selectFields(res.data as Record<string, unknown>, args.fields));
+      return ok(selectFields(ensureOk(res) as Record<string, unknown>, args.fields));
     }),
   );
 

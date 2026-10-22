@@ -4557,7 +4557,7 @@
           "description": "Catálogo a listar"
         },
         "search": {
-          "description": "Filtro por nombre (solo catálogos paginados)",
+          "description": "Filtro por nombre (en catálogos sin paginado se filtra localmente por name)",
           "type": "string"
         },
         "active": {
@@ -4738,7 +4738,7 @@
           "type": "string"
         },
         "type": {
-          "description": "Tipo de conexión",
+          "description": "Tipo de conexión: server o client (otro valor da 500 en el backend)",
           "type": "string"
         },
         "activated": {
@@ -5878,6 +5878,11 @@
           "type": "integer",
           "minimum": 1,
           "maximum": 200
+        },
+        "includeHealth": {
+          "default": false,
+          "description": "Incluir health logs por conexión (el backend tarda ~16 s); por defecto se usa lastHeartbeatAt de la conexión",
+          "type": "boolean"
         }
       },
       "$schema": "https://json-schema.org/draft/2020-12/schema",

@@ -1,5 +1,5 @@
 import type { GavrielClient } from "../gavrielClient.js";
-import { ok, paginationSchema, okTruncated, truncateSchema, selectFields, wrapReadOnly, forwardParams, fieldsSchema, idSchema } from "./shared.js";
+import { ok, paginationSchema, okTruncated, truncateSchema, selectFields, wrapReadOnly, forwardParams, fieldsSchema, idSchema, ensureOk } from "./shared.js";
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/server";
 import { requireConfirm, confirmSchema, seg } from "./writeHelpers.js";
@@ -22,9 +22,11 @@ export function registerOrgTools(server: McpServer, client: GavrielClient, role:
       annotations: { readOnlyHint: true },
     },
     wrapReadOnly(async (args) => {
-      const params: Record<string, unknown> = { page: args.page, limit: args.limit, ...forwardParams(args as Record<string, unknown>, ["search"]) };
-      const res = await client.get("/companies", params, { ttl: CACHE_TTL });
-      return okTruncated(selectFields(res.data as Record<string, unknown>, args.fields), args.truncate);
+      // /companies no acepta `search` (400): filtra por name o code (AND si van juntos), así que se prueba name y luego code.
+      const base = { page: args.page, limit: args.limit };
+      let data = ensureOk<{ data?: unknown[] }>(await client.get("/companies", args.search ? { ...base, name: args.search } : base, { ttl: CACHE_TTL }), "/companies");
+      if (args.search && Array.isArray(data?.data) && data.data.length === 0) data = ensureOk(await client.get("/companies", { ...base, code: args.search }, { ttl: CACHE_TTL }), "/companies");
+      return okTruncated(selectFields(data as Record<string, unknown>, args.fields), args.truncate);
     }),
   );
 
@@ -42,7 +44,7 @@ export function registerOrgTools(server: McpServer, client: GavrielClient, role:
     },
     wrapReadOnly(async (args) => {
       const res = await client.get(`/companies/${seg(args.id)}/technicians`);
-      return okTruncated(selectFields(res.data as Record<string, unknown>, args.fields), args.truncate);
+      return okTruncated(selectFields(ensureOk(res) as Record<string, unknown>, args.fields), args.truncate);
     }),
   );
 
@@ -62,7 +64,7 @@ export function registerOrgTools(server: McpServer, client: GavrielClient, role:
     wrapReadOnly(async (args) => {
       const params: Record<string, unknown> = { page: args.page, limit: args.limit, ...forwardParams(args as Record<string, unknown>, ["search"]) };
       const res = await client.get("/users", params);
-      return okTruncated(selectFields(res.data as Record<string, unknown>, args.fields), args.truncate);
+      return okTruncated(selectFields(ensureOk(res) as Record<string, unknown>, args.fields), args.truncate);
     }),
   );
 
@@ -78,7 +80,7 @@ export function registerOrgTools(server: McpServer, client: GavrielClient, role:
     },
     wrapReadOnly(async (args) => {
       const res = await client.get("/roles", undefined, { ttl: CACHE_TTL });
-      return okTruncated(res.data, args.truncate);
+      return okTruncated(ensureOk(res), args.truncate);
     }),
   );
 
@@ -92,7 +94,7 @@ export function registerOrgTools(server: McpServer, client: GavrielClient, role:
     },
     wrapReadOnly(async (_args) => {
       const res = await client.get("/auth/profile");
-      return ok(res.data);
+      return ok(ensureOk(res));
     }),
   );
 

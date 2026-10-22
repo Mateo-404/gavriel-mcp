@@ -48,7 +48,11 @@ export function registerTelephonyAndOpsTools(server: McpServer, client: GavrielC
       inputSchema: z.object({}),
       annotations: { readOnlyHint: true },
     },
-    wrapReadOnly(async () => ok(ensureOk(await client.get("/sip/me"), "sip/me"))),
+    wrapReadOnly(async () => {
+      // El backend devuelve la contraseña SIP en claro por perfil: no se expone al agente.
+      const d = ensureOk<{ profiles?: Record<string, unknown>[] }>(await client.get("/sip/me"), "sip/me");
+      return ok(Array.isArray(d?.profiles) ? { ...d, profiles: d.profiles.map(({ password, ...p }) => ({ ...p, hasPassword: !!password })) } : d);
+    }),
   );
 
   registerTool(

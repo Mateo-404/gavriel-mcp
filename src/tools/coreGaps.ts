@@ -24,7 +24,7 @@ const CATALOGS = {
   "events-formats": { path: "/events-formats", paged: true },
   states: { path: "/states" },
   cities: { path: "/cities" },
-  "ticket-categories": { path: "/ticket-categories", paged: true },
+  "ticket-categories": { path: "/ticket-categories" }, // no pagina ni filtra: search se aplica acá por nombre
   "ticket-priority-options": { path: "/tickets/priority-options" },
   "ticket-status-options": { path: "/tickets/status-options" },
   "activity-type-options": { path: "/activities/type-options" },
@@ -95,7 +95,7 @@ export function registerCoreGapTools(server: McpServer, client: GavrielClient, r
     {
       ...paginationSchema,
       catalog: z.enum(READ_CATALOGS).describe("Catálogo a listar"),
-      search: z.string().optional().describe("Filtro por nombre (solo catálogos paginados)"),
+      search: z.string().optional().describe("Filtro por nombre (en catálogos sin paginado se filtra localmente por name)"),
       active: z.boolean().optional().describe("Solo activos (intervention-categories, device-connection-types, device-brands; device-kinds ya es solo activos)"),
       stateId: z.string().optional().describe("Requerido para cities"),
       brandId: id("Marca (solo device-models)").optional(),
@@ -110,8 +110,14 @@ export function registerCoreGapTools(server: McpServer, client: GavrielClient, r
       else if (a.active && c.active) path += "/active";
       const params: Record<string, unknown> = c.paged && !(a.active && c.active) ? { page: a.page, limit: a.limit, ...(a.search ? Object.fromEntries((SEARCH_FIELDS[a.catalog as CatalogName] ?? ["name"]).map((f) => [f, a.search])) : {}) } : {};
       if (a.stateId) params.stateId = a.stateId;
-      const res = await client.get(path, params);
-      return out(ensureOk(res, path), a);
+      let data = ensureOk<unknown>(await client.get(path, params), path);
+      if (a.search && !(c as { paged?: boolean }).paged) {
+        const q = String(a.search).toLowerCase();
+        const keep = (l: unknown[]) => l.filter((x) => String((x as { name?: unknown })?.name ?? "").toLowerCase().includes(q));
+        const env = data as { data?: unknown[] } | null;
+        data = Array.isArray(data) ? keep(data) : Array.isArray(env?.data) ? { ...env, data: keep(env.data) } : data;
+      }
+      return out(data, a);
     },
   );
 

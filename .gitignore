@@ -86,4 +86,4 @@ analysis/
 /Microsoft/
 
 # directorios temporales de tests (proyectos aislados dentro del repo)
-/.tmp-*/
+/.tmp-*

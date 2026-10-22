@@ -1,5 +1,5 @@
 import type { GavrielClient } from "../gavrielClient.js";
-import { ok, buildBody, wrapReadOnly, okTruncated, idSchema } from "./shared.js";
+import { ok, buildBody, wrapReadOnly, okTruncated, idSchema, ensureOk, itemsOf } from "./shared.js";
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/server";
 import { requireConfirm, confirmSchema, seg, destructiveGuard, okOrInput } from "./writeHelpers.js";
@@ -7,6 +7,22 @@ import { registerTool, type Role } from "./roles.js";
 
 interface EventType { id: string; name: string; title?: string; eventsCodes?: Array<{ code: string; id: string; eventsTypeId?: string }> }
 interface EventCode { id: string; code: string; name?: string; eventsTypeId?: string; eventsFormatId?: string }
+
+// /events-types responde {data,meta}; /events-codes GET lista da 500 y limit>100 da 400, así que los códigos
+// de un formato salen de /events-formats/{id}.eventsCodes (trae todos).
+async function fetchTypes(client: GavrielClient): Promise<EventType[]> {
+  const all: EventType[] = [];
+  for (let page = 1; page <= 20; page++) {
+    const d = ensureOk<{ meta?: { pagination?: { pages?: number } } }>(await client.get("/events-types", { limit: 200, page }), "/events-types");
+    all.push(...(itemsOf(d) as unknown as EventType[]));
+    if (page >= (d?.meta?.pagination?.pages ?? 1)) break;
+  }
+  return all;
+}
+async function fetchCodes(client: GavrielClient, formatId: string): Promise<EventCode[]> {
+  const f = ensureOk<{ eventsCodes?: EventCode[] }>(await client.get(`/events-formats/${seg(formatId)}`), "/events-formats/{id}");
+  return Array.isArray(f?.eventsCodes) ? f.eventsCodes : [];
+}
 
 export function registerEventCatalogTools(server: McpServer, client: GavrielClient, role: Role): void {
   registerTool(
@@ -218,8 +234,7 @@ export function registerEventCatalogTools(server: McpServer, client: GavrielClie
       annotations: { readOnlyHint: true },
     },
     wrapReadOnly(async (args) => {
-      const { data } = await client.get("/events-types", { limit: 200 });
-      const types = Array.isArray(data) ? data as EventType[] : [];
+      const types = await fetchTypes(client);
       const byName = new Map<string, EventType[]>();
       for (const t of types) {
         const key = (t.name ?? "").trim().toUpperCase();
@@ -257,8 +272,7 @@ export function registerEventCatalogTools(server: McpServer, client: GavrielClie
       annotations: { readOnlyHint: true },
     },
     wrapReadOnly(async (args) => {
-      const { data } = await client.get("/events-codes", { limit: 500, eventsFormatId: args.eventsFormatId });
-      const codes = Array.isArray(data) ? data as EventCode[] : [];
+      const codes = await fetchCodes(client, args.eventsFormatId);
       const byCode = new Map<string, EventCode[]>();
       for (const c of codes) {
         const key = (c.code ?? "").trim().toUpperCase();
@@ -291,12 +305,7 @@ export function registerEventCatalogTools(server: McpServer, client: GavrielClie
       annotations: { readOnlyHint: true },
     },
     wrapReadOnly(async (args) => {
-      const [typesRes, codesRes] = await Promise.all([
-        client.get("/events-types", { limit: 200 }),
-        client.get("/events-codes", { limit: 500, eventsFormatId: args.eventsFormatId }),
-      ]);
-      const types = Array.isArray(typesRes.data) ? typesRes.data as EventType[] : [];
-      const codes = Array.isArray(codesRes.data) ? codesRes.data as EventCode[] : [];
+      const [types, codes] = await Promise.all([fetchTypes(client), fetchCodes(client, args.eventsFormatId)]);
 
       const codeTypeIds = new Set(codes.map((c) => c.eventsTypeId).filter(Boolean));
       const orphanTypes = types

@@ -1,5 +1,5 @@
 import type { GavrielClient } from "../gavrielClient.js";
-import { ok, okTruncated, wrapReadOnly, truncateSchema, selectFields, fieldsSchema, forwardParams } from "./shared.js";
+import { ok, okTruncated, wrapReadOnly, truncateSchema, selectFields, fieldsSchema, forwardParams, ensureOk } from "./shared.js";
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/server";
 import { requireConfirm, confirmSchema, destructiveGuard, okOrInput, seg } from "./writeHelpers.js";
@@ -10,6 +10,17 @@ const id = (d: string) => z.string().regex(ID).describe(d);
 const CLOUDS = z.array(z.string().regex(ID)).optional().describe("Nubes/proveedores a consultar (ej: hpp, imou, ezviz). Se envía como CSV");
 
 const RO = { readOnlyHint: true } as const;
+
+// /video/cameras y /cloud-devices-inventory responden {equipos:[...]} (cientos/miles de ítems): `fields` y `truncate` actúan sobre equipos.
+export function shapeEquipos(d: unknown, fields?: string[], truncate?: number) {
+  const o = d as { equipos?: Record<string, unknown>[] } | null;
+  if (!o || !Array.isArray(o.equipos)) return okTruncated(selectFields(d as Record<string, unknown>, fields), truncate);
+  const eq = fields?.length ? (selectFields(o.equipos, fields) as Record<string, unknown>[]) : o.equipos;
+  const wrap = (n: number) => ({ ...o, equipos: eq.slice(0, n), ...(n < eq.length ? { _truncado: `Se devuelven ${n} de ${eq.length} equipos. Usá fields/truncate más alto.` } : {}) });
+  let n = eq.length;
+  while (truncate && n > 1 && JSON.stringify(wrap(n)).length > truncate) n = Math.max(1, Math.floor(n / 2));
+  return ok(wrap(n));
+}
 
 export function registerVideoTools(server: McpServer, client: GavrielClient, role: Role): void {
   server.registerTool(
@@ -27,7 +38,7 @@ export function registerVideoTools(server: McpServer, client: GavrielClient, rol
     },
     wrapReadOnly(async (args) => {
       const res = await client.get("/video/cameras", args.fresh ? { fresh: 1 } : undefined);
-      return okTruncated(selectFields(res.data as Record<string, unknown>, args.fields), args.truncate);
+      return shapeEquipos(ensureOk(res), args.fields, args.truncate);
     }),
   );
 
@@ -50,7 +61,7 @@ export function registerVideoTools(server: McpServer, client: GavrielClient, rol
       const res = args.eventId
         ? await client.get(`/video/events/${seg(args.eventId)}/cameras`)
         : await client.get("/video/events/account-cameras", { accountId: args.accountId });
-      return okTruncated(selectFields(res.data as Record<string, unknown>, args.fields), args.truncate);
+      return okTruncated(selectFields(ensureOk(res) as Record<string, unknown>, args.fields), args.truncate);
     }),
   );
 
@@ -73,7 +84,7 @@ export function registerVideoTools(server: McpServer, client: GavrielClient, rol
       const res = args.eventId
         ? await client.get(`/video/event-clips/${seg(args.eventId)}`)
         : await client.get("/video/event-clips", { eventIds: args.eventIds!.join(",") });
-      return okTruncated(selectFields(res.data as Record<string, unknown>, args.fields), args.truncate);
+      return okTruncated(selectFields(ensureOk(res) as Record<string, unknown>, args.fields), args.truncate);
     }),
   );
 
@@ -108,7 +119,7 @@ export function registerVideoTools(server: McpServer, client: GavrielClient, rol
         if (args.channelNo === undefined || !args.from || !args.to) throw new Error("segments requiere channelNo, from y to");
         res = await client.get("/video/playback/segments", { ...base, channelNo: args.channelNo, from: args.from, to: args.to, ...(clouds ? { clouds } : {}) });
       }
-      return okTruncated(selectFields(res.data as Record<string, unknown>, args.fields), args.truncate);
+      return okTruncated(selectFields(ensureOk(res) as Record<string, unknown>, args.fields), args.truncate);
     }),
   );
 
@@ -127,7 +138,7 @@ export function registerVideoTools(server: McpServer, client: GavrielClient, rol
     },
     wrapReadOnly(async (args) => {
       const res = await client.get(args.id ? `/video/walls/${seg(args.id)}` : "/video/walls");
-      return okTruncated(selectFields(res.data as Record<string, unknown>, args.fields), args.truncate);
+      return okTruncated(selectFields(ensureOk(res) as Record<string, unknown>, args.fields), args.truncate);
     }),
   );
 
@@ -146,7 +157,7 @@ export function registerVideoTools(server: McpServer, client: GavrielClient, rol
     },
     wrapReadOnly(async (args) => {
       const res = await client.get("/cloud-devices-inventory", args.fresh ? { fresh: 1 } : undefined);
-      return okTruncated(selectFields(res.data as Record<string, unknown>, args.fields), args.truncate);
+      return shapeEquipos(ensureOk(res), args.fields, args.truncate);
     }),
   );
 
@@ -166,7 +177,7 @@ export function registerVideoTools(server: McpServer, client: GavrielClient, rol
     },
     wrapReadOnly(async (args) => {
       const res = await client.post("/video/cameras/resolve", forwardParams(args, ["accountIds", "deviceIds"]));
-      return okTruncated(res.data, args.truncate);
+      return okTruncated(ensureOk(res), args.truncate);
     }),
   );
 

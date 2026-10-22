@@ -1,5 +1,5 @@
 import type { GavrielClient } from "../gavrielClient.js";
-import { err, paginationSchema, MAX_LIMIT, okTruncated, truncateSchema, selectFields, wrapReadOnly, forwardParams, fieldsSchema } from "./shared.js";
+import { err, paginationSchema, MAX_LIMIT, okTruncated, truncateSchema, selectFields, wrapReadOnly, forwardParams, fieldsSchema, ensureOk } from "./shared.js";
 import { seg } from "./writeHelpers.js";
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/server";
@@ -14,7 +14,7 @@ export function registerMonitoringTools(server: McpServer, client: GavrielClient
       inputSchema: z.object({
               ...paginationSchema,
               bridgeId: z.string().optional().describe("ID del bridge"),
-              type: z.string().optional().describe("Tipo de conexión"),
+              type: z.string().optional().describe("Tipo de conexión: server o client (otro valor da 500 en el backend)"),
               activated: z.boolean().optional().describe("Solo conexiones activadas"),
               search: z.string().optional().describe("Búsqueda libre"),
               truncate: truncateSchema,
@@ -25,7 +25,7 @@ export function registerMonitoringTools(server: McpServer, client: GavrielClient
     wrapReadOnly(async (args) => {
       const params: Record<string, unknown> = { page: args.page, limit: args.limit, ...forwardParams(args as Record<string, unknown>, ["bridgeId", "type", "activated", "search"]) };
       const res = await client.get("/connections", params);
-      return okTruncated(selectFields(res.data as Record<string, unknown>, args.fields as string[] | undefined), args.truncate);
+      return okTruncated(selectFields(ensureOk(res) as Record<string, unknown>, args.fields as string[] | undefined), args.truncate);
     }),
   );
 
@@ -43,7 +43,7 @@ export function registerMonitoringTools(server: McpServer, client: GavrielClient
     },
     wrapReadOnly(async (args) => {
       const res = await client.get(`/connections/report/${seg(args.id)}`);
-      return okTruncated(selectFields(res.data as Record<string, unknown>, args.fields as string[] | undefined), args.truncate);
+      return okTruncated(selectFields(ensureOk(res) as Record<string, unknown>, args.fields as string[] | undefined), args.truncate);
     }),
   );
 
@@ -73,7 +73,7 @@ export function registerMonitoringTools(server: McpServer, client: GavrielClient
       if (args.nextToken !== undefined) params.nextToken = args.nextToken;
       if (args.limit !== undefined) params.limit = args.limit;
       const res = await client.get(`/bridges/${seg(args.id)}/logs`, params);
-      return okTruncated(selectFields(res.data as Record<string, unknown>, args.fields as string[] | undefined), args.truncate);
+      return okTruncated(selectFields(ensureOk(res) as Record<string, unknown>, args.fields as string[] | undefined), args.truncate);
     }),
   );
 
@@ -90,7 +90,7 @@ export function registerMonitoringTools(server: McpServer, client: GavrielClient
     },
     wrapReadOnly(async (args) => {
       const res = await client.get(`/bridges/${seg(args.id)}/disk-space`);
-      return okTruncated(res.data, args.truncate);
+      return okTruncated(ensureOk(res), args.truncate);
     }),
   );
 
@@ -106,7 +106,7 @@ export function registerMonitoringTools(server: McpServer, client: GavrielClient
     },
     wrapReadOnly(async (args) => {
       const res = await client.get("/events/accounts-with-pending-events");
-      return okTruncated(res.data, args.truncate);
+      return okTruncated(ensureOk(res), args.truncate);
     }),
   );
 
@@ -127,7 +127,7 @@ export function registerMonitoringTools(server: McpServer, client: GavrielClient
         : "/monitoring/all-connections-events-chart";
       try {
         const res = await client.get(path, args.connectionId ? { connectionId: args.connectionId } : undefined);
-        return okTruncated(res.data, args.truncate);
+        return okTruncated(ensureOk(res), args.truncate);
       } catch (e) {
         return err((e as Error).message);
       }
@@ -146,7 +146,7 @@ export function registerMonitoringTools(server: McpServer, client: GavrielClient
     },
     wrapReadOnly(async (args) => {
       const res = await client.get("/technician-locations/latest");
-      return okTruncated(res.data, args.truncate);
+      return okTruncated(ensureOk(res), args.truncate);
     }),
   );
 }

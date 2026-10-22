@@ -1,5 +1,5 @@
 import type { GavrielClient } from "../gavrielClient.js";
-import { err, okTruncated } from "./shared.js";
+import { err, okTruncated, ensureOk } from "./shared.js";
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/server";
 import type { Role } from "./roles.js";
@@ -23,6 +23,7 @@ export const READ_PREFIXES = [
   "/conversations",
   "/audit/logs",
   "/auth/me",
+  "/auth/profile",
   "/bridges",
   "/connections",
   "/users",
@@ -123,7 +124,7 @@ export function registerRawGetTool(server: McpServer, client: GavrielClient, _ro
       }
       try {
         const res = await client.get(path, sanitizeQuery(args.query as Record<string, unknown> | undefined));
-        return okTruncated(res.data, args.truncate);
+        return okTruncated(ensureOk(res, path), args.truncate);
       } catch (e) {
         return err((e as Error).message);
       }
