@@ -13,6 +13,13 @@ pnpm dev         # runs from src using tsx (no prior build required)
 
 Node >= 24 is required. We use **pnpm**; do not mix it with npm/yarn in the lockfile.
 
+### Installers and binaries
+
+`pnpm run build:bin` builds the single-file executables into `bin/` (git-ignored). `pnpm run install:cli` /
+`install:mcp` build and install them on your machine; `uninstall:cli` reverts. `test/install.test.mjs` runs the real
+executable in a sandbox (temp dirs, `--no-path`, overridden client config paths; it never touches your PATH or your
+real Claude/Codex/OpenCode files) and is skipped when `bin/` is missing; the PowerShell installer test runs on Windows only.
+
 ### Quick Development (optional)
 
 `pnpm run test:fast` runs only the selfcheck (plain Node) for quick local iteration. It does not replace `pnpm test` or the canonical CI path — that is what must pass before opening a PR.

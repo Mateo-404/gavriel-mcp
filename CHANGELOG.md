@@ -14,6 +14,10 @@ tag `vX.Y.Z`.
 - Date-time inputs use a lightweight `isoDateTime` schema (zod 4.6 injected a ~250-char regex per field into `tools/list`).
 
 ### Added
+- Installers: `gavriel install` / `uninstall` (self-install the single executable to a per-user folder, user PATH on Windows, optional MCP registration), `scripts/install.mjs` (from source: `pnpm run install:cli|install:mcp|uninstall:cli`), `scripts/install.ps1` and `scripts/install.sh` (download from the release and verify SHA-256).
+- One executable is now CLI + MCP server: `gavriel mcp serve` (`src/serve.ts`); `gavriel-mcp` keeps working.
+- MCP registration for **Codex** (`~/.codex/config.toml`) and **OpenCode** (`opencode.json`) besides Claude Desktop and Claude Code: `gavriel mcp install --client desktop|code|codex|opencode|all`, plus `gavriel mcp uninstall`.
+- Tests: TOML/PATH/client unit tests and end-to-end installer tests with the real executable (sandboxed), including the PowerShell installer against a local server and a tampered checksum.
 - CLI interactive menu (`gavriel` / `gavriel menu`) built on an inline selector (arrows, j/k, number shortcuts, Esc); password prompt echoes `*`; login retries on a wrong password or 2FA code (up to 5 times, only on a TTY).
 - Logo re-rasterized at higher resolution from the official SVG (wing feathers and the thin wordmark preserved); styles `blocks` (default), `braille`, `text`, `none` via `--logo` / `GAVRIEL_LOGO`.
 - CLI visual layer: official Gavriel logo (mint gradient, animated reveal and shine), branded palette with light/dark themes, rounded tables with status/priority colors, spinners, live TOTP countdown, colored JSON, styled prompts and help; honors NO_COLOR/FORCE_COLOR/CI/pipes with 16/256-color and ASCII fallbacks; `--no-color`, `--plain`, `--no-anim`.

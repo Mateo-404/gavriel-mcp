@@ -1,6 +1,7 @@
 import * as cmd from "./commands.js";
 import { ask, closeInput, confirm, InputError } from "./io.js";
 import { loadStore } from "../profiles.js";
+import { runningAsBinary } from "./paths.js";
 import * as ui from "./ui.js";
 
 // ── Selector inline (flechas / j k / números / Enter / Esc) ──────────────────
@@ -199,10 +200,13 @@ async function installMenu(): Promise<void> {
   if (!profileNames().length) { console.log(ui.line("info", "Primero iniciá sesión.", process.stdout)); return pause(); }
   const client = await select("¿Dónde instalar el MCP?", [
     { label: "Claude Desktop", hint: "edita claude_desktop_config.json (con backup)", value: "desktop" },
+    { label: "Codex", hint: "edita ~/.codex/config.toml (con backup)", value: "codex" },
+    { label: "OpenCode", hint: "edita ~/.config/opencode/opencode.json (con backup)", value: "opencode" },
     { label: "Claude Code", hint: "imprime el comando `claude mcp add`", value: "code" },
+    { label: "Todos los anteriores con archivo", hint: "Claude Desktop + Codex + OpenCode", value: "all" },
   ] as const);
   if (!client) return;
-  const mode = client === "desktop"
+  const mode = client !== "code"
     ? await select("¿Qué hacer?", [
         { label: "Vista previa", hint: "no escribe nada", value: "dry" },
         { label: "Instalar", hint: "pide confirmación", value: "install" },
@@ -227,12 +231,13 @@ export async function runMenu(help: () => string): Promise<void> {
       { label: "Código TOTP", hint: "ver código, guardar semilla", value: "totp" },
       { label: "Diagnóstico", hint: "almacén, perfil, API y sesión", value: "doctor" },
       { label: "Consultas", hint: "tickets, eventos pendientes, cuentas", value: "queries" },
-      { label: "Instalar en Claude", hint: "registrar este MCP", value: "install" },
+      { label: "Instalar el MCP", hint: "Claude Desktop, Codex, OpenCode, Claude Code", value: "install" },
+      ...(runningAsBinary() ? [{ label: "Instalar gavriel en este equipo", hint: "comando `gavriel` en el PATH", value: "selfinstall" as const }] : []),
       { label: "Ayuda", value: "help" },
       { label: "Salir", value: "exit" },
     ] as const, { initial: last, footer: "↑↓ mover · Enter elegir · 1-9 atajo · Esc/q salir" });
     if (!choice || choice === "exit") break;
-    last = ["login", "renew", "accounts", "totp", "doctor", "queries", "install", "help", "exit"].indexOf(choice);
+    last = ["login", "renew", "accounts", "totp", "doctor", "queries", "install", "selfinstall", "help", "exit"].indexOf(choice);
     switch (choice) {
       case "login": await run(() => cmd.login(ctxOf())); break;
       case "renew": {
@@ -250,6 +255,7 @@ export async function runMenu(help: () => string): Promise<void> {
       }
       case "queries": await queriesMenu(); break;
       case "install": await installMenu(); break;
+      case "selfinstall": await run(() => cmd.installCmd(ctxOf())); break;
       case "help": console.log(help()); console.log(""); await pause(); break;
     }
     console.error("");

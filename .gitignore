@@ -82,3 +82,5 @@ ehthumbs.db
 
 # Artefactos de análisis / trabajo temporal de fases (bundle descargado, notas)
 analysis/
+# caché que PowerShell puede crear en el cwd cuando LOCALAPPDATA es relativo/vacío (tests aislados)
+/Microsoft/

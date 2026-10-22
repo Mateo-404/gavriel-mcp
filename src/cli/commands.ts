@@ -8,7 +8,9 @@ import {
 import { parseSeedInput, secondsLeft, totp, totpFresh } from "../totp.js";
 import { ask, askHidden, confirm, rowsOf } from "./io.js";
 import * as ui from "./ui.js";
-import { mcpInstall } from "./mcpInstall.js";
+import { parseClients } from "./clients.js";
+import { install, uninstall } from "./install.js";
+import { mcpInstall, mcpUninstall } from "./mcpInstall.js";
 
 export const OPTIONS = {
   profile: { type: "string", short: "p" },
@@ -24,6 +26,10 @@ export const OPTIONS = {
   "server-path": { type: "string" },
   json: { type: "boolean" },
   logo: { type: "string" },
+  dir: { type: "string" },
+  register: { type: "string" },
+  "no-path": { type: "boolean" },
+  "keep-claude": { type: "boolean" },
   "no-color": { type: "boolean" },
   plain: { type: "boolean" },
   "no-anim": { type: "boolean" },
@@ -428,23 +434,57 @@ function loadConfigSafe(name: string): ReturnType<typeof loadConfig> | null {
 }
 
 // ── mcp install ───────────────────────────────────────────────────────────
+// ── install / uninstall (desde el binario) ──────────────────────────────────
+export async function installCmd(ctx: Ctx): Promise<void> {
+  const reg = str(ctx.values.register);
+  const register = reg === undefined || reg === "none" ? [] : parseClients(reg);
+  await showBanner(ctx);
+  await install({
+    dir: str(ctx.values.dir), path: !ctx.values["no-path"], register,
+    profile: str(ctx.values.profile), role: optRole(ctx), toolsets: optToolsets(ctx),
+    dryRun: Boolean(ctx.values["dry-run"]), yes: Boolean(ctx.values.yes), force: Boolean(ctx.values.force),
+  });
+}
+
+export async function uninstallCmd(ctx: Ctx): Promise<void> {
+  await uninstall({
+    dir: str(ctx.values.dir), unregister: !ctx.values["keep-claude"], purge: Boolean(ctx.values.purge),
+    dryRun: Boolean(ctx.values["dry-run"]), yes: Boolean(ctx.values.yes),
+  });
+}
+
 export async function mcp(ctx: Ctx): Promise<void> {
-  if (ctx.args[0] !== "install") {
-    throw new Error("Uso: gavriel mcp install [--client desktop|code] [--role r] [--toolsets t] [--force] [--server-path ruta] [--dry-run] [-y]");
+  const sub = ctx.args[0];
+  if (sub === "serve") { // servidor MCP por stdio: nada de banners ni texto en stdout
+    const p = str(ctx.values.profile);
+    if (p) process.env.GAVRIEL_PROFILE = p;
+    const { serve } = await import("../serve.js");
+    return serve();
   }
-  const client = str(ctx.values.client) ?? "desktop";
-  if (client !== "desktop" && client !== "code") throw new Error("--client debe ser desktop o code");
+  if (sub === "uninstall") {
+    const entryName = str(ctx.values.name) ?? "gavriel";
+    checkName(entryName);
+    const only = str(ctx.values.client) ? parseClients(str(ctx.values.client)) : undefined;
+    await mcpUninstall({ name: entryName, dryRun: Boolean(ctx.values["dry-run"]), yes: Boolean(ctx.values.yes), clients: only });
+    return;
+  }
+  if (sub !== "install") {
+    throw new Error("Uso: gavriel mcp install|uninstall|serve [--client desktop|code|codex|opencode|all] [--role r] [--toolsets t] [--force] [--server-path ruta] [--dry-run] [-y]");
+  }
+  const clients = parseClients(str(ctx.values.client));
   const entryName = str(ctx.values.name) ?? "gavriel";
   checkName(entryName);
   const role = optRole(ctx);
   const toolsets = optToolsets(ctx);
   const name = profileName(ctx);
   const p = profileOf(name);
-  await mcpInstall({
-    client, name: entryName, profile: name, role: role ?? p.role, toolsets: toolsets ?? p.toolsets,
-    dryRun: Boolean(ctx.values["dry-run"]), yes: Boolean(ctx.values.yes), force: Boolean(ctx.values.force),
-    serverPath: str(ctx.values["server-path"]),
-  });
+  for (const client of clients) {
+    await mcpInstall({
+      client, name: entryName, profile: name, role: role ?? p.role, toolsets: toolsets ?? p.toolsets,
+      dryRun: Boolean(ctx.values["dry-run"]), yes: Boolean(ctx.values.yes), force: Boolean(ctx.values.force),
+      serverPath: str(ctx.values["server-path"]),
+    });
+  }
 }
 
 // ── consultas ─────────────────────────────────────────────────────────────

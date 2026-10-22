@@ -34,7 +34,12 @@ const SECTIONS: readonly [string, readonly (readonly [string, string])[]][] = [
     ["totp set|clear|code", "Semilla TOTP opcional (renovación automática)"],
   ]],
   ["Claude", [
-    ["mcp install [--client desktop|code] [--role r] [--toolsets t]", "Registra el MCP (--force, --server-path, --dry-run, -y)"],
+    ["mcp install [--client desktop|code|codex|opencode|all] [--role r] [--toolsets t]", "Registra el MCP (--force, --server-path, --dry-run, -y)"],
+    ["mcp uninstall [--client c] | mcp serve", "Quita el MCP de Claude Desktop, Codex y OpenCode | arranca el servidor MCP por stdio"],
+  ]],
+  ["Instalación (desde el binario gavriel.exe)", [
+    ["install [--register desktop,codex,opencode|all] [--dir d] [--no-path] [-y]", "Se instala en tu usuario (sin admin), agrega al PATH y registra el MCP"],
+    ["uninstall [--purge] [--keep-claude] [-y]", "Quita el binario, el PATH y la entrada de Claude (--purge: también cuentas y secretos)"],
   ]],
   ["Consultas", [
     ["tickets [--status s] [--limit n]", "Tickets (abiertos, en progreso, pendientes, cerrados)"],
@@ -64,6 +69,7 @@ function helpText(stream: NodeJS.WriteStream): string {
 const COMMANDS: Record<string, (ctx: cmd.Ctx) => Promise<void>> = {
   login: cmd.login, renew: cmd.renew, logout: cmd.logout, whoami: cmd.whoami, doctor: cmd.doctor,
   menu: async () => runMenu(() => helpText(process.stdout)),
+  install: cmd.installCmd, uninstall: cmd.uninstallCmd,
   profile: cmd.profile, profiles: cmd.profile, totp: cmd.totpCmd, mcp: cmd.mcp,
   tickets: cmd.tickets, events: cmd.events, accounts: cmd.accounts,
 };

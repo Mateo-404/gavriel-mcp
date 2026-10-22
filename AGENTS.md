@@ -208,8 +208,27 @@ operativa:
 
 `dist/cli.js` (bin `gavriel`, y binario SEA `gavriel-<plat>-<arch>`): `login`,
 `renew`, `logout`, `whoami`, `doctor [--online]`, `profile`, `totp`,
-`mcp install [--force] [--server-path]` y consultas rápidas (`tickets`,
-`events pending`, `accounts`). Código en `src/cli.ts` y `src/cli/*.ts`.
+`menu` (TUI), `install`/`uninstall` (autoinstalación del binario: carpeta de usuario,
+PATH de usuario sin admin, registro del MCP), `mcp install|uninstall|serve` y consultas
+rápidas (`tickets`, `events pending`, `accounts`). Código en `src/cli.ts` y `src/cli/*.ts`.
+**Un solo ejecutable es CLI + servidor MCP**: `gavriel mcp serve` arranca el servidor
+(`src/serve.ts`, que también usa `src/index.ts` = bin `gavriel-mcp`).
+
+Clientes MCP (`src/cli/clients.ts` = rutas y formatos; `src/cli/mcpInstall.ts` = E/S):
+Claude Desktop (`mcpServers` en JSON), Codex (`[mcp_servers.<n>]` en `~/.codex/config.toml`,
+edición textual de tablas sin tocar el resto), OpenCode (`mcp.<n>` = `{type:"local", command:[…],
+environment, enabled}` en `~/.config/opencode/opencode.json`) y Claude Code (solo imprime
+`claude mcp add`). Siempre backup `.bak-<ts>` + escritura atómica; nunca se escriben secretos
+(solo `GAVRIEL_PROFILE`/rol/toolsets). Overrides de ruta: `GAVRIEL_CLAUDE_DESKTOP_CONFIG`,
+`GAVRIEL_CODEX_CONFIG`, `GAVRIEL_OPENCODE_CONFIG`, `CODEX_HOME`.
+
+Instalación: `src/cli/install.ts` (copia el propio ejecutable con rename atómico; en Windows un
+`.exe` en uso se renombra a `.old`), PATH de usuario en Windows por registro crudo
+(`HKCU\Environment\Path` como `REG_EXPAND_SZ`, conserva `%VARS%`, avisa con `WM_SETTINGCHANGE`);
+en Unix solo informa. `scripts/install.mjs` (desde el código: compila, genera el SEA y ejecuta
+`gavriel install`), `scripts/install.ps1` / `install.sh` (descargan de la release y verifican
+SHA-256). Variables: `GAVRIEL_INSTALL_DIR`, `GAVRIEL_REGISTER`, `GAVRIEL_BASE_URL`.
+Runtime/gestor: Node + pnpm; bun no se usa (el SEA ya trae runtime).
 Reglas: `login` autentica **antes** de persistir password/perfil; no pisa un
 perfil de otro email sin `--profile`; `--limit` 1..200; `--role`/`--toolsets`/
 `--api-base` se validan; salida 0 ok, 1 error (130 con Ctrl-C), 2 uso

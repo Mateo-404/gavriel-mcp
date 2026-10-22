@@ -13,23 +13,110 @@ monitoring system — as tools for AI agents (OpenCode, Claude Desktop).
 
 ## Requirements
 
-* Node.js 24+ (LTS; CI also tests Node 26)
+* To **use** gavriel: nothing. The single-file executable bundles its own runtime (no Node, no pnpm).
+* To **build or develop**: Node.js 24+ (LTS; CI also tests Node 26) and pnpm.
 * Gavriel user credentials (`app.gavriel.com.ar`)
 
 ## Installation
 
+### Quick install (no Node needed)
+
+One executable is both the `gavriel` CLI and the MCP server (`gavriel mcp serve`). The installer downloads it
+from the latest GitHub release, verifies its SHA-256, copies it to your user folder (no admin rights), adds it to
+your PATH and, if you ask, registers the MCP in your AI clients.
+
+```powershell
+# Windows (PowerShell)
+irm https://raw.githubusercontent.com/mateo-404/gavriel-mcp/main/scripts/install.ps1 | iex
+# also register the MCP (log in first with `gavriel login`, or run `gavriel mcp install` later):
+$env:GAVRIEL_REGISTER = "all"; irm https://raw.githubusercontent.com/mateo-404/gavriel-mcp/main/scripts/install.ps1 | iex
+```
+
+```bash
+# Linux / macOS
+curl -fsSL https://raw.githubusercontent.com/mateo-404/gavriel-mcp/main/scripts/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/mateo-404/gavriel-mcp/main/scripts/install.sh | GAVRIEL_REGISTER=all sh
+```
+
+Already have the executable (e.g. a download)? Run it once and let it install itself:
+
+```bash
+gavriel-win32-x64.exe install                    # or: gavriel install --register desktop,codex,opencode
+gavriel uninstall [--purge]                      # removes the binary, the PATH entry and the MCP entries
+```
+
+Install location: `%LOCALAPPDATA%\Programs\Gavriel` on Windows, `~/.local/bin` elsewhere (override with `--dir` or
+`GAVRIEL_INSTALL_DIR`; `--no-path` skips the PATH change; `--dry-run` shows what would happen). Without a terminal
+pass `--yes`. The executables are not code-signed, so SmartScreen may warn if you download them with a browser;
+the scripts above avoid that and verify the checksum instead.
+
+### From source
+
 ```bash
 cd ~/proyectos/gavriel-mcp
-pnpm install          # package manager: pnpm (see packageManager in package.json)
+pnpm install                 # package manager: pnpm (see packageManager in package.json)
+pnpm run install:cli         # build + single-file executable + install the `gavriel` command
+pnpm run install:mcp         # same, and also register the MCP in Claude Desktop (--client codex|opencode|all)
+pnpm run uninstall:cli
+```
+
+`install:*` compile with the local TypeScript, build the executable with `pnpm build:bin` only when it is stale and run
+`gavriel install`. **Why pnpm and not bun:** the executable already embeds its own runtime, so end users need neither;
+pnpm is the project's package manager (lockfile, CI, release). Bun would add a second runtime and lockfile for no gain.
+
+Plain MCP server without installing (development):
+
+```bash
 pnpm build
 cp .env.example .env   # fill in GAVRIEL_EMAIL and GAVRIEL_PASSWORD
+```
+
+### Registering the MCP in your AI clients
+
+After `gavriel login`, one command registers the server (the entry only carries the profile name, never secrets;
+existing settings are preserved, the file is backed up and written atomically):
+
+| Client | Command | File edited |
+|---|---|---|
+| Claude Desktop | `gavriel mcp install --client desktop` | `claude_desktop_config.json` (`mcpServers`) |
+| Codex | `gavriel mcp install --client codex` | `~/.codex/config.toml` (`[mcp_servers.gavriel]`) |
+| OpenCode | `gavriel mcp install --client opencode` | `~/.config/opencode/opencode.json` (`mcp`) |
+| Claude Code | `gavriel mcp install --client code` | prints the `claude mcp add` command |
+| all of the above that have a file | `gavriel mcp install --client all` | |
+
+Add `--dry-run` to preview, `--force` to replace an existing entry, `--role readonly|lite|full` and
+`--toolsets core,composites` to limit what the agent can see. `gavriel mcp uninstall [--client c]` removes it.
+Path overrides (useful for tests): `GAVRIEL_CLAUDE_DESKTOP_CONFIG`, `GAVRIEL_CODEX_CONFIG`,
+`GAVRIEL_OPENCODE_CONFIG`, `CODEX_HOME`.
+
+Manual equivalents (adjust the path to your installed `gavriel`):
+
+```json
+{ "mcpServers": { "gavriel": { "command": "C:\\Users\\you\\AppData\\Local\\Programs\\Gavriel\\gavriel.exe",
+  "args": ["mcp", "serve"], "env": { "GAVRIEL_PROFILE": "work" } } } }
+```
+
+```toml
+# ~/.codex/config.toml
+[mcp_servers.gavriel]
+command = 'C:\Users\you\AppData\Local\Programs\Gavriel\gavriel.exe'
+args = ['mcp', 'serve']
+
+[mcp_servers.gavriel.env]
+GAVRIEL_PROFILE = 'work'
+```
+
+```json
+{ "mcp": { "gavriel": { "type": "local", "enabled": true,
+  "command": ["C:\\Users\\you\\AppData\\Local\\Programs\\Gavriel\\gavriel.exe", "mcp", "serve"],
+  "environment": { "GAVRIEL_PROFILE": "work" } } } }
 ```
 
 ### MCPB bundle (Claude Desktop)
 
 `manifest.json` follows the [MCPB](https://github.com/modelcontextprotocol/mcpb) spec (credentials are asked
 as `user_config`, the password is sensitive). After `pnpm install && pnpm build`, run `pnpm mcpb:pack`
-(uses `npx @anthropic-ai/mcpb pack`) to produce `gavriel-mcp.mcpb`. Not published anywhere.
+(`@anthropic-ai/mcpb` is a pinned devDependency) to produce `gavriel-mcp.mcpb`. Not published anywhere.
 
 ## Configuration
 
@@ -81,7 +168,7 @@ header, which the client automatically respects.
 
 ## CLI (`gavriel`)
 
-Second binary (`dist/cli.js`, no extra dependencies) to log in, manage several Gavriel accounts, renew the trusted device and register the MCP in Claude.
+Second binary (`dist/cli.js`, no extra dependencies) to log in, manage several Gavriel accounts, renew the trusted device, install itself and register the MCP in Claude Desktop, Claude Code, Codex and OpenCode. The same executable also runs the MCP server: `gavriel mcp serve`.
 
 ```bash
 gavriel login                          # email + hidden password, stored in DPAPI / libsecret; handles 2FA
@@ -89,11 +176,13 @@ gavriel renew [--all]                  # re-trust the device (code, stored TOTP 
 gavriel profile list|add|use|remove|rename
 gavriel totp set|clear|code            # optional TOTP seed: lets the CLI and the MCP renew on their own
 gavriel whoami | gavriel doctor [--online]   # --online performs a real login
-gavriel mcp install --profile work --role lite --dry-run   # --force replaces an existing entry; --server-path <file> overrides the server location
+gavriel mcp install --client all --profile work --role lite --dry-run   # desktop|code|codex|opencode|all; --force replaces; --server-path <file> overrides the server
+gavriel mcp uninstall | gavriel mcp serve    # remove the entries | run the MCP server over stdio
+gavriel install [--register all] | gavriel uninstall [--purge]   # self-install / remove (see Installation)
 gavriel tickets --status open | gavriel events pending | gavriel accounts search <text>
 ```
 
-`login` authenticates first and only then stores the password/profile; a profile name already used by a different email is refused unless `--profile` is explicit. Exit codes: 0 ok, 1 error (130 on Ctrl-C), 2 bad usage. Piped input works: `printf 'me@x.com\nPASSWORD\n' | gavriel login`. The release also ships a standalone `gavriel-<platform>-<arch>` binary next to `gavriel-mcp-<platform>-<arch>`.
+`login` authenticates first and only then stores the password/profile; a profile name already used by a different email is refused unless `--profile` is explicit. Exit codes: 0 ok, 1 error (130 on Ctrl-C), 2 bad usage. Piped input works: `printf 'me@x.com\nPASSWORD\n' | gavriel login`. The release ships `gavriel-<platform>-<arch>` (CLI + MCP server, recommended) and the server-only `gavriel-mcp-<platform>-<arch>`, each with a `.sha256`.
 
 Run `gavriel` with no arguments in a terminal (or `gavriel menu`) for an interactive menu: arrow keys / j k / number shortcuts, Enter to choose, Esc to go back. It covers login, renewing the trusted device, accounts (list/switch/rename/log out/remove), TOTP (live code, save/clear seed), diagnostics, queries (tickets, pending events, account search) and installing the MCP in Claude. A wrong password or 2FA code lets you retry (up to 5 times) and the password is echoed as `*`.
 
@@ -121,7 +210,10 @@ expiration or after a 401. The API renews the token through the `x-new-token`
 header, which the client automatically respects. The `trusted_device_token` (valid
 for ~20 days and bypasses 2FA on subsequent logins) is also stored in the keyring.
 
-## Registering it in OpenCode
+## Registering it in OpenCode (manual, from source)
+
+> The easy way is `gavriel mcp install --client opencode` (see Installation). What follows is the manual setup
+> with the keyring on Linux.
 
 Install `libsecret-tools` (if not already installed) and store both secrets once,
 interactively (the value is requested through stdin and is not included on the
@@ -145,9 +237,9 @@ the secret:
       "command": ["node", "/path/to/project/gavriel-mcp/dist/index.js"],
       "environment": {
         "GAVRIEL_EMAIL": "user@example.com"
-      }
-    },
-    "enabled": true
+      },
+      "enabled": true
+    }
   }
 }
 ```
