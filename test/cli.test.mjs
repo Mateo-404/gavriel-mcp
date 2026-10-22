@@ -177,7 +177,7 @@ test("cli: login por pipe, sin eco, y no pisa nada si falla", { skip: !SECRETS_I
     assert.equal(bad.status, 1);
     assert.match(bad.stderr, /Login falló/);
     const doc = await cliIn(dir, "", ["doctor"]);
-    assert.match(doc.stdout, /OK\s+Password guardado/);
+    assert.match(doc.stdout, /(OK|✔|ok)\s+Password guardado/);
 
     // login fallido de un perfil nuevo no deja nada
     const dir2 = tmp();
@@ -207,7 +207,7 @@ test("cli: doctor omite el login sin --online y lo ejecuta con --online", { skip
     assert.match(off.stdout, /Sesión: omitida \(use --online\)/);
     assert.equal(off.status, 0, off.stdout);
     const on = await cliIn(dir, "", ["doctor", "--online"]);
-    assert.match(on.stdout, /OK\s+Sesión/);
+    assert.match(on.stdout, /(OK|✔|ok)\s+Sesión/);
   } finally {
     await api.close();
   }

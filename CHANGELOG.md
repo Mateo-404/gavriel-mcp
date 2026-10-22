@@ -14,6 +14,7 @@ tag `vX.Y.Z`.
 - Date-time inputs use a lightweight `isoDateTime` schema (zod 4.6 injected a ~250-char regex per field into `tools/list`).
 
 ### Added
+- CLI visual layer: official Gavriel logo (mint gradient, animated reveal and shine), branded palette with light/dark themes, rounded tables with status/priority colors, spinners, live TOTP countdown, colored JSON, styled prompts and help; honors NO_COLOR/FORCE_COLOR/CI/pipes with 16/256-color and ASCII fallbacks; `--no-color`, `--plain`, `--no-anim`.
 - `gavriel` CLI (`dist/cli.js`): multi-account profiles, login, trusted-device renewal, optional TOTP seed, `doctor`, `mcp install`, quick read queries. Zero new dependencies.
 - `GAVRIEL_PROFILE` and per-email password/TOTP keys; `GavrielClient` accepts a `getTwoFactorCode` hook (the MCP auto-renews with a stored seed).
 - ~100 new tools: notifications, video, SIP/operator telephony, infrastructure, core-gap endpoints; toolsets via `GAVRIEL_MCP_TOOLSETS`; server `instructions`.
