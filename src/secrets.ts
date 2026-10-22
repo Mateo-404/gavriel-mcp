@@ -48,7 +48,13 @@ function powershell(script: string, input: string): string | null {
     windowsHide: true,
     encoding: "utf8",
   });
-  if (r.status !== 0 || r.error) return null;
+  if (r.status !== 0 || r.error) {
+    // Diagnóstico opt-in (nunca imprime stdout: puede contener el secreto o el blob cifrado).
+    if (process.env.GAVRIEL_DEBUG_SECRETS === "1") {
+      console.error(`[secrets] powershell status=${r.status} signal=${r.signal} error=${r.error?.message ?? "-"} stderr=${String(r.stderr ?? "").slice(0, 400)}`);
+    }
+    return null;
+  }
   return r.stdout.replace(/[\r\n]+$/, "");
 }
 

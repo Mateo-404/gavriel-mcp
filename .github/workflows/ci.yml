@@ -32,6 +32,8 @@ jobs:
       - run: pnpm run selfcheck
       # Incluye contract.test: falla si test/tools.snapshot.json derivó (regenerar: pnpm test:snapshot).
       - name: Test
+        env:
+          GAVRIEL_DEBUG_SECRETS: "1"
         run: node --test "test/*.test.mjs"
       - name: Audit (prod deps, no bloqueante)
         continue-on-error: true
