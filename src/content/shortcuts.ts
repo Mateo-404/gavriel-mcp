@@ -2,7 +2,9 @@
  * Atajos de teclado (mundo aislado del content script).
  *
  *   Alt + 1…9      llama al contacto de la cuenta en esa posición de la lista
- *                  (1 = el primero que se ve). Nunca llama a Jurisdicción / 911.
+ *                  (1 = el primero), desde cualquier pestaña de la cuenta: usa la
+ *                  lista "Contactos de emergencia" si está a la vista y, si no, el
+ *                  menú "Llamar a…" del botón flotante. Nunca llama a Jurisdicción / 911.
  *   Ctrl + Enter   acción principal según contexto, en este orden:
  *                    1. llamada en curso      -> cortar
  *                    2. llamada entrante      -> atender
@@ -41,7 +43,10 @@ interface Contact {
   /** Posición en la lista, empezando en 1: es el número del atajo. */
   position: number;
   name: string;
-  callButton: HTMLButtonElement;
+  /** Botón que inicia la llamada a este contacto. */
+  button: HTMLButtonElement;
+  /** Elemento junto al cual se muestra el indicador "Alt+N". */
+  badgeHost: Element;
 }
 
 interface BadgeSpec {
@@ -55,6 +60,8 @@ const HINT_ATTR = 'data-gv-hint';
 const LOCK_MS = 1500;
 const MAX_SHORTCUT_CONTACTS = 9;
 const CONTACTS_HEADING = /^contactos de emergencia$/i;
+const ACCOUNT_CONTACTS_HEADING = /^contactos de la cuenta$/i;
+const MENU_TOGGLE = 'button[aria-label="Elegir otro contacto"]';
 const DIAL_INPUT = 'input[placeholder="Número…"]';
 const FAB_OPEN = 'button[aria-label="Abrir softphone"]';
 const FAB_ANY = `${FAB_OPEN}, button[aria-label="Minimizar softphone"]`;
@@ -64,6 +71,7 @@ function main(): void {
   let enabled: boolean = DEFAULT_SETTINGS.shortcutsEnabled;
   let lastCallAt = 0;
   let hangingUp = false;
+  let callingFromMenu = false;
 
   const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -108,10 +116,41 @@ function main(): void {
       contacts.push({
         position: contacts.length + 1,
         name: parseContactName(card.innerText) || 'contacto',
-        callButton,
+        button: callButton,
+        badgeHost: callButton,
       });
     }
     return contacts.slice(0, MAX_SHORTCUT_CONTACTS);
+  };
+
+  /**
+   * Contactos del menú "Llamar a…" del botón flotante, que existe en todas las
+   * pestañas de la cuenta. Es la misma lista y el mismo orden que "Contactos de
+   * emergencia" (Gavriel solo descarta los que no tienen teléfono). Un clic en un
+   * ítem inicia la llamada y Gavriel cierra el menú solo.
+   */
+  const findMenuContacts = (): Contact[] => {
+    const menu = [...document.querySelectorAll<HTMLElement>('[role="menu"]')].find((m) => /Llamar a/.test(m.innerText));
+    const heading = menu && [...menu.querySelectorAll<HTMLElement>('div')].find(
+      (el) => el.children.length === 0 && ACCOUNT_CONTACTS_HEADING.test(el.textContent?.trim() ?? ''),
+    );
+    const section = heading?.parentElement;
+    if (!section) return [];
+    return [...section.querySelectorAll<HTMLButtonElement>('button')]
+      .filter(visible)
+      .slice(0, MAX_SHORTCUT_CONTACTS)
+      .map((button, index) => ({
+        position: index + 1,
+        name: parseContactName(button.innerText) || 'contacto',
+        button,
+        badgeHost: button.lastElementChild ?? button, // el teléfono: el indicador va antes
+      }));
+  };
+
+  /** Contactos que se ven ahora: la lista de la pestaña Contactos o, si no está, el menú abierto. */
+  const visibleContacts = (): Contact[] => {
+    const listed = findContacts();
+    return listed.length > 0 ? listed : findMenuContacts();
   };
 
   const findHangup = (): HTMLButtonElement | undefined =>
@@ -213,8 +252,8 @@ function main(): void {
   const decorate = (): void => {
     const wanted = new Map<Element, BadgeSpec>();
     if (enabled) {
-      for (const contact of findContacts()) {
-        wanted.set(contact.callButton, { text: `Alt+${contact.position}`, place: 'before' });
+      for (const contact of visibleContacts()) {
+        wanted.set(contact.badgeHost, { text: `Alt+${contact.position}`, place: 'before' });
       }
       const action = plan();
       const target =
@@ -257,17 +296,54 @@ function main(): void {
 
   // ---------- Acciones ----------
 
-  const callContact = (position: number): void => {
+  const startCall = (contact: Contact): void => {
+    toast(`Llamando a ${contact.name}…`);
+    contact.button.click();
+  };
+
+  /**
+   * Llama al contacto N desde cualquier pestaña de la cuenta. Si la lista de
+   * contactos no está a la vista (Gavriel solo dibuja la pestaña activa), usa el
+   * menú "Llamar a…" del botón flotante: lo abre, elige el contacto y, si hizo
+   * falta abrirlo, lo deja cerrado.
+   */
+  const callContact = async (position: number): Promise<void> => {
     if (isCalling()) return toast('Ya hay una llamada en curso (Ctrl+Enter para cortar)');
     if (modalOpen()) return toast('Cerrá el menú o diálogo abierto para llamar');
-    const contact = findContacts().find((c) => c.position === position);
-    if (!contact) return toast(`No hay contacto ${position} en esta pantalla`);
-    if (contact.callButton.disabled) return toast(`No se puede llamar a ${contact.name}`);
-    const now = Date.now();
-    if (now - lastCallAt < LOCK_MS) return; // evita llamadas dobles
-    lastCallAt = now;
-    toast(`Llamando a ${contact.name}…`);
-    contact.callButton.click();
+    if (callingFromMenu || Date.now() - lastCallAt < LOCK_MS) return; // evita llamadas dobles
+
+    const listed = findContacts().find((c) => c.position === position);
+    if (listed) {
+      if (listed.button.disabled) return toast(`No se puede llamar a ${listed.name}`);
+      lastCallAt = Date.now();
+      return startCall(listed);
+    }
+    if (findContacts().length > 0) return toast(`No hay contacto ${position} en esta cuenta`);
+
+    const toggle = document.querySelector<HTMLButtonElement>(MENU_TOGGLE);
+    if (!toggle || !visible(toggle)) return toast('Abrí una cuenta para llamar a sus contactos');
+
+    callingFromMenu = true;
+    try {
+      const wasOpen = toggle.getAttribute('aria-expanded') === 'true';
+      if (!wasOpen) toggle.click();
+      const menuContacts = await waitFor(() => {
+        const found = findMenuContacts();
+        return found.length > 0 ? found : null;
+      }, 700);
+      const target = menuContacts?.find((c) => c.position === position);
+      if (!target) {
+        toast(`No hay contacto ${position} en esta cuenta`);
+      } else {
+        lastCallAt = Date.now();
+        startCall(target); // Gavriel inicia la llamada y cierra el menú
+      }
+      await sleep(250);
+      if (!wasOpen && toggle.getAttribute('aria-expanded') === 'true') toggle.click(); // no lo dejamos abierto
+    } finally {
+      callingFromMenu = false;
+      schedule();
+    }
   };
 
   /** Radix Tabs activa la pestaña con mousedown/foco, no con click. */
@@ -355,7 +431,7 @@ function main(): void {
       const position = digitFromKeyCode(event.code);
       if (position) {
         consume(event);
-        callContact(position);
+        void callContact(position);
       }
       return;
     }

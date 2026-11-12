@@ -14,7 +14,7 @@ siguen apareciendo en pantalla: solo se silencia el audio, y solo en el navegado
 
 | Atajo          | Acción                                                                                         |
 | -------------- | ---------------------------------------------------------------------------------------------- |
-| `Alt` + `1…9`  | Llama al contacto de la cuenta en esa posición de la lista (1 = el primero). Nunca llama a Jurisdicción ni al 911. |
+| `Alt` + `1…9`  | Llama al contacto de la cuenta en esa posición de la lista (1 = el primero), **desde cualquier pestaña de la cuenta**. Nunca llama a Jurisdicción ni al 911. |
 | `Ctrl` + `Enter` | Corta la llamada en curso; si hay una entrante, la atiende; si hay un número en el marcador, llama. Sin ninguna de las tres no interviene. |
 
 Protecciones: ignora teclas repetidas, `AltGr`, `Shift`/`Meta`; bloquea llamadas dobles durante 1,5 s; no llama si ya
@@ -67,7 +67,7 @@ build.ts           script de build (Bun.build, un IIFE por content script)
 - Softphone: "Colgar" existe solo dentro de la pestaña *Marcador*; el botón flotante se pone rojo (`bg-destructive`)
   durante una llamada; la llamada entrante es una tarjeta "Llamada de: …" con *Atender* / *Rechazar* (los eventos
   también tienen un "Atender", por eso se distingue).
-- Contactos: sección *Contactos de emergencia*, cada uno con un botón `aria-label="Llamar"`.
+- Contactos: sección *Contactos de emergencia*, cada uno con un botón `aria-label="Llamar"`. Gavriel solo dibuja la pestaña activa, así que desde otras pestañas (p. ej. Dispositivos) el atajo usa el menú "Llamar a…" del botón flotante, que existe en todas, tiene la misma lista y el mismo orden, y se cierra solo al elegir un contacto.
 
 ## Pruebas
 
