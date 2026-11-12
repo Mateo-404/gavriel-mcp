@@ -1,0 +1,405 @@
+/**
+ * Atajos de teclado (mundo aislado del content script).
+ *
+ *   Alt + 1…9      llama al contacto de la cuenta en esa posición de la lista
+ *                  (1 = el primero que se ve). Nunca llama a Jurisdicción / 911.
+ *   Ctrl + Enter   acción principal según contexto, en este orden:
+ *                    1. llamada en curso      -> cortar
+ *                    2. llamada entrante      -> atender
+ *                    3. número en el marcador -> llamar
+ *                  Sin ninguna de las tres no intercepta nada.
+ *
+ * Los atajos se muestran dentro de cada componente (junto al botón de llamar de
+ * cada contacto, y dentro de "Colgar" / "Atender" / "Llamar"), no flotando encima.
+ *
+ * Cómo está armado Gavriel (verificado en su código):
+ *   - Los contactos están bajo "Contactos de emergencia", ordenados por su campo
+ *     `order`; cada uno tiene un botón con aria-label="Llamar".
+ *   - Con una llamada en curso el botón "Colgar" solo existe dentro de la pestaña
+ *     "Marcador" del softphone; con el panel cerrado hay que abrirlo. El botón
+ *     flotante del softphone se pone rojo (bg-destructive) durante la llamada.
+ *   - "Atender" también existe en los eventos: la llamada entrante se reconoce
+ *     porque su tarjeta dice "Llamada de: <número>" e incluye "Rechazar".
+ *
+ * Seguridad: ignora teclas repetidas, AltGr (Ctrl+Alt en Windows), combinaciones
+ * con Shift/Meta, bloquea llamadas dobles durante 1,5 s, y no llama mientras hay
+ * un menú o diálogo modal abierto ni si ya hay una llamada en curso.
+ */
+import { DEFAULT_SETTINGS } from '../shared/constants';
+import { digitFromKeyCode, isHangupLabel, parseContactName } from '../shared/labels';
+import { readSetting, touches } from '../shared/storage';
+
+declare global {
+  interface Window {
+    __gvShortcuts?: boolean;
+  }
+}
+
+type Action = 'hangup' | 'answer' | 'dial';
+
+interface Contact {
+  /** Posición en la lista, empezando en 1: es el número del atajo. */
+  position: number;
+  name: string;
+  callButton: HTMLButtonElement;
+}
+
+interface BadgeSpec {
+  text: string;
+  /** 'before': hermano anterior del anfitrión; 'inside': hijo al final del anfitrión. */
+  place: 'before' | 'inside';
+}
+
+const SETTING = 'shortcutsEnabled' as const;
+const HINT_ATTR = 'data-gv-hint';
+const LOCK_MS = 1500;
+const MAX_SHORTCUT_CONTACTS = 9;
+const CONTACTS_HEADING = /^contactos de emergencia$/i;
+const DIAL_INPUT = 'input[placeholder="Número…"]';
+const FAB_OPEN = 'button[aria-label="Abrir softphone"]';
+const FAB_ANY = `${FAB_OPEN}, button[aria-label="Minimizar softphone"]`;
+const CALL_BUTTON = 'button[aria-label="Llamar"]';
+
+function main(): void {
+  let enabled: boolean = DEFAULT_SETTINGS.shortcutsEnabled;
+  let lastCallAt = 0;
+  let hangingUp = false;
+
+  const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
+
+  const visible = (el: Element): boolean =>
+    el.getClientRects().length > 0 && getComputedStyle(el).visibility !== 'hidden';
+
+  /** Texto propio de un elemento, sin contar los indicadores que agregamos nosotros. */
+  const ownText = (el: Element): string => {
+    let text = '';
+    el.childNodes.forEach((node) => {
+      if (node instanceof Element && node.hasAttribute(HINT_ATTR)) return;
+      text += node.textContent ?? '';
+    });
+    return text.trim();
+  };
+
+  const buttons = (): HTMLButtonElement[] => [...document.querySelectorAll<HTMLButtonElement>('button')];
+
+  // ---------- Detección de elementos de la página ----------
+
+  /** Contactos de la cuenta, en el orden en que se ven (sin Jurisdicción ni 911). */
+  const findContacts = (): Contact[] => {
+    const heading = [...document.querySelectorAll<HTMLElement>('p, h2, h3, h4')].find(
+      (el) => el.children.length === 0 && CONTACTS_HEADING.test(el.textContent?.trim() ?? '') && visible(el),
+    );
+    const section = heading?.parentElement;
+    if (!section) return [];
+
+    const contacts: Contact[] = [];
+    for (const callButton of section.querySelectorAll<HTMLButtonElement>(CALL_BUTTON)) {
+      if (!visible(callButton)) continue;
+      // La tarjeta es el ancestro más grande (sin salir de la sección) que sigue
+      // conteniendo un único botón de llamar
+      let card: HTMLElement = callButton;
+      while (
+        card.parentElement &&
+        card.parentElement !== section &&
+        card.parentElement.querySelectorAll(CALL_BUTTON).length === 1
+      ) {
+        card = card.parentElement;
+      }
+      contacts.push({
+        position: contacts.length + 1,
+        name: parseContactName(card.innerText) || 'contacto',
+        callButton,
+      });
+    }
+    return contacts.slice(0, MAX_SHORTCUT_CONTACTS);
+  };
+
+  const findHangup = (): HTMLButtonElement | undefined =>
+    buttons().find(
+      (b) =>
+        !b.disabled &&
+        visible(b) &&
+        [b.getAttribute('aria-label'), b.title, ownText(b)].some((label) => isHangupLabel(label)),
+    );
+
+  /** El botón flotante del softphone se pone rojo (bg-destructive) durante una llamada. */
+  const callingFab = (): HTMLButtonElement | undefined =>
+    [...document.querySelectorAll<HTMLButtonElement>(FAB_ANY)].find((f) => f.classList.contains('bg-destructive'));
+
+  const isCalling = (): boolean => !!findHangup() || !!callingFab();
+
+  /**
+   * "Atender" de una llamada entrante. Los eventos también tienen un "Atender":
+   * la tarjeta de la llamada es la que tiene "Llamada de: <número>", "Rechazar"
+   * y un único "Atender".
+   */
+  const findAnswer = (): HTMLButtonElement | undefined =>
+    buttons().find((b) => {
+      if (b.disabled || !visible(b) || ownText(b) !== 'Atender') return false;
+      let el: HTMLElement | null = b.parentElement;
+      for (let depth = 0; depth < 3 && el && el !== document.body; depth++, el = el.parentElement) {
+        const labels = [...el.querySelectorAll('button')].map(ownText);
+        if (
+          /Llamada de:/.test(el.innerText) &&
+          labels.includes('Rechazar') &&
+          labels.filter((t) => t === 'Atender').length === 1
+        ) {
+          return true;
+        }
+      }
+      return false;
+    });
+
+  const dialInput = (): HTMLInputElement | null => document.querySelector<HTMLInputElement>(DIAL_INPUT);
+
+  const dialButtonFor = (input: HTMLElement): HTMLButtonElement | null => {
+    let root: HTMLElement | null = input;
+    for (let depth = 0; depth < 6 && root; depth++, root = root.parentElement) {
+      const button = [...root.querySelectorAll<HTMLButtonElement>('button')].find((b) => ownText(b) === 'Llamar');
+      if (button) return button;
+    }
+    return null;
+  };
+
+  /** Radix abre el menú o diálogo modal bloqueando los clics del resto de la página. */
+  const modalOpen = (): boolean => document.body.style.pointerEvents === 'none';
+
+  // ---------- Aviso breve ----------
+
+  let toastEl: HTMLDivElement | undefined;
+  let toastTimer: number | undefined;
+  const toast = (message: string): void => {
+    if (!toastEl) {
+      toastEl = document.createElement('div');
+      toastEl.className = 'gv-toast';
+      toastEl.setAttribute('role', 'status');
+      toastEl.setAttribute('aria-live', 'polite');
+      document.body.appendChild(toastEl);
+    }
+    toastEl.textContent = message;
+    toastEl.classList.add('gv-show');
+    clearTimeout(toastTimer);
+    toastTimer = window.setTimeout(() => toastEl?.classList.remove('gv-show'), 1800);
+  };
+
+  // ---------- Indicadores dentro de cada componente ----------
+
+  /** Qué haría Ctrl+Enter ahora mismo (null = no interceptar). */
+  const plan = (): Action | null => {
+    if (isCalling()) return 'hangup';
+    if (findAnswer()) return 'answer';
+    const input = dialInput();
+    if (input && document.activeElement === input && input.value.trim() && dialButtonFor(input)) return 'dial';
+    return null;
+  };
+
+  const shown = new Map<Element, HTMLElement>(); // anfitrión -> indicador
+
+  const makeBadge = (text: string): HTMLElement => {
+    const badge = document.createElement('kbd');
+    badge.className = 'gv-kbd';
+    badge.setAttribute(HINT_ATTR, '');
+    badge.setAttribute('aria-hidden', 'true');
+    badge.textContent = text;
+    return badge;
+  };
+
+  const place = (host: Element, badge: HTMLElement, where: BadgeSpec['place']): void => {
+    if (where === 'before') host.parentElement?.insertBefore(badge, host);
+    else host.append(badge);
+  };
+
+  /** Deja exactamente los indicadores que corresponden; no toca el DOM si ya están bien. */
+  const decorate = (): void => {
+    const wanted = new Map<Element, BadgeSpec>();
+    if (enabled) {
+      for (const contact of findContacts()) {
+        wanted.set(contact.callButton, { text: `Alt+${contact.position}`, place: 'before' });
+      }
+      const action = plan();
+      const target =
+        action === 'hangup'
+          ? findHangup()
+          : action === 'answer'
+            ? findAnswer()
+            : action === 'dial'
+              ? dialButtonFor(dialInput()!)
+              : null;
+      if (target) wanted.set(target, { text: 'Ctrl+Enter', place: 'inside' });
+    }
+
+    for (const [host, badge] of shown) {
+      if (!wanted.has(host)) {
+        badge.remove();
+        shown.delete(host);
+      }
+    }
+    for (const [host, spec] of wanted) {
+      let badge = shown.get(host);
+      if (!badge) {
+        badge = makeBadge(spec.text);
+        shown.set(host, badge);
+      } else if (badge.textContent !== spec.text) {
+        badge.textContent = spec.text;
+      }
+      if (!badge.isConnected) place(host, badge, spec.place); // React pudo haberlo descartado al re-renderizar
+    }
+  };
+
+  let timer: number | undefined;
+  const schedule = (): void => {
+    if (timer !== undefined) return;
+    timer = window.setTimeout(() => {
+      timer = undefined;
+      decorate();
+    }, 80);
+  };
+
+  // ---------- Acciones ----------
+
+  const callContact = (position: number): void => {
+    if (isCalling()) return toast('Ya hay una llamada en curso (Ctrl+Enter para cortar)');
+    if (modalOpen()) return toast('Cerrá el menú o diálogo abierto para llamar');
+    const contact = findContacts().find((c) => c.position === position);
+    if (!contact) return toast(`No hay contacto ${position} en esta pantalla`);
+    if (contact.callButton.disabled) return toast(`No se puede llamar a ${contact.name}`);
+    const now = Date.now();
+    if (now - lastCallAt < LOCK_MS) return; // evita llamadas dobles
+    lastCallAt = now;
+    toast(`Llamando a ${contact.name}…`);
+    contact.callButton.click();
+  };
+
+  /** Radix Tabs activa la pestaña con mousedown/foco, no con click. */
+  const activateTab = (tab: HTMLElement): void => {
+    tab.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true, button: 0 }));
+    tab.focus();
+  };
+
+  const waitFor = async <T>(read: () => T | null | undefined, ms: number): Promise<T | null | undefined> => {
+    for (let waited = 0; waited < ms; waited += 50) {
+      const value = read();
+      if (value) return value;
+      await sleep(50);
+    }
+    return read();
+  };
+
+  const hangUp = async (): Promise<void> => {
+    hangingUp = true;
+    try {
+      let button = findHangup();
+      let openedPanel = false;
+      if (!button) {
+        // Solo se abre si está cerrado: el botón rojo dice "Abrir softphone".
+        // Si ya está abierto (dice "Minimizar"), basta con volver a "Marcador".
+        const red = callingFab();
+        const fab = red ? (red.matches(FAB_OPEN) ? red : null) : document.querySelector<HTMLButtonElement>(FAB_OPEN);
+        if (fab) {
+          fab.click();
+          openedPanel = true;
+        }
+        button = (await waitFor(() => {
+          const found = findHangup();
+          if (found) return found;
+          const marcador = [...document.querySelectorAll<HTMLElement>('[role="tab"]')].find(
+            (t) => ownText(t) === 'Marcador' && t.getAttribute('aria-selected') === 'false',
+          );
+          if (marcador) activateTab(marcador);
+          return null;
+        }, 900)) as HTMLButtonElement | undefined;
+      }
+      if (!button) return toast('No encontré el botón de colgar');
+      toast('Cortando llamada…');
+      button.click();
+      if (openedPanel) {
+        // lo dejamos como estaba: panel minimizado
+        await sleep(250);
+        document.querySelector<HTMLButtonElement>('button[aria-label="Minimizar softphone"]')?.click();
+      }
+    } finally {
+      hangingUp = false;
+      schedule();
+    }
+  };
+
+  const runPrimary = (action: Action): void => {
+    if (action === 'hangup') {
+      if (!hangingUp) void hangUp();
+    } else if (action === 'answer') {
+      toast('Atendiendo llamada…');
+      findAnswer()?.click();
+    } else {
+      const input = dialInput();
+      const dial = input && dialButtonFor(input);
+      const now = Date.now();
+      if (input && dial && !dial.disabled && now - lastCallAt >= LOCK_MS) {
+        lastCallAt = now;
+        toast(`Llamando a ${input.value.trim()}…`);
+        dial.click();
+      }
+    }
+  };
+
+  const consume = (event: KeyboardEvent): void => {
+    event.preventDefault();
+    event.stopPropagation();
+  };
+
+  const onKeyDown = (event: KeyboardEvent): void => {
+    if (!enabled || event.isComposing || event.repeat) return;
+    if (event.metaKey || event.shiftKey) return;
+
+    // Alt + dígito (sin Ctrl: en Windows AltGr se reporta como Ctrl+Alt)
+    if (event.altKey && !event.ctrlKey && !event.getModifierState('AltGraph')) {
+      const position = digitFromKeyCode(event.code);
+      if (position) {
+        consume(event);
+        callContact(position);
+      }
+      return;
+    }
+
+    // Ctrl + Enter
+    if (event.ctrlKey && !event.altKey && event.key === 'Enter') {
+      const action = plan();
+      if (action) {
+        consume(event);
+        runPrimary(action);
+      }
+    }
+  };
+
+  window.addEventListener('keydown', onKeyDown, true);
+
+  // ---------- Estado e inicio ----------
+
+  void readSetting(SETTING).then((value) => {
+    enabled = value;
+    schedule();
+  });
+  chrome.storage.onChanged.addListener((changes, area) => {
+    if (touches(changes, area, SETTING)) {
+      void readSetting(SETTING).then((value) => {
+        enabled = value;
+        schedule();
+      });
+    }
+  });
+
+  const start = (): void => {
+    new MutationObserver(schedule).observe(document.body, { childList: true, subtree: true });
+    document.addEventListener('focusin', schedule);
+    document.addEventListener('input', schedule);
+    window.addEventListener('resize', schedule);
+    setInterval(schedule, 1000);
+    schedule();
+  };
+  if (document.body) start();
+  else document.addEventListener('DOMContentLoaded', start);
+}
+
+if (!window.__gvShortcuts) {
+  window.__gvShortcuts = true;
+  main();
+}

@@ -1,0 +1,20 @@
+{
+  "name": "gavriel-tools",
+  "version": "0.6.0",
+  "private": true,
+  "description": "Extensión de navegador con herramientas extra para Gavriel (silenciar sonidos del panel, atajos de teclado).",
+  "type": "module",
+  "scripts": {
+    "build": "bun run build.ts",
+    "dev": "bun run build.ts --watch",
+    "typecheck": "tsc --noEmit",
+    "test": "bun test",
+    "check": "bun run typecheck && bun test && bun run build"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.4.4",
+    "@types/chrome": "^0.3.7",
+    "bun": "^1.4.4",
+    "typescript": "^7.0.2"
+  }
+}
