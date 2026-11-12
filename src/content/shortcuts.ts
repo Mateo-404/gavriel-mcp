@@ -1,6 +1,8 @@
 /**
  * Atajos de teclado (mundo aislado del content script).
  *
+ *   Mantener Alt  abre el menú de contactos (con el "Alt+N" de cada uno); al soltar
+ *                  Alt se cierra. Un toque rápido de Alt no hace nada.
  *   Alt + 1…9      llama al contacto de la cuenta en esa posición de la lista
  *                  (1 = el primero), desde cualquier pestaña de la cuenta: usa la
  *                  lista "Contactos de emergencia" si está a la vista y, si no, el
@@ -58,6 +60,8 @@ interface BadgeSpec {
 const SETTING = 'shortcutsEnabled' as const;
 const HINT_ATTR = 'data-gv-hint';
 const LOCK_MS = 1500;
+/** Cuánto hay que mantener Alt (sin otra tecla) para que se abra el menú de contactos. */
+const PEEK_DELAY_MS = 350;
 const MAX_SHORTCUT_CONTACTS = 9;
 const CONTACTS_HEADING = /^contactos de emergencia$/i;
 const ACCOUNT_CONTACTS_HEADING = /^contactos de la cuenta$/i;
@@ -72,6 +76,8 @@ function main(): void {
   let lastCallAt = 0;
   let hangingUp = false;
   let callingFromMenu = false;
+  let peekTimer: number | undefined;
+  let peekOpened = false; // el menú lo abrimos nosotros al mantener Alt
 
   const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -296,6 +302,44 @@ function main(): void {
 
   // ---------- Acciones ----------
 
+  // ---------- Mantener Alt: ver los contactos ----------
+
+  const menuToggle = (): HTMLButtonElement | null => {
+    const toggle = document.querySelector<HTMLButtonElement>(MENU_TOGGLE);
+    return toggle && visible(toggle) ? toggle : null;
+  };
+
+  const cancelPeekTimer = (): void => {
+    clearTimeout(peekTimer);
+    peekTimer = undefined;
+  };
+
+  /**
+   * Al mantener Alt, abre el menú "Llamar a…" para que se vean los contactos con su
+   * "Alt+N". Solo si la lista de contactos no está ya a la vista, no hay llamada ni
+   * diálogo abierto, y el menú no lo abrió el usuario por su cuenta.
+   */
+  const openPeek = (): void => {
+    peekTimer = undefined;
+    const toggle = menuToggle();
+    if (!enabled || !toggle || isCalling() || modalOpen() || findContacts().length > 0) return;
+    if (toggle.getAttribute('aria-expanded') === 'true') return;
+    toggle.click();
+    peekOpened = true;
+    schedule();
+  };
+
+  /** Al soltar Alt: cierra el menú si lo abrimos nosotros. Devuelve true si hizo algo. */
+  const closePeek = (): boolean => {
+    cancelPeekTimer();
+    if (!peekOpened) return false;
+    peekOpened = false;
+    const toggle = menuToggle();
+    if (toggle?.getAttribute('aria-expanded') === 'true') toggle.click(); // si ya se cerró (elegiste un contacto), no
+    schedule();
+    return true;
+  };
+
   const startCall = (contact: Contact): void => {
     toast(`Llamando a ${contact.name}…`);
     contact.button.click();
@@ -423,8 +467,16 @@ function main(): void {
   };
 
   const onKeyDown = (event: KeyboardEvent): void => {
+    // Cualquier otra tecla junto con Alt (Alt+Tab, Alt+←…) no es "mantener Alt"
+    if (event.key !== 'Alt') cancelPeekTimer();
     if (!enabled || event.isComposing || event.repeat) return;
     if (event.metaKey || event.shiftKey) return;
+
+    // Mantener Alt solo (sin Ctrl/Shift/Meta): tras un instante se abre el menú de contactos
+    if (event.key === 'Alt') {
+      if (!event.ctrlKey) peekTimer = window.setTimeout(openPeek, PEEK_DELAY_MS);
+      return;
+    }
 
     // Alt + dígito (sin Ctrl: en Windows AltGr se reporta como Ctrl+Alt)
     if (event.altKey && !event.ctrlKey && !event.getModifierState('AltGraph')) {
@@ -446,7 +498,14 @@ function main(): void {
     }
   };
 
+  const onKeyUp = (event: KeyboardEvent): void => {
+    // preventDefault evita que Windows/Chrome le den foco a su menú al soltar Alt
+    if (event.key === 'Alt' && closePeek()) event.preventDefault();
+  };
+
   window.addEventListener('keydown', onKeyDown, true);
+  window.addEventListener('keyup', onKeyUp, true);
+  window.addEventListener('blur', () => void closePeek()); // Alt+Tab: se pierde el keyup
 
   // ---------- Estado e inicio ----------
 
@@ -458,6 +517,7 @@ function main(): void {
     if (touches(changes, area, SETTING)) {
       void readSetting(SETTING).then((value) => {
         enabled = value;
+        if (!enabled) closePeek();
         schedule();
       });
     }

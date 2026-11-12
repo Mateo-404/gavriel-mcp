@@ -14,6 +14,7 @@ siguen apareciendo en pantalla: solo se silencia el audio, y solo en el navegado
 
 | Atajo          | Acción                                                                                         |
 | -------------- | ---------------------------------------------------------------------------------------------- |
+| Mantener `Alt` | Abre el menú de contactos (cada uno con su `Alt+N`); al soltar `Alt` se cierra. Un toque rápido no hace nada. |
 | `Alt` + `1…9`  | Llama al contacto de la cuenta en esa posición de la lista (1 = el primero), **desde cualquier pestaña de la cuenta**. Nunca llama a Jurisdicción ni al 911. |
 | `Ctrl` + `Enter` | Corta la llamada en curso; si hay una entrante, la atiende; si hay un número en el marcador, llama. Sin ninguna de las tres no interviene. |
 
