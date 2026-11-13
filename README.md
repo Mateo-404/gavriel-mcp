@@ -42,18 +42,18 @@ bun install
 bun run build        # compila src/ y static/ en dist/
 ```
 
-Cada  genera dos carpetas:
+Cada `bun run build` genera dos carpetas:
 
 | Navegador | Carpeta | Cómo cargarla |
 | --------- | ------- | ------------- |
-| Chrome, Edge, Brave, Chromium |  |  → **Modo desarrollador** → **Cargar descomprimida** |
-| Firefox 128 o más nuevo |  |  → **Cargar complemento temporal** → elegir  |
+| Chrome, Edge, Brave, Chromium | `dist/` | `chrome://extensions` → **Modo desarrollador** → **Cargar descomprimida** |
+| Firefox 128 o más nuevo | `dist-firefox/` | `about:debugging#/runtime/this-firefox` → **Cargar complemento temporal** → elegir `dist-firefox/manifest.json` |
 
-Al cambiar el código:  (o  para recompilar al guardar) y el botón de recargar de la extensión.
+Al cambiar el código: `bun run build` (o `bun run dev` para recompilar al guardar) y el botón de recargar de la extensión.
 
-**Firefox.** El manifest de Firefox lleva además un id propio, la versión mínima 128 (la primera que admite ) y el permiso del sitio. Sin firmar en addons.mozilla.org solo se puede cargar como temporal: se pierde al cerrar Firefox. Si tras cargarla no actúa en Gavriel, abrí  → Gavriel Tools → **Permisos** y activá el acceso a app.gavriel.com.ar. No se probó en un Firefox real.
+**Firefox.** El manifest de Firefox lleva además un id propio, la versión mínima 128 (la primera que admite `world: "MAIN"`) y el permiso del sitio. Sin firmar en addons.mozilla.org solo se puede cargar como temporal: se pierde al cerrar Firefox. Si tras cargarla no actúa en Gavriel, abrí `about:addons` → Gavriel Tools → **Permisos** y activá el acceso a app.gavriel.com.ar. No se probó en un Firefox real.
 
-**Linux.** Funciona igual (Bun y los navegadores tienen versión para Linux; no se probó allá). + suele cambiar la distribución del teclado en GNOME y KDE: si te molesta, se desactiva en la configuración del teclado. Algunos escritorios usan +clic para mover ventanas.
+**Linux.** Funciona igual (Bun y los navegadores tienen versión para Linux; no se probó allá). `Alt`+`Shift` suele cambiar la distribución del teclado en GNOME y KDE: si te molesta, se desactiva en la configuración del teclado. Algunos escritorios usan `Alt`+clic para mover ventanas.
 
 ## Scripts
 
