@@ -5,6 +5,7 @@ import { join } from 'node:path';
 const manifest = (await Bun.file('static/manifest.json').json()) as {
   icons: Record<string, string>;
   action: { default_popup: string };
+  options_ui?: { page: string; open_in_tab?: boolean };
   content_scripts: { js: string[]; css?: string[]; world?: string; matches: string[] }[];
 };
 
@@ -24,6 +25,14 @@ describe('manifest', () => {
     }
     for (const icon of Object.values(manifest.icons)) expect(existsSync(join('static', icon))).toBe(true);
     expect(existsSync(join('static', manifest.action.default_popup))).toBe(true);
+  });
+
+  test('la página de ajustes existe, abre en una pestaña y tiene su fuente', () => {
+    const page = manifest.options_ui?.page ?? '';
+    expect(page).not.toBe('');
+    expect(manifest.options_ui?.open_in_tab).toBe(true);
+    expect(existsSync(join('static', page))).toBe(true);
+    expect(existsSync(join('src', 'options', 'options.ts'))).toBe(true);
   });
 
   test('solo actúa sobre app.gavriel.com.ar', () => {

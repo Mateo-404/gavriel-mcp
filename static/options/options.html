@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Ajustes de Gavriel Tools</title>
+  <link rel="stylesheet" href="options.css">
+</head>
+<body>
+  <header class="top">
+    <div class="wrap top-inner">
+      <img class="logo" src="../logo.svg" alt="Gavriel">
+      <span class="tag">Tools</span>
+      <h1>Ajustes</h1>
+      <p class="saved" id="saved" role="status" aria-live="polite"></p>
+    </div>
+  </header>
+
+  <div class="wrap layout">
+    <nav class="toc" aria-label="Secciones de esta página">
+      <a href="#atajos">Atajos de teclado</a>
+      <a href="#cuenta">Al abrir una cuenta</a>
+      <a href="#sonidos">Sonidos</a>
+      <a href="#mantenimiento">Mantenimiento</a>
+    </nav>
+
+    <main class="content">
+      <section id="atajos" class="block" aria-labelledby="h-atajos">
+        <h2 id="h-atajos">Atajos de teclado</h2>
+        <p class="lead">Funcionan en app.gavriel.com.ar. Los números <kbd>Alt+N</kbd> de cada contacto o evento se ven solo mientras mantenés <kbd>Alt</kbd>.</p>
+
+        <label class="row" for="keys">
+          <span class="row-text">
+            <strong>Usar atajos de teclado</strong>
+            <small id="keys-state">Cargando…</small>
+          </span>
+          <input type="checkbox" id="keys" role="switch">
+          <span class="switch" aria-hidden="true"></span>
+        </label>
+
+        <div class="catalog" id="catalog" aria-label="Lista de atajos"></div>
+        <p class="note">En Windows, <kbd>Alt</kbd>+<kbd>Shift</kbd> también cambia el idioma del teclado si tenés más de uno instalado. Se desactiva en Configuración, Hora e idioma, Teclado.</p>
+      </section>
+
+      <section id="cuenta" class="block" aria-labelledby="h-cuenta">
+        <h2 id="h-cuenta">Al abrir una cuenta</h2>
+        <p class="lead">Lo que la extensión deja listo apenas entrás al análisis de una cuenta. Se aplica una vez por cuenta y no vuelve a tocar nada si cambiás de pestaña.</p>
+
+        <label class="row" for="opt-contacts">
+          <span class="row-text">
+            <strong>Entrar a Contactos</strong>
+            <small>Abre la pestaña Contactos, así lo primero que ves es a quién llamar.</small>
+          </span>
+          <input type="checkbox" id="opt-contacts" role="switch">
+          <span class="switch" aria-hidden="true"></span>
+        </label>
+
+        <label class="row" for="opt-secrets">
+          <span class="row-text">
+            <strong>Mostrar clave y contraclave</strong>
+            <small>Toca el ojito por vos. Solo aparece si tu usuario tiene permiso para ver la clave, y queda a la vista de quien mire tu pantalla.</small>
+          </span>
+          <input type="checkbox" id="opt-secrets" role="switch">
+          <span class="switch" aria-hidden="true"></span>
+        </label>
+      </section>
+
+      <section id="sonidos" class="block" aria-labelledby="h-sonidos">
+        <h2 id="h-sonidos">Sonidos</h2>
+        <p class="lead">Se manejan desde el ícono de Gavriel Tools en la barra del navegador, sin entrar acá.</p>
+        <p class="summary" id="sounds-summary"></p>
+      </section>
+
+      <section id="mantenimiento" class="block" aria-labelledby="h-mant">
+        <h2 id="h-mant">Mantenimiento</h2>
+
+        <div class="row row-static">
+          <span class="row-text">
+            <strong>Restablecer ajustes</strong>
+            <small>Vuelve los atajos y las opciones de cuenta a como vienen de fábrica. No cambia los sonidos.</small>
+          </span>
+          <div class="actions" id="reset-ask">
+            <button type="button" class="btn" id="reset">Restablecer</button>
+          </div>
+          <div class="actions" id="reset-confirm" hidden>
+            <button type="button" class="btn btn-danger" id="reset-yes">Sí, restablecer</button>
+            <button type="button" class="btn btn-quiet" id="reset-no">Cancelar</button>
+          </div>
+        </div>
+      </section>
+
+      <footer class="foot">
+        <a href="https://gavriel.app/" target="_blank" rel="noopener">gavriel.app</a>
+        <span id="version"></span>
+      </footer>
+    </main>
+  </div>
+
+  <script src="options.js"></script>
+</body>
+</html>

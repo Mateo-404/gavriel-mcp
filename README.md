@@ -6,7 +6,7 @@ Extensión de Chrome (Manifest V3, TypeScript, compilada con [Bun](https://bun.s
 ## Qué hace
 
 **Silenciar sonidos del panel de monitoreo.** Dentro de `/monitoring-panel`, silencia los sonidos que cada usuario
-elija en el popup. Por defecto: `alarm`, `siren` y `beep`. Si Gavriel reproduce un sonido nuevo, aparece en la lista
+elija en el popup (el ícono de la extensión, que maneja solo el sonido). Por defecto: `alarm`, `siren` y `beep`. Si Gavriel reproduce un sonido nuevo, aparece en la lista
 (sin silenciarse) para que se elija. Las llamadas, las grabaciones y cualquier otro audio no se tocan. Los eventos
 siguen apareciendo en pantalla: solo se silencia el audio, y solo en el navegador de quien instala la extensión.
 
@@ -20,7 +20,9 @@ siguen apareciendo en pantalla: solo se silencia el audio, y solo en el navegado
 | `Alt` + `Shift` | En una cuenta, **copia al portapapeles el nombre de la última persona a la que llamaste** (por ejemplo `Pablo Perren`, sin el teléfono ni la descripción). Sin tocar nada: abre «Búsqueda avanzada», desmarca «Ocultar operación (intervención, llamadas…)» si hace falta, lee la descripción «Contacto vía Teléfono a …» del evento más reciente y deja el panel y el filtro como estaban. Tarda menos de un segundo. Ojo: en Windows, `Alt`+`Shift` también cambia el idioma del teclado si tenés más de uno instalado (se desactiva en Configuración → Hora e idioma → Teclado). |
 | `Ctrl` + `Enter` | Corta la llamada en curso; si hay una entrante, la atiende; si hay un número en el marcador, llama. **Sin nada de eso, en una cuenta intervenida abre «Cerrar intervención» y deja el cursor en «Resolución»** (el diálogo de Gavriel manda el foco a «Categoría»; la extensión lo mueve). Confirmar el cierre sigue siendo manual: el botón queda deshabilitado hasta completar categoría y resolución. No interviene si escribís en un campo ni con un diálogo abierto. |
 
-**Al abrir una cuenta** (se puede desactivar cada cosa en el popup): entra directo a la pestaña **Contactos** y toca el ojito de **Clave** y **Contraclave**. Se aplica una sola vez por cuenta y solo si el botón existe: Gavriel dibuja el ojito únicamente si tu usuario tiene permiso para ver la clave.
+**Ajustes.** Todo lo que no es sonido se maneja en una página propia: botón **Ajustes** del popup, o clic derecho en el ícono → *Opciones*. Ahí se activan o desactivan los atajos (con la lista completa y en qué pantalla funciona cada uno), las opciones de cuenta y un botón para restablecer. Se guarda al instante.
+
+**Al abrir una cuenta** (se puede desactivar cada cosa en Ajustes): entra directo a la pestaña **Contactos** y toca el ojito de **Clave** y **Contraclave**. Se aplica una sola vez por cuenta y solo si el botón existe: Gavriel dibuja el ojito únicamente si tu usuario tiene permiso para ver la clave.
 
 Protecciones: ignora teclas repetidas, `AltGr`, `Shift`/`Meta`; bloquea llamadas dobles durante 1,5 s; no llama si ya
 hay una llamada en curso ni con un menú o diálogo modal abierto.
@@ -58,9 +60,10 @@ src/
     shortcuts.ts   atajos e indicadores dentro de los componentes
     events-nav.ts  recorrer los eventos del panel con las flechas
     account.ts     al abrir una cuenta: pestaña Contactos y ojito de la clave
-  popup/popup.ts   interruptores y lista de sonidos
+  popup/popup.ts   popup: solo sonidos (interruptor general y lista) + botón Ajustes
+  options/options.ts   página de ajustes: atajos, opciones de cuenta, restablecer
   shared/          constantes, almacenamiento tipado y lógica pura (testeada)
-static/            manifest.json, popup.html/css, shortcuts.css, iconos, logo
+static/            manifest.json, popup/ y options/ (html y css), shortcuts.css, iconos, logo
 test/              bun test
 build.ts           script de build (Bun.build, un IIFE por content script)
 ```

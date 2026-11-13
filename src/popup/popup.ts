@@ -1,34 +1,10 @@
 /**
- * Popup. Todo se guarda en chrome.storage.local; las páginas de Gavriel
- * (bridge.ts / shortcuts.ts) reaccionan al cambio al instante.
+ * Popup: solo el sonido (interruptor general y qué sonidos silenciar). Atajos y opciones de
+ * cuenta están en la página de ajustes, a la que lleva el botón "Ajustes".
+ * Todo se guarda en chrome.storage.local; las páginas de Gavriel reaccionan al instante.
  */
 import { FRIENDLY_SOUND_NAMES, type Settings } from '../shared/constants';
 import { readSetting, readSettings, touches, writeSettings } from '../shared/storage';
-
-interface Toggle {
-  key: 'muteEnabled' | 'shortcutsEnabled';
-  box: string;
-  state: string;
-  on: string;
-  off: string;
-}
-
-const TOGGLES: readonly Toggle[] = [
-  {
-    key: 'muteEnabled',
-    box: 'mute',
-    state: 'state-mute',
-    on: 'Se silencian los sonidos elegidos',
-    off: 'Todos los sonidos habilitados',
-  },
-  {
-    key: 'shortcutsEnabled',
-    box: 'keys',
-    state: 'state-keys',
-    on: 'Atajos activos',
-    off: 'Atajos desactivados',
-  },
-];
 
 const $ = <T extends HTMLElement>(id: string): T => {
   const el = document.getElementById(id);
@@ -38,38 +14,27 @@ const $ = <T extends HTMLElement>(id: string): T => {
 
 $('version').textContent = `v${chrome.runtime.getManifest().version}`;
 
-for (const toggle of TOGGLES) {
-  const box = $<HTMLInputElement>(toggle.box);
-  const state = $<HTMLElement>(toggle.state);
+// ---- Ajustes: abre la página de configuración en una pestaña propia ----
+$('open-settings').addEventListener('click', () => {
+  void chrome.runtime.openOptionsPage();
+  window.close();
+});
 
-  const render = (on: boolean): void => {
-    box.checked = on;
-    state.textContent = on ? toggle.on : toggle.off;
-    if (toggle.key === 'muteEnabled') $('sounds').classList.toggle('off', !on);
-  };
+// ---- Interruptor general ----
+const muteBox = $<HTMLInputElement>('mute');
+const muteState = $('state-mute');
 
-  void readSetting(toggle.key).then(render);
-  box.addEventListener('change', () => {
-    void writeSettings({ [toggle.key]: box.checked });
-    render(box.checked);
-  });
+function renderMaster(on: boolean): void {
+  muteBox.checked = on;
+  muteState.textContent = on ? 'Se silencian los sonidos elegidos' : 'Todos los sonidos habilitados';
+  $('sounds').classList.toggle('off', !on);
 }
 
-// ---- Qué hacer al abrir una cuenta ----
-const ACCOUNT_OPTIONS = [
-  { key: 'openContactsTab', box: 'opt-contacts' },
-  { key: 'revealSecrets', box: 'opt-secrets' },
-] as const;
-
-for (const option of ACCOUNT_OPTIONS) {
-  const box = $<HTMLInputElement>(option.box);
-  void readSetting(option.key).then((on) => {
-    box.checked = on;
-  });
-  box.addEventListener('change', () => {
-    void writeSettings({ [option.key]: box.checked });
-  });
-}
+void readSetting('muteEnabled').then(renderMaster);
+muteBox.addEventListener('change', () => {
+  void writeSettings({ muteEnabled: muteBox.checked });
+  renderMaster(muteBox.checked);
+});
 
 // ---- Lista de sonidos: uno por archivo de /sounds/ que Gavriel reproduce ----
 const list = $<HTMLUListElement>('sound-list');

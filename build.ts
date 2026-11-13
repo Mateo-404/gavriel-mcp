@@ -13,6 +13,7 @@ const ENTRYPOINTS = [
   'src/content/bridge.ts',
   'src/content/mute.ts',
   'src/content/shortcuts.ts',
+  'src/options/options.ts',
   'src/popup/popup.ts',
 ];
 
