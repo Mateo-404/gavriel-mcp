@@ -15,7 +15,9 @@
  *                    1. llamada en curso      -> cortar
  *                    2. llamada entrante      -> atender
  *                    3. número en el marcador -> llamar
- *                  Sin ninguna de las tres no intercepta nada.
+ *                    4. cuenta intervenida    -> "Cerrar intervención": abre el formulario con
+ *                       el cursor en "Resolución" (confirmar sigue siendo manual)
+ *                  Sin ninguna de las cuatro no intercepta nada (ni escribiendo en un campo).
  *
  * Los atajos se muestran dentro de cada componente (junto al botón de llamar de
  * cada contacto, y dentro de "Colgar" / "Atender" / "Llamar"), no flotando encima.
@@ -45,7 +47,7 @@ declare global {
   }
 }
 
-type Action = 'hangup' | 'answer' | 'dial';
+type Action = 'hangup' | 'answer' | 'dial' | 'close';
 
 interface Contact {
   /** Posición en la lista, empezando en 1: es el número del atajo. */
@@ -88,6 +90,7 @@ function main(): void {
   let lastCallAt = 0;
   let lastOpenAt = 0;
   let hangingUp = false;
+  let closing = false;
   let callingFromMenu = false;
   let peekTimer: number | undefined;
   let peekOpened = false; // el menú lo abrimos nosotros al mantener Alt
@@ -210,6 +213,10 @@ function main(): void {
       return false;
     });
 
+  /** Botón "Cerrar intervención" de la cuenta (abre un formulario: no cierra nada por sí solo). */
+  const findCloseIntervention = (): HTMLButtonElement | undefined =>
+    buttons().find((b) => !b.disabled && visible(b) && ownText(b) === 'Cerrar intervención');
+
   const dialInput = (): HTMLInputElement | null => document.querySelector<HTMLInputElement>(DIAL_INPUT);
 
   const dialButtonFor = (input: HTMLElement): HTMLButtonElement | null => {
@@ -246,11 +253,21 @@ function main(): void {
 
   const events = createEventsNav({ visible, toast });
 
-  /** Teclear en un campo o moverse dentro de un menú/lista/pestañas: las flechas no son nuestras. */
+  const EDITABLE = 'input, textarea, select, [contenteditable=""], [contenteditable="true"]';
+
+  /** ¿El foco está escribiendo en un campo? */
+  const isEditable = (el: Element | null): boolean => !!el && !!el.closest(EDITABLE);
+
+  /**
+   * Las flechas no son nuestras si estás escribiendo en un campo, dentro de un menú o lista
+   * desplegada, o sobre un control que las usa (pestaña, deslizador, opción…). Los diálogos
+   * modales se detectan aparte (modalOpen), no por el rol de un ancestro.
+   */
   const ownsArrowKeys = (target: EventTarget | null): boolean => {
     if (!(target instanceof Element)) return false;
-    if (target.closest('input, textarea, select, [contenteditable=""], [contenteditable="true"]')) return true;
-    return !!target.closest('[role="menu"], [role="listbox"], [role="tablist"], [role="slider"], [role="dialog"]');
+    if (isEditable(target)) return true;
+    if (target.closest('[role="menu"], [role="listbox"]')) return true;
+    return !!target.closest('[role="tab"], [role="slider"], [role="option"], [role="menuitem"], [role="combobox"], [role="radio"]');
   };
 
   // ---------- Indicadores dentro de cada componente ----------
@@ -261,6 +278,9 @@ function main(): void {
     if (findAnswer()) return 'answer';
     const input = dialInput();
     if (input && document.activeElement === input && input.value.trim() && dialButtonFor(input)) return 'dial';
+    // Sin llamada que atender, cortar ni marcar: en una cuenta intervenida, abre "Cerrar intervención".
+    // Nunca mientras escribís en un campo ni con un diálogo abierto (podría ser el Ctrl+Enter de otro formulario).
+    if (!isEditable(document.activeElement) && !modalOpen() && findCloseIntervention()) return 'close';
     return null;
   };
 
@@ -303,7 +323,9 @@ function main(): void {
             ? findAnswer()
             : action === 'dial'
               ? dialButtonFor(dialInput()!)
-              : null;
+              : action === 'close'
+                ? findCloseIntervention()
+                : null;
       if (target) wanted.set(target, { text: 'Ctrl+Enter', place: 'inside', altOnly: false });
     }
 
@@ -486,9 +508,41 @@ function main(): void {
     }
   };
 
+  /**
+   * Abre el formulario de "Cerrar intervención" y deja el cursor listo en "Resolución".
+   * El formulario es un diálogo de Radix: al abrirse manda el foco al primer control (el
+   * selector de Categoría, id="category"), así que se espera a que aparezca el textarea
+   * (id="resolution") y se lo enfoca. Confirmar sigue siendo manual: el botón queda
+   * deshabilitado hasta completar Categoría y Resolución.
+   */
+  const openCloseIntervention = async (): Promise<void> => {
+    const button = findCloseIntervention();
+    if (!button) return;
+    closing = true;
+    try {
+      toast('Cerrar intervención: escribí la resolución');
+      button.click();
+      const area = await waitFor(() => {
+        const field = document.getElementById('resolution');
+        return field instanceof HTMLTextAreaElement && visible(field) ? field : null;
+      }, 2000);
+      if (!area) return;
+      // Radix enfoca Categoría al abrir; se enfoca Resolución después y se vuelve a comprobar
+      for (const pause of [150, 300]) {
+        await sleep(pause);
+        if (document.activeElement !== area) area.focus();
+      }
+    } finally {
+      closing = false;
+      schedule();
+    }
+  };
+
   const runPrimary = (action: Action): void => {
     if (action === 'hangup') {
       if (!hangingUp) void hangUp();
+    } else if (action === 'close') {
+      if (!closing) void openCloseIntervention();
     } else if (action === 'answer') {
       toast('Atendiendo llamada…');
       findAnswer()?.click();
@@ -513,7 +567,15 @@ function main(): void {
     // Cualquier otra tecla junto con Alt (Alt+Tab, Alt+←…) no es "mantener Alt"
     if (event.key !== 'Alt') cancelPeekTimer();
     if (!enabled || event.isComposing || event.repeat) return;
-    if (event.metaKey || event.shiftKey) return;
+    if (event.metaKey) return;
+
+    // Flechas sobre los eventos del panel, con o sin Shift (por si otra cosa del navegador se queda
+    // con las flechas solas). Escribiendo en un campo o dentro de un menú no son nuestras.
+    if (!event.altKey && !event.ctrlKey && isArrowKey(event.key)) {
+      if (events.active() && !modalOpen() && !ownsArrowKeys(event.target) && events.move(event.key)) consume(event);
+      return;
+    }
+    if (event.shiftKey) return;
 
     // Mantener Alt solo (sin Ctrl/Shift/Meta): se muestran los indicadores Alt+N y, tras un
     // instante, se abre el menú de contactos
@@ -536,20 +598,21 @@ function main(): void {
       return;
     }
 
-    // Flechas, Enter y Escape sobre los eventos del panel (sin ningún modificador)
+    // Enter y Escape sobre los eventos del panel (sin ningún modificador)
     if (!event.altKey && !event.ctrlKey) {
-      if (events.active() && !modalOpen() && !ownsArrowKeys(event.target)) {
-        if (isArrowKey(event.key) && events.move(event.key)) {
-          consume(event);
-          return;
-        }
-        // Enter solo abre si el foco está en la tarjeta marcada (no si estás en un botón o campo)
-        const onMarkedCard =
-          event.target === document.body || (event.target instanceof Element && event.target.hasAttribute(FOCUS_ATTR));
-        if (event.key === 'Enter' && events.hasFocus() && onMarkedCard && events.openFocused()) {
-          consume(event);
-          return;
-        }
+      // Enter solo abre si el foco está en la tarjeta marcada (no si estás en un botón o campo)
+      const onMarkedCard =
+        event.target === document.body || (event.target instanceof Element && event.target.hasAttribute(FOCUS_ATTR));
+      if (
+        event.key === 'Enter' &&
+        events.active() &&
+        !modalOpen() &&
+        events.hasFocus() &&
+        onMarkedCard &&
+        events.openFocused()
+      ) {
+        consume(event);
+        return;
       }
       if (event.key === 'Escape' && events.hasFocus()) events.clear(); // sin consumir: Gavriel también la usa
     }

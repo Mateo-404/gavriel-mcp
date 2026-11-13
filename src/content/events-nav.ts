@@ -56,6 +56,7 @@ export interface EventsNav {
 
 export function createEventsNav({ visible, toast }: Deps): EventsNav {
   let focusKey: string | null = null;
+  let hinted = false;
 
   const active = (): boolean => isPanelList(location.pathname);
 
@@ -117,6 +118,10 @@ export function createEventsNav({ visible, toast }: Deps): EventsNav {
       if (!target) return false;
       focusKey = target.key;
       mark(target, true);
+      if (!hinted) {
+        hinted = true; // la primera vez, un aviso de cómo seguir
+        toast('Flechas: recorrer eventos · Enter: abrir · Esc: salir');
+      }
       return true;
     },
 

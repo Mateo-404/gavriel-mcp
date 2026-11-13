@@ -46,11 +46,29 @@ html[data-gv-alt] .gv-kbd[data-gv-altonly] {
   z-index: 1;
 }
 
-/* Tarjeta marcada con las flechas (el atributo lo pone events-nav.ts; React reescribe className) */
+/* Tarjeta marcada con las flechas (el atributo lo pone events-nav.ts; React reescribe className).
+   Se nota también en el tema oscuro: anillo grueso, resplandor lila y una etiqueta propia. */
 .monitoring-panel-event-card[data-gv-focus] {
-  outline: none;
-  box-shadow: 0 0 0 2px #bf88df, 0 0 0 5px rgba(191, 136, 223, 0.28);
+  outline: 3px solid #bf88df;
+  outline-offset: 2px;
+  box-shadow: 0 0 0 8px rgba(191, 136, 223, 0.3), 0 0 28px 6px rgba(191, 136, 223, 0.55);
+  filter: brightness(1.12);
+  z-index: 2;
   transition: box-shadow 0.12s;
+}
+.monitoring-panel-event-card[data-gv-focus]::after {
+  content: "↵ Enter para abrir";
+  position: absolute;
+  top: -11px;
+  right: 12px;
+  padding: 1px 8px;
+  border-radius: 6px;
+  font: 600 10px/1.5 system-ui, "Segoe UI", sans-serif;
+  color: #fff;
+  background: #8b4fc4;
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 3;
 }
 
 .gv-toast {
