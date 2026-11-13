@@ -8,6 +8,8 @@ export type Settings = {
   openContactsTab: boolean;
   /** Al abrir una cuenta, mostrar la clave y la contraclave (toca el ojito). */
   revealSecrets: boolean;
+  /** Durante una llamada, mostrar una tarjeta flotante con a quién se llama. */
+  showCallCard: boolean;
   /** Nombres (sin extensión) de los sonidos de /sounds/ que se silencian. */
   mutedSounds: string[];
   /** Sonidos que Gavriel ya reprodujo (lista que muestra el popup). */
@@ -26,6 +28,7 @@ export const DEFAULT_SETTINGS: Settings = {
   shortcutsEnabled: true,
   openContactsTab: true,
   revealSecrets: true,
+  showCallCard: true,
   mutedSounds: [...DEFAULT_SOUNDS],
   knownSounds: [...DEFAULT_SOUNDS],
 };

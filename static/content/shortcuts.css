@@ -97,3 +97,29 @@ html[data-gv-alt] .gv-kbd[data-gv-altonly] {
     transition: none;
   }
 }
+
+/* Tarjeta "a quién llamo": flota sobre el teléfono, chica y sin tapar nada (no recibe clics) */
+.gv-callcard {
+  position: fixed;
+  right: 24px;
+  bottom: 96px;
+  display: grid;
+  gap: 1px;
+  max-width: min(260px, calc(100vw - 32px));
+  padding: 8px 14px 9px;
+  border-radius: 14px;
+  pointer-events: none;
+  font: 500 12px/1.3 system-ui, "Segoe UI", sans-serif;
+  color: #f4faf6;
+  background: rgba(0, 30, 18, 0.94);
+  border: 1px solid rgba(169, 230, 189, 0.4);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+  z-index: 2147483000;
+  animation: gv-callcard-in 0.16s ease-out;
+}
+.gv-callcard[hidden] { display: none; }
+.gv-callcard-label { font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: #a9e6bd; }
+.gv-callcard-name { font-size: 14px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gv-callcard-desc { color: #c4d9cc; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@keyframes gv-callcard-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .gv-callcard { animation: none; } }

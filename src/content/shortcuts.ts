@@ -43,6 +43,7 @@ import { digitFromKeyCode, isHangupLabel, parseContactName } from '../shared/lab
 import { readSetting, touches } from '../shared/storage';
 import { accountIdFromLocation } from '../shared/routes';
 import { createEventsNav, FOCUS_ATTR } from './events-nav';
+import { createCallCard } from './call-card';
 import { createLastContact } from './last-contact';
 
 declare global {
@@ -257,6 +258,7 @@ function main(): void {
 
   const events = createEventsNav({ visible, toast });
   const copyLastContact = createLastContact({ visible, toast });
+  const callCard = createCallCard({ isCalling, visible });
 
   const EDITABLE = 'input, textarea, select, [contenteditable=""], [contenteditable="true"]';
 
@@ -351,6 +353,7 @@ function main(): void {
       if (!badge.isConnected) place(host, badge, spec.place); // React pudo haberlo descartado al re-renderizar
     }
     events.refresh();
+    callCard.update();
   };
 
   let timer: number | undefined;
@@ -663,7 +666,9 @@ function main(): void {
     enabled = value;
     schedule();
   });
+  void readSetting('showCallCard').then((value) => callCard.setEnabled(value));
   chrome.storage.onChanged.addListener((changes, area) => {
+    if (touches(changes, area, 'showCallCard')) void readSetting('showCallCard').then((v) => callCard.setEnabled(v));
     if (touches(changes, area, SETTING)) {
       void readSetting(SETTING).then((value) => {
         enabled = value;

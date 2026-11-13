@@ -13,6 +13,7 @@ describe('sanitizeSettings', () => {
       shortcutsEnabled: false,
       openContactsTab: false,
       revealSecrets: false,
+      showCallCard: false,
       mutedSounds: ['alarm'],
       knownSounds: ['alarm', 'siren', 'beep', 'ding'],
     });
@@ -20,6 +21,7 @@ describe('sanitizeSettings', () => {
     expect(settings.shortcutsEnabled).toBe(false);
     expect(settings.openContactsTab).toBe(false);
     expect(settings.revealSecrets).toBe(false);
+    expect(settings.showCallCard).toBe(false);
     expect(settings.mutedSounds).toEqual(['alarm']);
     expect(settings.knownSounds).toHaveLength(4);
   });
@@ -34,6 +36,7 @@ describe('sanitizeSettings', () => {
       shortcutsEnabled: 1,
       openContactsTab: 'si',
       revealSecrets: null,
+      showCallCard: 'x',
       mutedSounds: ['alarm', 42],
       knownSounds: 'alarm',
     });

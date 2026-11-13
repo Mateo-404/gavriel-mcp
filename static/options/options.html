@@ -20,6 +20,7 @@
     <nav class="toc" aria-label="Secciones de esta página">
       <a href="#atajos">Atajos de teclado</a>
       <a href="#cuenta">Al abrir una cuenta</a>
+      <a href="#llamada">Durante una llamada</a>
       <a href="#sonidos">Sonidos</a>
       <a href="#mantenimiento">Mantenimiento</a>
     </nav>
@@ -61,6 +62,20 @@
             <small>Toca el ojito por vos. Solo aparece si tu usuario tiene permiso para ver la clave, y queda a la vista de quien mire tu pantalla.</small>
           </span>
           <input type="checkbox" id="opt-secrets" role="switch">
+          <span class="switch" aria-hidden="true"></span>
+        </label>
+      </section>
+
+      <section id="llamada" class="block" aria-labelledby="h-llamada">
+        <h2 id="h-llamada">Durante una llamada</h2>
+        <p class="lead">Cuando llamás a un contacto, una tarjeta chica flota sobre el teléfono con su nombre y su descripción. Desaparece sola al cortar y vuelve con el próximo contacto.</p>
+
+        <label class="row" for="opt-callcard">
+          <span class="row-text">
+            <strong>Mostrar a quién estoy llamando</strong>
+            <small>Funciona con los atajos, con el mouse, desde el menú del teléfono y desde el marcador.</small>
+          </span>
+          <input type="checkbox" id="opt-callcard" role="switch">
           <span class="switch" aria-hidden="true"></span>
         </label>
       </section>
