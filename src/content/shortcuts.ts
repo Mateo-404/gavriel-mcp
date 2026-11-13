@@ -189,8 +189,8 @@ function main(): void {
     buttons().find(
       (b) =>
         !b.disabled &&
-        visible(b) &&
-        [b.getAttribute('aria-label'), b.title, ownText(b)].some((label) => isHangupLabel(label)),
+        [b.getAttribute('aria-label'), b.title, ownText(b)].some((label) => isHangupLabel(label)) &&
+        visible(b),
     );
 
   /** El botón flotante del softphone se pone rojo (bg-destructive) durante una llamada. */
@@ -206,7 +206,7 @@ function main(): void {
    */
   const findAnswer = (): HTMLButtonElement | undefined =>
     buttons().find((b) => {
-      if (b.disabled || !visible(b) || ownText(b) !== 'Atender') return false;
+      if (b.disabled || ownText(b) !== 'Atender' || !visible(b)) return false;
       let el: HTMLElement | null = b.parentElement;
       for (let depth = 0; depth < 3 && el && el !== document.body; depth++, el = el.parentElement) {
         const labels = [...el.querySelectorAll('button')].map(ownText);
@@ -223,7 +223,7 @@ function main(): void {
 
   /** Botón "Cerrar intervención" de la cuenta (abre un formulario: no cierra nada por sí solo). */
   const findCloseIntervention = (): HTMLButtonElement | undefined =>
-    buttons().find((b) => !b.disabled && visible(b) && ownText(b) === 'Cerrar intervención');
+    buttons().find((b) => !b.disabled && ownText(b) === 'Cerrar intervención' && visible(b));
 
   const dialInput = (): HTMLInputElement | null => document.querySelector<HTMLInputElement>(DIAL_INPUT);
 
@@ -238,6 +238,7 @@ function main(): void {
 
   /** Radix abre el menú o diálogo modal bloqueando los clics del resto de la página. */
   const modalOpen = (): boolean => document.body.style.pointerEvents === 'none';
+  const dialogOpen = (): boolean => modalOpen() || document.querySelector('[role="dialog"]') !== null;
 
   // ---------- Aviso breve ----------
 
@@ -317,6 +318,11 @@ function main(): void {
 
   /** Deja exactamente los indicadores que corresponden; no toca el DOM si ya están bien. */
   const decorate = guard('indicadores', (): void => {
+    // Con un diálogo abierto no hay nada que indicar y escribir ahí dispara muchos cambios: no se toca el DOM
+    if (dialogOpen()) {
+      callCard.update();
+      return;
+    }
     const wanted = new Map<Element, BadgeSpec>();
     if (enabled) {
       if (events.active()) {
@@ -724,9 +730,13 @@ function main(): void {
   });
 
   const start = (): void => {
-    watchDom(decorate, { delayMs: 80, fallbackMs: 1500 });
-    document.addEventListener('focusin', schedule);
-    document.addEventListener('input', schedule);
+    watchDom(decorate, { delayMs: 150, fallbackMs: 1500 });
+    document.addEventListener('focusin', (event) => {
+      if (!isEditable(event.target)) schedule(); // enfocar un campo de texto no cambia ningún indicador
+    });
+    document.addEventListener('input', (event) => {
+      if (event.target === dialInput()) schedule(); // solo el campo del marcador cambia qué hace Ctrl+Enter
+    });
     window.addEventListener('resize', schedule);
   };
   if (document.body) start();
