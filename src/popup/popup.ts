@@ -16,8 +16,8 @@ $('version').textContent = `v${chrome.runtime.getManifest().version}`;
 
 // ---- Ajustes: abre la página de configuración en una pestaña propia ----
 $('open-settings').addEventListener('click', () => {
-  void chrome.runtime.openOptionsPage();
-  window.close();
+  // Si Chrome aún no leyó options_ui (extensión sin recargar), se abre la página directamente
+  chrome.runtime.openOptionsPage().catch(() => chrome.tabs.create({ url: chrome.runtime.getURL('options/options.html') })).finally(() => window.close());
 });
 
 // ---- Interruptor general ----
