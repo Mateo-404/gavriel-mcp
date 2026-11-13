@@ -10,13 +10,16 @@ elija en el popup. Por defecto: `alarm`, `siren` y `beep`. Si Gavriel reproduce 
 (sin silenciarse) para que se elija. Las llamadas, las grabaciones y cualquier otro audio no se tocan. Los eventos
 siguen apareciendo en pantalla: solo se silencia el audio, y solo en el navegador de quien instala la extensión.
 
-**Atajos de teclado.** Se muestran dentro de cada componente, sin flotar encima:
+**Atajos de teclado.** Los indicadores `Alt+N` solo se ven mientras se mantiene `Alt` y van dentro de cada componente, sin flotar encima:
 
-| Atajo          | Acción                                                                                         |
-| -------------- | ---------------------------------------------------------------------------------------------- |
-| Mantener `Alt` | Abre el menú de contactos (cada uno con su `Alt+N`); al soltar `Alt` se cierra. Un toque rápido no hace nada. |
-| `Alt` + `1…9`  | Llama al contacto de la cuenta en esa posición de la lista (1 = el primero), **desde cualquier pestaña de la cuenta**. Nunca llama a Jurisdicción ni al 911. |
+| Atajo | Acción |
+| ----- | ------ |
+| `↑` `↓` `←` `→` | En el panel de monitoreo recorren los eventos. La primera flecha marca siempre el primer evento de la columna de la izquierda; `↓`/`↑` bajan y suben por la columna y `←`/`→` pasan a la columna vecina. `Enter` abre el evento marcado y `Esc` quita la marca. |
+| `Alt` + `1…9` | **En el panel:** abre el evento N (columna por columna: primero todos los de NUEVO, después los de la columna siguiente). **En una cuenta:** llama al contacto en esa posición de la lista (1 = el primero), desde cualquier pestaña. Nunca llama a Jurisdicción ni al 911. |
+| Mantener `Alt` | Muestra los atajos Alt+N y, en una cuenta, abre el menú de contactos; al soltar `Alt` se cierra. Un toque rápido no hace nada. |
 | `Ctrl` + `Enter` | Corta la llamada en curso; si hay una entrante, la atiende; si hay un número en el marcador, llama. Sin ninguna de las tres no interviene. |
+
+**Al abrir una cuenta** (se puede desactivar cada cosa en el popup): entra directo a la pestaña **Contactos** y toca el ojito de **Clave** y **Contraclave**. Se aplica una sola vez por cuenta y solo si el botón existe: Gavriel dibuja el ojito únicamente si tu usuario tiene permiso para ver la clave.
 
 Protecciones: ignora teclas repetidas, `AltGr`, `Shift`/`Meta`; bloquea llamadas dobles durante 1,5 s; no llama si ya
 hay una llamada en curso ni con un menú o diálogo modal abierto.
@@ -52,6 +55,8 @@ src/
     mute.ts        silenciador (corre en el mundo de la página: world MAIN)
     bridge.ts      pasa la configuración de chrome.storage a mute.ts
     shortcuts.ts   atajos e indicadores dentro de los componentes
+    events-nav.ts  recorrer los eventos del panel con las flechas
+    account.ts     al abrir una cuenta: pestaña Contactos y ojito de la clave
   popup/popup.ts   interruptores y lista de sonidos
   shared/          constantes, almacenamiento tipado y lógica pura (testeada)
 static/            manifest.json, popup.html/css, shortcuts.css, iconos, logo

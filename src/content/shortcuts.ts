@@ -1,9 +1,13 @@
 /**
  * Atajos de teclado (mundo aislado del content script).
  *
- *   Mantener Alt  abre el menú de contactos (con el "Alt+N" de cada uno); al soltar
- *                  Alt se cierra. Un toque rápido de Alt no hace nada.
- *   Alt + 1…9      llama al contacto de la cuenta en esa posición de la lista
+ *   Mantener Alt  muestra los atajos Alt+N (solo mientras se mantiene) y, en una cuenta,
+ *                  abre el menú de contactos; al soltar Alt todo se oculta. Un toque
+ *                  rápido de Alt no hace nada.
+ *   ↑ ↓ ← →       recorren los eventos del panel (la primera flecha marca el primer
+ *                  evento de la columna de la izquierda); Enter abre el marcado.
+ *   Alt + 1…9      en el panel abre el evento N (columna por columna); en una cuenta:
+ *                  llama al contacto de la cuenta en esa posición de la lista
  *                  (1 = el primero), desde cualquier pestaña de la cuenta: usa la
  *                  lista "Contactos de emergencia" si está a la vista y, si no, el
  *                  menú "Llamar a…" del botón flotante. Nunca llama a Jurisdicción / 911.
@@ -30,8 +34,10 @@
  * un menú o diálogo modal abierto ni si ya hay una llamada en curso.
  */
 import { DEFAULT_SETTINGS } from '../shared/constants';
+import { isArrowKey } from '../shared/grid';
 import { digitFromKeyCode, isHangupLabel, parseContactName } from '../shared/labels';
 import { readSetting, touches } from '../shared/storage';
+import { createEventsNav, FOCUS_ATTR } from './events-nav';
 
 declare global {
   interface Window {
@@ -55,10 +61,16 @@ interface BadgeSpec {
   text: string;
   /** 'before': hermano anterior del anfitrión; 'inside': hijo al final del anfitrión. */
   place: 'before' | 'inside';
+  /** Solo se ve mientras se mantiene Alt. */
+  altOnly: boolean;
+  /** Se muestra en la esquina de abajo a la derecha del anfitrión (tarjetas de eventos). */
+  corner?: boolean;
 }
 
 const SETTING = 'shortcutsEnabled' as const;
 const HINT_ATTR = 'data-gv-hint';
+/** Atributo de <html> mientras se mantiene Alt: el CSS muestra solo entonces los indicadores Alt+N. */
+const ALT_ATTR = 'data-gv-alt';
 const LOCK_MS = 1500;
 /** Cuánto hay que mantener Alt (sin otra tecla) para que se abra el menú de contactos. */
 const PEEK_DELAY_MS = 350;
@@ -74,10 +86,13 @@ const CALL_BUTTON = 'button[aria-label="Llamar"]';
 function main(): void {
   let enabled: boolean = DEFAULT_SETTINGS.shortcutsEnabled;
   let lastCallAt = 0;
+  let lastOpenAt = 0;
   let hangingUp = false;
   let callingFromMenu = false;
   let peekTimer: number | undefined;
   let peekOpened = false; // el menú lo abrimos nosotros al mantener Alt
+
+  const root = document.documentElement;
 
   const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -227,6 +242,17 @@ function main(): void {
     toastTimer = window.setTimeout(() => toastEl?.classList.remove('gv-show'), 1800);
   };
 
+  // ---------- Eventos del panel (flechas, Enter, Alt+N) ----------
+
+  const events = createEventsNav({ visible, toast });
+
+  /** Teclear en un campo o moverse dentro de un menú/lista/pestañas: las flechas no son nuestras. */
+  const ownsArrowKeys = (target: EventTarget | null): boolean => {
+    if (!(target instanceof Element)) return false;
+    if (target.closest('input, textarea, select, [contenteditable=""], [contenteditable="true"]')) return true;
+    return !!target.closest('[role="menu"], [role="listbox"], [role="tablist"], [role="slider"], [role="dialog"]');
+  };
+
   // ---------- Indicadores dentro de cada componente ----------
 
   /** Qué haría Ctrl+Enter ahora mismo (null = no interceptar). */
@@ -240,12 +266,13 @@ function main(): void {
 
   const shown = new Map<Element, HTMLElement>(); // anfitrión -> indicador
 
-  const makeBadge = (text: string): HTMLElement => {
+  const makeBadge = (spec: BadgeSpec): HTMLElement => {
     const badge = document.createElement('kbd');
-    badge.className = 'gv-kbd';
+    badge.className = spec.corner ? 'gv-kbd gv-kbd--corner' : 'gv-kbd';
     badge.setAttribute(HINT_ATTR, '');
     badge.setAttribute('aria-hidden', 'true');
-    badge.textContent = text;
+    if (spec.altOnly) badge.setAttribute('data-gv-altonly', '');
+    badge.textContent = spec.text;
     return badge;
   };
 
@@ -258,8 +285,15 @@ function main(): void {
   const decorate = (): void => {
     const wanted = new Map<Element, BadgeSpec>();
     if (enabled) {
-      for (const contact of visibleContacts()) {
-        wanted.set(contact.badgeHost, { text: `Alt+${contact.position}`, place: 'before' });
+      if (events.active()) {
+        // Lista de eventos del panel: Alt+N abre el evento N (columna por columna)
+        events.numbered().forEach((card, index) => {
+          wanted.set(card.el, { text: `Alt+${index + 1}`, place: 'inside', altOnly: true, corner: true });
+        });
+      } else {
+        for (const contact of visibleContacts()) {
+          wanted.set(contact.badgeHost, { text: `Alt+${contact.position}`, place: 'before', altOnly: true });
+        }
       }
       const action = plan();
       const target =
@@ -270,7 +304,7 @@ function main(): void {
             : action === 'dial'
               ? dialButtonFor(dialInput()!)
               : null;
-      if (target) wanted.set(target, { text: 'Ctrl+Enter', place: 'inside' });
+      if (target) wanted.set(target, { text: 'Ctrl+Enter', place: 'inside', altOnly: false });
     }
 
     for (const [host, badge] of shown) {
@@ -282,13 +316,14 @@ function main(): void {
     for (const [host, spec] of wanted) {
       let badge = shown.get(host);
       if (!badge) {
-        badge = makeBadge(spec.text);
+        badge = makeBadge(spec);
         shown.set(host, badge);
       } else if (badge.textContent !== spec.text) {
         badge.textContent = spec.text;
       }
       if (!badge.isConnected) place(host, badge, spec.place); // React pudo haberlo descartado al re-renderizar
     }
+    events.refresh();
   };
 
   let timer: number | undefined;
@@ -338,6 +373,14 @@ function main(): void {
     if (toggle?.getAttribute('aria-expanded') === 'true') toggle.click(); // si ya se cerró (elegiste un contacto), no
     schedule();
     return true;
+  };
+
+  /** Alt+N en la lista de eventos del panel: abre el evento N (con una pausa para no abrir dos). */
+  const openEvent = (position: number): void => {
+    if (modalOpen()) return toast('Cerrá el menú o diálogo abierto para abrir un evento');
+    if (Date.now() - lastOpenAt < LOCK_MS) return;
+    lastOpenAt = Date.now();
+    events.openNth(position);
   };
 
   const startCall = (contact: Contact): void => {
@@ -472,9 +515,13 @@ function main(): void {
     if (!enabled || event.isComposing || event.repeat) return;
     if (event.metaKey || event.shiftKey) return;
 
-    // Mantener Alt solo (sin Ctrl/Shift/Meta): tras un instante se abre el menú de contactos
+    // Mantener Alt solo (sin Ctrl/Shift/Meta): se muestran los indicadores Alt+N y, tras un
+    // instante, se abre el menú de contactos
     if (event.key === 'Alt') {
-      if (!event.ctrlKey) peekTimer = window.setTimeout(openPeek, PEEK_DELAY_MS);
+      if (!event.ctrlKey) {
+        root.setAttribute(ALT_ATTR, '');
+        peekTimer = window.setTimeout(openPeek, PEEK_DELAY_MS);
+      }
       return;
     }
 
@@ -483,9 +530,28 @@ function main(): void {
       const position = digitFromKeyCode(event.code);
       if (position) {
         consume(event);
-        void callContact(position);
+        if (events.active()) openEvent(position);
+        else void callContact(position);
       }
       return;
+    }
+
+    // Flechas, Enter y Escape sobre los eventos del panel (sin ningún modificador)
+    if (!event.altKey && !event.ctrlKey) {
+      if (events.active() && !modalOpen() && !ownsArrowKeys(event.target)) {
+        if (isArrowKey(event.key) && events.move(event.key)) {
+          consume(event);
+          return;
+        }
+        // Enter solo abre si el foco está en la tarjeta marcada (no si estás en un botón o campo)
+        const onMarkedCard =
+          event.target === document.body || (event.target instanceof Element && event.target.hasAttribute(FOCUS_ATTR));
+        if (event.key === 'Enter' && events.hasFocus() && onMarkedCard && events.openFocused()) {
+          consume(event);
+          return;
+        }
+      }
+      if (event.key === 'Escape' && events.hasFocus()) events.clear(); // sin consumir: Gavriel también la usa
     }
 
     // Ctrl + Enter
@@ -499,13 +565,21 @@ function main(): void {
   };
 
   const onKeyUp = (event: KeyboardEvent): void => {
+    if (event.key !== 'Alt') return;
+    root.removeAttribute(ALT_ATTR); // se ocultan los indicadores Alt+N
     // preventDefault evita que Windows/Chrome le den foco a su menú al soltar Alt
-    if (event.key === 'Alt' && closePeek()) event.preventDefault();
+    if (closePeek()) event.preventDefault();
   };
 
   window.addEventListener('keydown', onKeyDown, true);
   window.addEventListener('keyup', onKeyUp, true);
-  window.addEventListener('blur', () => void closePeek()); // Alt+Tab: se pierde el keyup
+  window.addEventListener('blur', () => {
+    // Alt+Tab: se pierde el keyup
+    root.removeAttribute(ALT_ATTR);
+    void closePeek();
+  });
+  // Si usás el mouse, la marca del teclado ya no tiene sentido
+  document.addEventListener('pointerdown', () => events.clear(), true);
 
   // ---------- Estado e inicio ----------
 
@@ -517,7 +591,11 @@ function main(): void {
     if (touches(changes, area, SETTING)) {
       void readSetting(SETTING).then((value) => {
         enabled = value;
-        if (!enabled) closePeek();
+        if (!enabled) {
+          root.removeAttribute(ALT_ATTR);
+          events.clear();
+          closePeek();
+        }
         schedule();
       });
     }

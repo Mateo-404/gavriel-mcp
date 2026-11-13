@@ -11,11 +11,15 @@ describe('sanitizeSettings', () => {
     const settings = sanitizeSettings({
       muteEnabled: false,
       shortcutsEnabled: false,
+      openContactsTab: false,
+      revealSecrets: false,
       mutedSounds: ['alarm'],
       knownSounds: ['alarm', 'siren', 'beep', 'ding'],
     });
     expect(settings.muteEnabled).toBe(false);
     expect(settings.shortcutsEnabled).toBe(false);
+    expect(settings.openContactsTab).toBe(false);
+    expect(settings.revealSecrets).toBe(false);
     expect(settings.mutedSounds).toEqual(['alarm']);
     expect(settings.knownSounds).toHaveLength(4);
   });
@@ -28,6 +32,8 @@ describe('sanitizeSettings', () => {
     const settings = sanitizeSettings({
       muteEnabled: 'si',
       shortcutsEnabled: 1,
+      openContactsTab: 'si',
+      revealSecrets: null,
       mutedSounds: ['alarm', 42],
       knownSounds: 'alarm',
     });

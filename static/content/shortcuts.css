@@ -19,6 +19,40 @@
   user-select: none;
 }
 
+/* Los Alt+N solo se ven mientras se mantiene Alt (shortcuts.ts pone data-gv-alt en <html>) */
+.gv-kbd[data-gv-altonly] {
+  display: none;
+}
+html[data-gv-alt] .gv-kbd[data-gv-altonly] {
+  display: inline-flex;
+}
+
+/* En las tarjetas de eventos el indicador va como una pestañita sobre el borde superior izquierdo:
+   no mueve nada ni tapa datos (el título arranca 8 px más abajo y las tarjetas tienen 12 px de margen) */
+.monitoring-panel-event-card {
+  position: relative;
+}
+.gv-kbd--corner {
+  position: absolute;
+  top: -9px;
+  left: 12px;
+  margin: 0;
+  padding: 0 6px;
+  font-size: 10px;
+  opacity: 0.95;
+  background: rgba(0, 30, 18, 0.82);
+  color: #a9e6bd;
+  border-color: rgba(169, 230, 189, 0.5);
+  z-index: 1;
+}
+
+/* Tarjeta marcada con las flechas (el atributo lo pone events-nav.ts; React reescribe className) */
+.monitoring-panel-event-card[data-gv-focus] {
+  outline: none;
+  box-shadow: 0 0 0 2px #bf88df, 0 0 0 5px rgba(191, 136, 223, 0.28);
+  transition: box-shadow 0.12s;
+}
+
 .gv-toast {
   position: fixed;
   left: 50%;

@@ -29,6 +29,11 @@
     },
     {
       "matches": ["https://app.gavriel.com.ar/*"],
+      "js": ["content/account.js"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": ["https://app.gavriel.com.ar/*"],
       "js": ["content/shortcuts.js"],
       "css": ["content/shortcuts.css"],
       "run_at": "document_idle"

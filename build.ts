@@ -9,6 +9,7 @@ import { watch } from 'node:fs';
 import { cp, readFile, rm, writeFile } from 'node:fs/promises';
 
 const ENTRYPOINTS = [
+  'src/content/account.ts',
   'src/content/bridge.ts',
   'src/content/mute.ts',
   'src/content/shortcuts.ts',

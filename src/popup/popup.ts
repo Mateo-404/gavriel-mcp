@@ -55,6 +55,22 @@ for (const toggle of TOGGLES) {
   });
 }
 
+// ---- Qué hacer al abrir una cuenta ----
+const ACCOUNT_OPTIONS = [
+  { key: 'openContactsTab', box: 'opt-contacts' },
+  { key: 'revealSecrets', box: 'opt-secrets' },
+] as const;
+
+for (const option of ACCOUNT_OPTIONS) {
+  const box = $<HTMLInputElement>(option.box);
+  void readSetting(option.key).then((on) => {
+    box.checked = on;
+  });
+  box.addEventListener('change', () => {
+    void writeSettings({ [option.key]: box.checked });
+  });
+}
+
 // ---- Lista de sonidos: uno por archivo de /sounds/ que Gavriel reproduce ----
 const list = $<HTMLUListElement>('sound-list');
 

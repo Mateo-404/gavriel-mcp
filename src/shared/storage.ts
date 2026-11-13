@@ -12,6 +12,9 @@ export function sanitizeSettings(raw: Record<string, unknown>): Settings {
     muteEnabled: typeof raw.muteEnabled === 'boolean' ? raw.muteEnabled : DEFAULT_SETTINGS.muteEnabled,
     shortcutsEnabled:
       typeof raw.shortcutsEnabled === 'boolean' ? raw.shortcutsEnabled : DEFAULT_SETTINGS.shortcutsEnabled,
+    openContactsTab:
+      typeof raw.openContactsTab === 'boolean' ? raw.openContactsTab : DEFAULT_SETTINGS.openContactsTab,
+    revealSecrets: typeof raw.revealSecrets === 'boolean' ? raw.revealSecrets : DEFAULT_SETTINGS.revealSecrets,
     mutedSounds: isNames(raw.mutedSounds) ? raw.mutedSounds : [...DEFAULT_SETTINGS.mutedSounds],
     knownSounds: isNames(raw.knownSounds) ? raw.knownSounds : [...DEFAULT_SETTINGS.knownSounds],
   };

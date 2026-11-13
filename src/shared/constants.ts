@@ -4,6 +4,10 @@ export type Settings = {
   muteEnabled: boolean;
   /** Interruptor general de los atajos de teclado. */
   shortcutsEnabled: boolean;
+  /** Al abrir una cuenta, entrar directo a la pestaña Contactos. */
+  openContactsTab: boolean;
+  /** Al abrir una cuenta, mostrar la clave y la contraclave (toca el ojito). */
+  revealSecrets: boolean;
   /** Nombres (sin extensión) de los sonidos de /sounds/ que se silencian. */
   mutedSounds: string[];
   /** Sonidos que Gavriel ya reprodujo (lista que muestra el popup). */
@@ -20,6 +24,8 @@ export const DEFAULT_SOUNDS: readonly string[] = ['alarm', 'siren', 'beep'];
 export const DEFAULT_SETTINGS: Settings = {
   muteEnabled: true,
   shortcutsEnabled: true,
+  openContactsTab: true,
+  revealSecrets: true,
   mutedSounds: [...DEFAULT_SOUNDS],
   knownSounds: [...DEFAULT_SOUNDS],
 };
