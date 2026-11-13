@@ -11,6 +11,8 @@
  *                  (1 = el primero), desde cualquier pestaña de la cuenta: usa la
  *                  lista "Contactos de emergencia" si está a la vista y, si no, el
  *                  menú "Llamar a…" del botón flotante. Nunca llama a Jurisdicción / 911.
+ *   Alt + Shift    en una cuenta: copia el nombre de la última persona a la que se llamó
+ *                  (ver last-contact.ts); sin tocar nada, deja los filtros como estaban.
  *   Ctrl + Enter   acción principal según contexto, en este orden:
  *                    1. llamada en curso      -> cortar
  *                    2. llamada entrante      -> atender
@@ -39,7 +41,9 @@ import { DEFAULT_SETTINGS } from '../shared/constants';
 import { isArrowKey } from '../shared/grid';
 import { digitFromKeyCode, isHangupLabel, parseContactName } from '../shared/labels';
 import { readSetting, touches } from '../shared/storage';
+import { accountIdFromLocation } from '../shared/routes';
 import { createEventsNav, FOCUS_ATTR } from './events-nav';
+import { createLastContact } from './last-contact';
 
 declare global {
   interface Window {
@@ -252,6 +256,7 @@ function main(): void {
   // ---------- Eventos del panel (flechas, Enter, Alt+N) ----------
 
   const events = createEventsNav({ visible, toast });
+  const copyLastContact = createLastContact({ visible, toast });
 
   const EDITABLE = 'input, textarea, select, [contenteditable=""], [contenteditable="true"]';
 
@@ -568,6 +573,14 @@ function main(): void {
     if (event.key !== 'Alt') cancelPeekTimer();
     if (!enabled || event.isComposing || event.repeat) return;
     if (event.metaKey) return;
+
+    // Alt + Shift apretados juntos (sin otra tecla), en una cuenta: copia el nombre de la última
+    // persona a la que se llamó. No se consume la tecla: el sistema puede usar Alt+Shift para
+    // cambiar de idioma del teclado y eso no se puede impedir desde una página.
+    if (!event.ctrlKey && ((event.key === 'Shift' && event.altKey) || (event.key === 'Alt' && event.shiftKey))) {
+      if (accountIdFromLocation(location.pathname, location.search)) void copyLastContact();
+      return;
+    }
 
     // Flechas sobre los eventos del panel, con o sin Shift (por si otra cosa del navegador se queda
     // con las flechas solas). Escribiendo en un campo o dentro de un menú no son nuestras.
