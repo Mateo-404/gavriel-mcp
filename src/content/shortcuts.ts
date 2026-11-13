@@ -45,6 +45,7 @@ import { accountIdFromLocation } from '../shared/routes';
 import { createEventsNav, FOCUS_ATTR } from './events-nav';
 import { createCallCard } from './call-card';
 import { createLastContact } from './last-contact';
+import { createPanelActions } from './panel-actions';
 import { guard, watchDom } from './runtime';
 
 declare global {
@@ -53,7 +54,7 @@ declare global {
   }
 }
 
-type Action = 'hangup' | 'answer' | 'dial' | 'close';
+type Action = 'hangup' | 'answer' | 'dial' | 'bulk' | 'close';
 
 interface Contact {
   /** Posición en la lista, empezando en 1: es el número del atajo. */
@@ -260,11 +261,12 @@ function main(): void {
   const events = createEventsNav({ visible, toast });
   const copyLastContact = createLastContact({ visible, toast });
   const callCard = createCallCard({ isCalling, visible });
+  const panel = createPanelActions({ visible, ownText });
 
   const EDITABLE = 'input, textarea, select, [contenteditable=""], [contenteditable="true"]';
 
   /** ¿El foco está escribiendo en un campo? */
-  const isEditable = (el: Element | null): boolean => !!el && !!el.closest(EDITABLE);
+  const isEditable = (el: EventTarget | null): boolean => el instanceof Element && !!el.closest(EDITABLE);
 
   /**
    * Las flechas no son nuestras si estás escribiendo en un campo, dentro de un menú o lista
@@ -286,6 +288,8 @@ function main(): void {
     if (findAnswer()) return 'answer';
     const input = dialInput();
     if (input && document.activeElement === input && input.value.trim() && dialButtonFor(input)) return 'dial';
+    // En el panel con un filtro activo: «Procesar masivo»
+    if (events.active() && !isEditable(document.activeElement) && !modalOpen() && panel.bulkButton()) return 'bulk';
     // Sin llamada que atender, cortar ni marcar: en una cuenta intervenida, abre "Cerrar intervención".
     // Nunca mientras escribís en un campo ni con un diálogo abierto (podría ser el Ctrl+Enter de otro formulario).
     if (!isEditable(document.activeElement) && !modalOpen() && findCloseIntervention()) return 'close';
@@ -323,6 +327,13 @@ function main(): void {
           wanted.set(contact.badgeHost, { text: `Alt+${contact.position}`, place: 'before', altOnly: true });
         }
       }
+      if (events.active()) {
+        panel.filters().forEach((chip, index) => {
+          wanted.set(chip, { text: `Alt+⇧${index + 1}`, place: 'inside', altOnly: true });
+        });
+        const clear = panel.clearButton();
+        if (clear && !modalOpen()) wanted.set(clear, { text: 'Esc', place: 'inside', altOnly: false });
+      }
       const action = plan();
       const target =
         action === 'hangup'
@@ -331,9 +342,11 @@ function main(): void {
             ? findAnswer()
             : action === 'dial'
               ? dialButtonFor(dialInput()!)
-              : action === 'close'
-                ? findCloseIntervention()
-                : null;
+              : action === 'bulk'
+                ? panel.bulkButton()
+                : action === 'close'
+                  ? findCloseIntervention()
+                  : null;
       if (target) wanted.set(target, { text: 'Ctrl+Enter', place: 'inside', altOnly: false });
     }
 
@@ -550,6 +563,9 @@ function main(): void {
   const runPrimary = (action: Action): void => {
     if (action === 'hangup') {
       if (!hangingUp) void hangUp();
+    } else if (action === 'bulk') {
+      toast('Procesar masivo: escribí el motivo');
+      void panel.openBulk();
     } else if (action === 'close') {
       if (!closing) void openCloseIntervention();
     } else if (action === 'answer') {
@@ -592,6 +608,16 @@ function main(): void {
       if (events.active() && !modalOpen() && !ownsArrowKeys(event.target) && events.move(event.key)) consume(event);
       return;
     }
+    // Alt + Shift + N: activa o desactiva el filtro N por tipo de evento (en el panel)
+    if (event.altKey && event.shiftKey && !event.ctrlKey && !event.getModifierState('AltGraph')) {
+      const position = digitFromKeyCode(event.code);
+      if (position && events.active()) {
+        consume(event);
+        if (modalOpen()) toast('Cerrá el menú o diálogo abierto para filtrar');
+        else if (!panel.toggleFilter(position)) toast(`No hay filtro ${position}`);
+      }
+      return;
+    }
     if (event.shiftKey) return;
 
     // Mantener Alt solo (sin Ctrl/Shift/Meta): se muestran los indicadores Alt+N y, tras un
@@ -631,7 +657,10 @@ function main(): void {
         consume(event);
         return;
       }
-      if (event.key === 'Escape' && events.hasFocus()) events.clear(); // sin consumir: Gavriel también la usa
+      if (event.key === 'Escape') {
+        if (events.hasFocus()) events.clear(); // sin consumir: Gavriel también la usa
+        else if (events.active() && !modalOpen() && !isEditable(event.target) && panel.clearFilters()) consume(event);
+      }
     }
 
     // Ctrl + Enter

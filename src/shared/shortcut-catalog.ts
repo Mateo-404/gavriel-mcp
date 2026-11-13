@@ -28,7 +28,24 @@ export const SHORTCUTS: readonly Shortcut[] = [
     description: 'Recorren los eventos. La primera flecha marca el primer evento de la columna de la izquierda. También funcionan con Shift.',
   },
   { scope: 'panel', keys: ['Enter'], chord: false, description: 'Abre el evento marcado.' },
-  { scope: 'panel', keys: ['Esc'], chord: false, description: 'Quita la marca.' },
+  {
+    scope: 'panel',
+    keys: ['Esc'],
+    chord: false,
+    description: 'Quita la marca de la tarjeta; si no hay ninguna y hay un filtro activo, aprieta «Limpiar filtros».',
+  },
+  {
+    scope: 'panel',
+    keys: ['Alt', 'Shift', '1…9'],
+    chord: true,
+    description: 'Activa o desactiva el filtro N por tipo de evento (los botones de colores bajo el buscador), de izquierda a derecha.',
+  },
+  {
+    scope: 'panel',
+    keys: ['Ctrl', 'Enter'],
+    chord: true,
+    description: 'Con un filtro activo, aprieta «Procesar masivo» y deja el cursor en el motivo del cierre. Confirmar sigue siendo manual.',
+  },
   {
     scope: 'panel',
     keys: ['Alt', '1…9'],
