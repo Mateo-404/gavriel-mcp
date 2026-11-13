@@ -44,6 +44,7 @@ import { readSetting, touches } from '../shared/storage';
 import { accountIdFromLocation } from '../shared/routes';
 import { createEventsNav, FOCUS_ATTR } from './events-nav';
 import { createCallCard } from './call-card';
+import { createClientCopy } from './client-copy';
 import { createLastContact } from './last-contact';
 import { createPanelActions } from './panel-actions';
 import { guard, watchDom } from './runtime';
@@ -262,6 +263,7 @@ function main(): void {
   const copyLastContact = createLastContact({ visible, toast });
   const callCard = createCallCard({ isCalling, visible });
   const panel = createPanelActions({ visible, ownText });
+  const copyClientMessage = createClientCopy({ visible, toast });
 
   const EDITABLE = 'input, textarea, select, [contenteditable=""], [contenteditable="true"]';
 
@@ -626,6 +628,15 @@ function main(): void {
       if (!event.ctrlKey) {
         root.setAttribute(ALT_ATTR, '');
         peekTimer = window.setTimeout(openPeek, PEEK_DELAY_MS);
+      }
+      return;
+    }
+
+    // Alt + C en una cuenta: copia «Estimado/a cliente» + nombre y dirección de la cuenta
+    if (event.altKey && !event.ctrlKey && !event.getModifierState('AltGraph') && event.code === 'KeyC') {
+      if (accountIdFromLocation(location.pathname, location.search)) {
+        consume(event);
+        void copyClientMessage();
       }
       return;
     }

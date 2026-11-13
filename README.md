@@ -18,6 +18,7 @@ siguen apareciendo en pantalla: solo se silencia el audio, y solo en el navegado
 | `Alt` + `1…9` | **En el panel:** abre el evento N (columna por columna: primero todos los de NUEVO, después los de la columna siguiente). **En una cuenta:** llama al contacto en esa posición de la lista (1 = el primero), desde cualquier pestaña. Nunca llama a Jurisdicción ni al 911. |
 | `Alt` + `Shift` + `1…9` | **En el panel:** activa o desactiva el filtro N por tipo de evento (los botones de colores bajo el buscador, de izquierda a derecha). Sus indicadores `Alt+⇧N` se ven al mantener `Alt`. Con un filtro activo, `Ctrl`+`Enter` aprieta **Procesar masivo** y deja el cursor en el motivo del cierre (confirmar sigue siendo manual), y `Esc` aprieta **Limpiar filtros** (si no hay una tarjeta marcada con las flechas). |
 | Mantener `Alt` | Muestra los atajos Alt+N y, en una cuenta, abre el menú de contactos; al soltar `Alt` se cierra. Un toque rápido no hace nada. |
+| `Alt` + `C` | En una cuenta, copia al portapapeles el mensaje para el cliente: `Estimado/a cliente: *MERLO FERNANDO*` y, en otra línea, `Alarma de: *J. M. NOLLI 1820, RAFAELA · Santa Fe*` (nombre de la cuenta y dirección de «Localización y contacto»). |
 | `Alt` + `Shift` | En una cuenta, **copia al portapapeles el nombre de la última persona a la que llamaste** (por ejemplo `Pablo Perren`, sin el teléfono ni la descripción). Sin tocar nada: abre «Búsqueda avanzada», desmarca «Ocultar operación (intervención, llamadas…)» si hace falta, lee la descripción «Contacto vía Teléfono a …» del evento más reciente y deja el panel y el filtro como estaban. Tarda menos de un segundo. Ojo: en Windows, `Alt`+`Shift` también cambia el idioma del teclado si tenés más de uno instalado (se desactiva en Configuración → Hora e idioma → Teclado). |
 | `Ctrl` + `Enter` | Corta la llamada en curso; si hay una entrante, la atiende; si hay un número en el marcador, llama. **Sin nada de eso, en una cuenta intervenida abre «Cerrar intervención» y deja el cursor en «Resolución»** (el diálogo de Gavriel manda el foco a «Categoría»; la extensión lo mueve). Confirmar el cierre sigue siendo manual: el botón queda deshabilitado hasta completar categoría y resolución. No interviene si escribís en un campo ni con un diálogo abierto. |
 
@@ -76,6 +77,7 @@ src/
     shortcuts.ts   atajos e indicadores dentro de los componentes
     events-nav.ts  recorrer los eventos del panel con las flechas
     call-card.ts   tarjeta flotante con a quién se llama
+    client-copy.ts Alt+C: mensaje para el cliente con cuenta y dirección
     runtime.ts     aislamiento de errores y observador del DOM sin bucles
     account.ts     al abrir una cuenta: pestaña Contactos y ojito de la clave
   popup/popup.ts   popup: solo sonidos (interruptor general y lista) + botón Ajustes

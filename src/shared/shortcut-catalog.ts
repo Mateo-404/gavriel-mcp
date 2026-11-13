@@ -66,6 +66,12 @@ export const SHORTCUTS: readonly Shortcut[] = [
   },
   {
     scope: 'cuenta',
+    keys: ['Alt', 'C'],
+    chord: true,
+    description: 'Copia «Estimado/a cliente: *cuenta*» y «Alarma de: *dirección*» (dos líneas) para pegarlo en el mensaje.',
+  },
+  {
+    scope: 'cuenta',
     keys: ['Alt', 'Shift'],
     chord: true,
     description: 'Copia el nombre de la última persona a la que llamaste.',
