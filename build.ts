@@ -1,12 +1,14 @@
 /**
  * Compila la extensión con Bun: src/**.ts -> dist/**.js y copia static/ a dist/.
- * La carpeta a cargar en Chrome ("Cargar descomprimida") es dist/.
+ * Carpetas a cargar: dist/ en Chrome/Chromium ("Cargar descomprimida") y dist-firefox/ en Firefox
+ * (about:debugging -> Cargar complemento temporal -> manifest.json).
  *
  *   bun run build     compila una vez
  *   bun run dev       recompila al guardar
  */
 import { watch } from 'node:fs';
 import { cp, readFile, rm, writeFile } from 'node:fs/promises';
+import { forChrome, forFirefox, type Manifest } from './manifest-targets';
 
 const ENTRYPOINTS = [
   'src/content/account.ts',
@@ -20,6 +22,7 @@ const ENTRYPOINTS = [
 async function build(): Promise<void> {
   const started = performance.now();
   await rm('dist', { recursive: true, force: true });
+  await rm('dist-firefox', { recursive: true, force: true });
 
   // Los content scripts no pueden ser módulos ES: cada entrada sale como IIFE autocontenido.
   const result = await Bun.build({
@@ -39,12 +42,15 @@ async function build(): Promise<void> {
 
   // La versión del manifest sale de package.json: una sola fuente de verdad
   const pkg = JSON.parse(await readFile('package.json', 'utf8')) as { version: string };
-  const manifest = JSON.parse(await readFile('static/manifest.json', 'utf8')) as { version: string };
-  manifest.version = pkg.version;
-  await writeFile('dist/manifest.json', `${JSON.stringify(manifest, null, 2)}\n`);
+  const base = JSON.parse(await readFile('static/manifest.json', 'utf8')) as Manifest;
+  const write = (dir: string, manifest: Manifest): Promise<void> =>
+    writeFile(`${dir}/manifest.json`, `${JSON.stringify(manifest, null, 2)}\n`);
+  await write('dist', forChrome(base, pkg.version));
+  await cp('dist', 'dist-firefox', { recursive: true });
+  await write('dist-firefox', forFirefox(base, pkg.version));
 
   const ms = Math.round(performance.now() - started);
-  console.log(`✔ dist/ listo (v${pkg.version}, ${result.outputs.length} archivos JS, ${ms} ms)`);
+  console.log(`✔ dist/ y dist-firefox/ listos (v${pkg.version}, ${result.outputs.length} archivos JS, ${ms} ms)`);
 }
 
 await build();

@@ -42,9 +42,18 @@ bun install
 bun run build        # compila src/ y static/ en dist/
 ```
 
-Después, en `chrome://extensions`: activar **Modo desarrollador** → **Cargar descomprimida** → elegir la carpeta
-**`dist/`**. Al cambiar el código: `bun run build` (o `bun run dev` para recompilar al guardar) y el botón de recargar de
-la extensión.
+Cada  genera dos carpetas:
+
+| Navegador | Carpeta | Cómo cargarla |
+| --------- | ------- | ------------- |
+| Chrome, Edge, Brave, Chromium |  |  → **Modo desarrollador** → **Cargar descomprimida** |
+| Firefox 128 o más nuevo |  |  → **Cargar complemento temporal** → elegir  |
+
+Al cambiar el código:  (o  para recompilar al guardar) y el botón de recargar de la extensión.
+
+**Firefox.** El manifest de Firefox lleva además un id propio, la versión mínima 128 (la primera que admite ) y el permiso del sitio. Sin firmar en addons.mozilla.org solo se puede cargar como temporal: se pierde al cerrar Firefox. Si tras cargarla no actúa en Gavriel, abrí  → Gavriel Tools → **Permisos** y activá el acceso a app.gavriel.com.ar. No se probó en un Firefox real.
+
+**Linux.** Funciona igual (Bun y los navegadores tienen versión para Linux; no se probó allá). + suele cambiar la distribución del teclado en GNOME y KDE: si te molesta, se desactiva en la configuración del teclado. Algunos escritorios usan +clic para mover ventanas.
 
 ## Scripts
 
@@ -73,7 +82,8 @@ src/
   shared/          constantes, almacenamiento tipado y lógica pura (testeada)
 static/            manifest.json, popup/ y options/ (html y css), shortcuts.css, iconos, logo
 test/              bun test
-build.ts           script de build (Bun.build, un IIFE por content script)
+build.ts           script de build (Bun.build, un IIFE por content script; genera dist/ y dist-firefox/)
+manifest-targets.ts  manifest de cada navegador a partir de static/manifest.json
 ```
 
 ## Cómo funciona Gavriel (verificado en su código)
