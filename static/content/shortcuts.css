@@ -135,3 +135,9 @@ html[data-gv-plain] .monitoring-panel-event-card {
   border-bottom-color: var(--border) !important;
 }
 html[data-gv-nogrid] button[aria-label="Grilla"] { display: none !important; }
+/* El renglón del evento que "está sonando" (anillo y fondo naranja de Gavriel) y su ícono que pulsa */
+html[data-gv-plain] .monitoring-panel-event-block.ring-warning {
+  background-color: transparent !important;
+  box-shadow: none !important;
+}
+html[data-gv-plain] .monitoring-panel-event-card i.pi-volume-up.animate-pulse { animation: none !important; }
