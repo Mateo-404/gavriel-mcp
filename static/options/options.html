@@ -21,6 +21,7 @@
       <a href="#atajos">Atajos de teclado</a>
       <a href="#cuenta">Al abrir una cuenta</a>
       <a href="#llamada">Durante una llamada</a>
+      <a href="#panel">Panel de monitoreo</a>
       <a href="#sonidos">Sonidos</a>
       <a href="#mantenimiento">Mantenimiento</a>
     </nav>
@@ -76,6 +77,29 @@
             <small>Funciona con los atajos, con el mouse, desde el menú del teléfono y desde el marcador.</small>
           </span>
           <input type="checkbox" id="opt-callcard" role="switch">
+          <span class="switch" aria-hidden="true"></span>
+        </label>
+      </section>
+
+      <section id="panel" class="block" aria-labelledby="h-panel">
+        <h2 id="h-panel">Panel de monitoreo</h2>
+        <p class="lead">Menos ruido visual. Solo cambia cómo se ve en tu navegador: los eventos y los sonidos siguen funcionando igual.</p>
+
+        <label class="row" for="opt-banner">
+          <span class="row-text">
+            <strong>Ocultar el aviso de alerta sonora</strong>
+            <small>Esconde la barra naranja «Alerta sonora · N pendientes» con su botón «Ver eventos».</small>
+          </span>
+          <input type="checkbox" id="opt-banner" role="switch">
+          <span class="switch" aria-hidden="true"></span>
+        </label>
+
+        <label class="row" for="opt-plain">
+          <span class="row-text">
+            <strong>Eventos sin fondo de color</strong>
+            <small>Quita el tinte de color de cada tarjeta. Queda la franja de color a la izquierda, que indica el tipo de evento.</small>
+          </span>
+          <input type="checkbox" id="opt-plain" role="switch">
           <span class="switch" aria-hidden="true"></span>
         </label>
       </section>

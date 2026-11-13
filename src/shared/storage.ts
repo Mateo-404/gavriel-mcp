@@ -16,6 +16,9 @@ export function sanitizeSettings(raw: Record<string, unknown>): Settings {
       typeof raw.openContactsTab === 'boolean' ? raw.openContactsTab : DEFAULT_SETTINGS.openContactsTab,
     revealSecrets: typeof raw.revealSecrets === 'boolean' ? raw.revealSecrets : DEFAULT_SETTINGS.revealSecrets,
     showCallCard: typeof raw.showCallCard === 'boolean' ? raw.showCallCard : DEFAULT_SETTINGS.showCallCard,
+    hideSoundBanner:
+      typeof raw.hideSoundBanner === 'boolean' ? raw.hideSoundBanner : DEFAULT_SETTINGS.hideSoundBanner,
+    plainEvents: typeof raw.plainEvents === 'boolean' ? raw.plainEvents : DEFAULT_SETTINGS.plainEvents,
     mutedSounds: isNames(raw.mutedSounds) ? raw.mutedSounds : [...DEFAULT_SETTINGS.mutedSounds],
     knownSounds: isNames(raw.knownSounds) ? raw.knownSounds : [...DEFAULT_SETTINGS.knownSounds],
   };

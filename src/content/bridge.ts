@@ -16,20 +16,29 @@ import { readSettings, readSetting, touches, writeSettings } from '../shared/sto
 
 const root = document.documentElement;
 
+/** Interruptores visuales: el CSS (shortcuts.css) actúa según estos atributos de <html>. */
+function applyLook(settings: Pick<Settings, 'hideSoundBanner' | 'plainEvents'>): void {
+  root.toggleAttribute('data-gv-nobanner', settings.hideSoundBanner);
+  root.toggleAttribute('data-gv-plain', settings.plainEvents);
+}
+
 function apply(settings: Pick<Settings, 'muteEnabled' | 'mutedSounds'>): void {
   root.setAttribute(MUTE_ATTR, settings.muteEnabled ? '1' : '0');
   root.setAttribute(MUTED_SOUNDS_ATTR, JSON.stringify(settings.mutedSounds));
 }
 
 async function load(): Promise<void> {
-  apply(await readSettings());
+  const settings = await readSettings();
+  apply(settings);
+  applyLook(settings);
 }
 
+applyLook(DEFAULT_SETTINGS);
 apply(DEFAULT_SETTINGS); // valores por defecto hasta leer lo guardado
 void load();
 
 chrome.storage.onChanged.addListener((changes, area) => {
-  if (touches(changes, area, 'muteEnabled', 'mutedSounds')) void load();
+  if (touches(changes, area, 'muteEnabled', 'mutedSounds', 'hideSoundBanner', 'plainEvents')) void load();
 });
 
 // Sonido nuevo detectado: se agrega a la lista del popup (sin silenciarlo)

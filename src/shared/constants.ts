@@ -10,6 +10,10 @@ export type Settings = {
   revealSecrets: boolean;
   /** Durante una llamada, mostrar una tarjeta flotante con a quién se llama. */
   showCallCard: boolean;
+  /** Oculta el aviso naranja "Alerta sonora · N pendientes" del panel de monitoreo. */
+  hideSoundBanner: boolean;
+  /** Quita el fondo de color de las tarjetas de eventos (queda la franja de color a la izquierda). */
+  plainEvents: boolean;
   /** Nombres (sin extensión) de los sonidos de /sounds/ que se silencian. */
   mutedSounds: string[];
   /** Sonidos que Gavriel ya reprodujo (lista que muestra el popup). */
@@ -29,6 +33,8 @@ export const DEFAULT_SETTINGS: Settings = {
   openContactsTab: true,
   revealSecrets: true,
   showCallCard: true,
+  hideSoundBanner: true,
+  plainEvents: true,
   mutedSounds: [...DEFAULT_SOUNDS],
   knownSounds: [...DEFAULT_SOUNDS],
 };

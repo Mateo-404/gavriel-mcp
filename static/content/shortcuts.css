@@ -123,3 +123,14 @@ html[data-gv-alt] .gv-kbd[data-gv-altonly] {
 .gv-callcard-desc { color: #c4d9cc; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 @keyframes gv-callcard-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 @media (prefers-reduced-motion: reduce) { .gv-callcard { animation: none; } }
+
+/* Panel de monitoreo más tranquilo (se activan desde Ajustes mediante atributos de <html>) */
+html[data-gv-nobanner] div[role="status"]:has(> button[aria-label="Cerrar alerta sonora"]) {
+  display: none !important;
+}
+html[data-gv-plain] .monitoring-panel-event-card {
+  background-color: var(--card) !important;
+  border-top-color: var(--border) !important;
+  border-right-color: var(--border) !important;
+  border-bottom-color: var(--border) !important;
+}
