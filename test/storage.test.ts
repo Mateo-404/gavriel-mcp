@@ -14,6 +14,9 @@ describe('sanitizeSettings', () => {
       openContactsTab: false,
       revealSecrets: false,
       showCallCard: false,
+      hideSoundBanner: false,
+      plainEvents: false,
+      hideGridView: false,
       mutedSounds: ['alarm'],
       knownSounds: ['alarm', 'siren', 'beep', 'ding'],
     });
@@ -22,6 +25,9 @@ describe('sanitizeSettings', () => {
     expect(settings.openContactsTab).toBe(false);
     expect(settings.revealSecrets).toBe(false);
     expect(settings.showCallCard).toBe(false);
+    expect(settings.hideSoundBanner).toBe(false);
+    expect(settings.plainEvents).toBe(false);
+    expect(settings.hideGridView).toBe(false);
     expect(settings.mutedSounds).toEqual(['alarm']);
     expect(settings.knownSounds).toHaveLength(4);
   });

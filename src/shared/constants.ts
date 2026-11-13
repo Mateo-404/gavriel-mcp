@@ -14,6 +14,8 @@ export type Settings = {
   hideSoundBanner: boolean;
   /** Quita el fondo de color de las tarjetas de eventos (queda la franja de color a la izquierda). */
   plainEvents: boolean;
+  /** Oculta el botón de la vista Grilla del panel (quedan Kanban y Mapa). */
+  hideGridView: boolean;
   /** Nombres (sin extensión) de los sonidos de /sounds/ que se silencian. */
   mutedSounds: string[];
   /** Sonidos que Gavriel ya reprodujo (lista que muestra el popup). */
@@ -35,6 +37,7 @@ export const DEFAULT_SETTINGS: Settings = {
   showCallCard: true,
   hideSoundBanner: true,
   plainEvents: true,
+  hideGridView: true,
   mutedSounds: [...DEFAULT_SOUNDS],
   knownSounds: [...DEFAULT_SOUNDS],
 };

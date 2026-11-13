@@ -5,7 +5,7 @@ Extensión de Chrome (Manifest V3, TypeScript, compilada con [Bun](https://bun.s
 
 ## Qué hace
 
-**Silenciar sonidos del panel de monitoreo.** Dentro de `/monitoring-panel`, silencia los sonidos que cada usuario
+**Silenciar sonidos del panel de monitoreo.** En cualquier pantalla de Gavriel, silencia los sonidos que cada usuario
 elija en el popup (el ícono de la extensión, que maneja solo el sonido). Por defecto: `alarm`, `siren` y `beep`. Si Gavriel reproduce un sonido nuevo, aparece en la lista
 (sin silenciarse) para que se elija. Las llamadas, las grabaciones y cualquier otro audio no se tocan. Los eventos
 siguen apareciendo en pantalla: solo se silencia el audio, y solo en el navegador de quien instala la extensión.
@@ -22,7 +22,7 @@ siguen apareciendo en pantalla: solo se silencia el audio, y solo en el navegado
 
 **Tarjeta de llamada.** Al llamar a un contacto (con atajo, mouse, menú del teléfono o marcador) flota sobre el botón del teléfono una tarjeta chica con su nombre y descripción. No recibe clics, se va sola al cortar y vuelve con el siguiente contacto. Se apaga en Ajustes.
 
-**Panel más tranquilo.** En Ajustes, «Panel de monitoreo»: oculta la barra naranja «Alerta sonora · N pendientes» y quita el tinte de color de las tarjetas de eventos (queda la franja izquierda con el color del tipo). Es solo CSS activado por atributos de <html>; no toca datos ni sonidos.
+**Panel más tranquilo.** En Ajustes, «Panel de monitoreo»: oculta la barra naranja «Alerta sonora · N pendientes» quita el tinte de color de las tarjetas de eventos (queda la franja izquierda con el color del tipo) y oculta el botón de la vista Grilla (Kanban y Mapa quedan). Es solo CSS activado por atributos de <html>; no toca datos ni sonidos.
 
 **Ajustes.** Todo lo que no es sonido se maneja en una página propia: botón **Ajustes** del popup, o clic derecho en el ícono → *Opciones*. Ahí se activan o desactivan los atajos (con la lista completa y en qué pantalla funciona cada uno), las opciones de cuenta y un botón para restablecer. Se guarda al instante.
 

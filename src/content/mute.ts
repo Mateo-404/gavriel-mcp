@@ -2,7 +2,7 @@
  * Silenciador. Corre en el mundo de la página (world: MAIN) porque tiene que
  * interceptar `HTMLMediaElement`, que es el de la página y no el del content script.
  *
- * Silencia, dentro de /monitoring-panel, los sonidos de /sounds/<nombre>.mp3 que
+ * Silencia, en cualquier pantalla de Gavriel, los sonidos de /sounds/<nombre>.mp3 que
  * el usuario eligió en el popup. No toca nada más: llamadas, grabaciones u otro
  * audio quedan intactos.
  *
@@ -34,7 +34,6 @@ function main(): void {
   const root = document.documentElement;
 
   const enabled = (): boolean => root.getAttribute(MUTE_ATTR) !== '0';
-  const inPanel = (): boolean => location.pathname.includes('monitoring-panel');
   const mutedSounds = (): Set<string> => {
     try {
       const value: unknown = JSON.parse(root.getAttribute(MUTED_SOUNDS_ATTR) ?? 'null');
@@ -47,7 +46,7 @@ function main(): void {
 
   const soundName = (el: HTMLMediaElement): string | null => soundNameFromUrl(el.currentSrc || el.src || '');
   const shouldMute = (el: HTMLMediaElement): boolean => {
-    if (!enabled() || !inPanel()) return false;
+    if (!enabled()) return false;
     const name = soundName(el);
     return name !== null && mutedSounds().has(name);
   };
@@ -152,17 +151,6 @@ function main(): void {
     attributes: true,
     attributeFilter: [MUTE_ATTR, MUTED_SOUNDS_ATTR],
   });
-
-  // Navegación dentro de la SPA (entrar/salir de /monitoring-panel)
-  for (const method of ['pushState', 'replaceState'] as const) {
-    const original = history[method];
-    history[method] = function (this: History, ...args: Parameters<History['pushState']>) {
-      const result = original.apply(this, args);
-      setTimeout(recheckAll, 0);
-      return result;
-    };
-  }
-  window.addEventListener('popstate', recheckAll);
 }
 
 if (!window.__gavrielMute) {

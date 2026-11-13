@@ -134,3 +134,4 @@ html[data-gv-plain] .monitoring-panel-event-card {
   border-right-color: var(--border) !important;
   border-bottom-color: var(--border) !important;
 }
+html[data-gv-nogrid] button[aria-label="Grilla"] { display: none !important; }

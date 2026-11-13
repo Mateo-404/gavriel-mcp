@@ -19,6 +19,7 @@ export function sanitizeSettings(raw: Record<string, unknown>): Settings {
     hideSoundBanner:
       typeof raw.hideSoundBanner === 'boolean' ? raw.hideSoundBanner : DEFAULT_SETTINGS.hideSoundBanner,
     plainEvents: typeof raw.plainEvents === 'boolean' ? raw.plainEvents : DEFAULT_SETTINGS.plainEvents,
+    hideGridView: typeof raw.hideGridView === 'boolean' ? raw.hideGridView : DEFAULT_SETTINGS.hideGridView,
     mutedSounds: isNames(raw.mutedSounds) ? raw.mutedSounds : [...DEFAULT_SETTINGS.mutedSounds],
     knownSounds: isNames(raw.knownSounds) ? raw.knownSounds : [...DEFAULT_SETTINGS.knownSounds],
   };

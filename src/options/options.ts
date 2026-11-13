@@ -7,7 +7,7 @@ import { DEFAULT_SETTINGS, FRIENDLY_SOUND_NAMES, type Settings } from '../shared
 import { SCOPE_TITLES, shortcutsFor, type Shortcut, type ShortcutScope } from '../shared/shortcut-catalog';
 import { readSettings, touches, writeSettings } from '../shared/storage';
 
-type SwitchKey = 'shortcutsEnabled' | 'openContactsTab' | 'revealSecrets' | 'showCallCard' | 'hideSoundBanner' | 'plainEvents';
+type SwitchKey = 'shortcutsEnabled' | 'openContactsTab' | 'revealSecrets' | 'showCallCard' | 'hideSoundBanner' | 'plainEvents' | 'hideGridView';
 
 const SWITCHES: readonly { key: SwitchKey; id: string }[] = [
   { key: 'shortcutsEnabled', id: 'keys' },
@@ -16,6 +16,7 @@ const SWITCHES: readonly { key: SwitchKey; id: string }[] = [
   { key: 'showCallCard', id: 'opt-callcard' },
   { key: 'hideSoundBanner', id: 'opt-banner' },
   { key: 'plainEvents', id: 'opt-plain' },
+  { key: 'hideGridView', id: 'opt-grid' },
 ];
 
 const SCOPES: readonly ShortcutScope[] = ['panel', 'cuenta', 'llamadas'];
@@ -134,6 +135,7 @@ $('reset-yes').addEventListener('click', () => {
     showCallCard: DEFAULT_SETTINGS.showCallCard,
     hideSoundBanner: DEFAULT_SETTINGS.hideSoundBanner,
     plainEvents: DEFAULT_SETTINGS.plainEvents,
+    hideGridView: DEFAULT_SETTINGS.hideGridView,
   }).then(async () => {
     render(await readSettings());
     showResetConfirm(false);
@@ -149,7 +151,7 @@ void readSettings().then(render);
 
 // Si algo cambia desde otro lado (el popup, otra pestaña), esta página se actualiza sola
 chrome.storage.onChanged.addListener((changes, area) => {
-  if (touches(changes, area, 'shortcutsEnabled', 'openContactsTab', 'revealSecrets', 'showCallCard', 'hideSoundBanner', 'plainEvents', 'muteEnabled', 'mutedSounds')) {
+  if (touches(changes, area, 'shortcutsEnabled', 'openContactsTab', 'revealSecrets', 'showCallCard', 'hideSoundBanner', 'plainEvents', 'hideGridView', 'muteEnabled', 'mutedSounds')) {
     void readSettings().then(render);
   }
 });
