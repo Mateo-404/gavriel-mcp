@@ -22,7 +22,11 @@ export function sanitizeSettings(raw: Record<string, unknown>): Settings {
 }
 
 export async function readSettings(): Promise<Settings> {
-  return sanitizeSettings(await chrome.storage.local.get(DEFAULT_SETTINGS));
+  try {
+    return sanitizeSettings(await chrome.storage.local.get(DEFAULT_SETTINGS));
+  } catch {
+    return sanitizeSettings({}); // contexto invalidado o almacenamiento caído: valores por defecto
+  }
 }
 
 export async function readSetting<K extends keyof Settings>(key: K): Promise<Settings[K]> {
@@ -30,7 +34,11 @@ export async function readSetting<K extends keyof Settings>(key: K): Promise<Set
 }
 
 export async function writeSettings(patch: Partial<Settings>): Promise<void> {
-  await chrome.storage.local.set(patch);
+  try {
+    await chrome.storage.local.set(patch);
+  } catch {
+    /* contexto invalidado: no hay nada que guardar */
+  }
 }
 
 /** ¿Este cambio de chrome.storage toca alguna de estas claves? */

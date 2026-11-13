@@ -77,6 +77,7 @@ export function createCallCard({ isCalling, visible }: Deps): {
     const input = document.querySelector<HTMLInputElement>('input[placeholder="Número…"]');
     const number = input?.value.trim();
     if (!input || !number) return null;
+    scanKnown(); // los contactos se leen solo cuando hace falta
     // el botón "Llamar" del marcador comparte contenedor (cerca) con el campo del número
     let root: Element | null = button;
     for (let i = 0; i < 6 && root && !root.contains(input); i++) root = root.parentElement;
@@ -186,7 +187,6 @@ export function createCallCard({ isCalling, visible }: Deps): {
 
   const update = (): void => {
     if (!enabled) return hide();
-    scanKnown();
     if (isCalling()) {
       if (pending) {
         current = pending;

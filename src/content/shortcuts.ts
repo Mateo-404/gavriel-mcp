@@ -45,6 +45,7 @@ import { accountIdFromLocation } from '../shared/routes';
 import { createEventsNav, FOCUS_ATTR } from './events-nav';
 import { createCallCard } from './call-card';
 import { createLastContact } from './last-contact';
+import { guard, watchDom } from './runtime';
 
 declare global {
   interface Window {
@@ -309,7 +310,7 @@ function main(): void {
   };
 
   /** Deja exactamente los indicadores que corresponden; no toca el DOM si ya están bien. */
-  const decorate = (): void => {
+  const decorate = guard('indicadores', (): void => {
     const wanted = new Map<Element, BadgeSpec>();
     if (enabled) {
       if (events.active()) {
@@ -354,7 +355,7 @@ function main(): void {
     }
     events.refresh();
     callCard.update();
-  };
+  });
 
   let timer: number | undefined;
   const schedule = (): void => {
@@ -571,7 +572,7 @@ function main(): void {
     event.stopPropagation();
   };
 
-  const onKeyDown = (event: KeyboardEvent): void => {
+  const onKeyDown = guard('teclado', (event: KeyboardEvent): void => {
     // Cualquier otra tecla junto con Alt (Alt+Tab, Alt+←…) no es "mantener Alt"
     if (event.key !== 'Alt') cancelPeekTimer();
     if (!enabled || event.isComposing || event.repeat) return;
@@ -641,14 +642,14 @@ function main(): void {
         runPrimary(action);
       }
     }
-  };
+  });
 
-  const onKeyUp = (event: KeyboardEvent): void => {
+  const onKeyUp = guard('teclado', (event: KeyboardEvent): void => {
     if (event.key !== 'Alt') return;
     root.removeAttribute(ALT_ATTR); // se ocultan los indicadores Alt+N
     // preventDefault evita que Windows/Chrome le den foco a su menú al soltar Alt
     if (closePeek()) event.preventDefault();
-  };
+  });
 
   window.addEventListener('keydown', onKeyDown, true);
   window.addEventListener('keyup', onKeyUp, true);
@@ -683,12 +684,10 @@ function main(): void {
   });
 
   const start = (): void => {
-    new MutationObserver(schedule).observe(document.body, { childList: true, subtree: true });
+    watchDom(decorate, { delayMs: 80, fallbackMs: 1500 });
     document.addEventListener('focusin', schedule);
     document.addEventListener('input', schedule);
     window.addEventListener('resize', schedule);
-    setInterval(schedule, 1000);
-    schedule();
   };
   if (document.body) start();
   else document.addEventListener('DOMContentLoaded', start);

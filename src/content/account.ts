@@ -17,6 +17,7 @@
 import { DEFAULT_SETTINGS, type Settings } from '../shared/constants';
 import { accountIdFromLocation } from '../shared/routes';
 import { readSettings, touches } from '../shared/storage';
+import { guard, watchDom } from './runtime';
 
 declare global {
   interface Window {
@@ -49,7 +50,7 @@ function main(): void {
     tab.focus({ preventScroll: true });
   };
 
-  const apply = (): void => {
+  const apply = guard('cuenta', (): void => {
     const accountId = accountIdFromLocation(location.pathname, location.search);
     if (!accountId) {
       visit = null; // al salir de la cuenta, la próxima vez vuelve a aplicarse
@@ -78,7 +79,7 @@ function main(): void {
         }
       }
     }
-  };
+  });
 
   let timer: number | undefined;
   const schedule = (): void => {
@@ -103,9 +104,8 @@ function main(): void {
   });
 
   const start = (): void => {
-    new MutationObserver(schedule).observe(document.body, { childList: true, subtree: true });
-    setInterval(schedule, 500); // también detecta el cambio de cuenta (cambia la URL, no el DOM)
-    schedule();
+    // el intervalo de respaldo detecta el cambio de cuenta (cambia la URL, no el DOM)
+    watchDom(apply, { delayMs: 100, fallbackMs: 700 });
   };
   if (document.body) start();
   else document.addEventListener('DOMContentLoaded', start);

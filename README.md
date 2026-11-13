@@ -29,6 +29,8 @@ siguen apareciendo en pantalla: solo se silencia el audio, y solo en el navegado
 Protecciones: ignora teclas repetidas, `AltGr`, `Shift`/`Meta`; bloquea llamadas dobles durante 1,5 s; no llama si ya
 hay una llamada en curso ni con un menú o diálogo modal abierto.
 
+Robustez: cada manejador está aislado (una falla se avisa una vez por consola y no rompe la página), los observadores ignoran lo que dibuja la propia extensión, no gastan nada con la pestaña oculta y se apagan solos si la extensión se recarga mientras Gavriel sigue abierto (basta F5). Si el almacenamiento falla, se usan los valores por defecto.
+
 ## Instalar y compilar
 
 Se usa siempre Bun (y pnpm solo si Bun no se pudiera). Si no tenés Bun global, queda como dependencia del proyecto.
@@ -62,6 +64,7 @@ src/
     shortcuts.ts   atajos e indicadores dentro de los componentes
     events-nav.ts  recorrer los eventos del panel con las flechas
     call-card.ts   tarjeta flotante con a quién se llama
+    runtime.ts     aislamiento de errores y observador del DOM sin bucles
     account.ts     al abrir una cuenta: pestaña Contactos y ojito de la clave
   popup/popup.ts   popup: solo sonidos (interruptor general y lista) + botón Ajustes
   options/options.ts   página de ajustes: atajos, opciones de cuenta, restablecer
