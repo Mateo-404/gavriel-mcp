@@ -4,3 +4,6 @@ dist/
 .DS_Store
 dist-firefox/
 .mcp.json
+netlog.json
+chrome-net-export-log.json
+netlog.json

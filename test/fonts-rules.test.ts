@@ -21,7 +21,9 @@ describe('tipografías locales', () => {
     expect(rule.action.type).toBe('block');
     expect(rule.condition.urlFilter).toContain('fonts.googleapis.com/css2?family=Geist');
     expect(rule.condition.initiatorDomains).toEqual(['app.gavriel.com.ar']);
-    expect(rule.condition.resourceTypes).toEqual(['stylesheet']);
+    // En perfiles con historial Chrome precarga ese CSS por su cuenta con sec-fetch-dest: empty (tipo «other»), no como
+    // hoja de estilo: visto en un registro de red real. Por eso se bloquean también esos tipos.
+    expect(rule.condition.resourceTypes).toEqual(['stylesheet', 'xmlhttprequest', 'other', 'font']);
   });
 
   test('el conjunto de reglas y los recursos accesibles están en el manifest', () => {

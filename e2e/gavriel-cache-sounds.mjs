@@ -88,8 +88,12 @@ await new Promise((r) => server.listen(8443, '127.0.0.1', r));
 const profile = mkdtempSync(join(tmpdir(), 'gv-e2e-'));
 const chrome = spawn(CHROME, [
   `--user-data-dir=${profile}`, '--remote-debugging-pipe', '--remote-debugging-port=9333', '--enable-unsafe-extension-debugging',
-  `--host-resolver-rules=MAP ${HOST} 127.0.0.1:8443, MAP fonts.googleapis.com 127.0.0.1:8443, MAP fonts.gstatic.com 127.0.0.1:8443`, '--ignore-certificate-errors',
-  '--no-first-run', '--no-default-browser-check', '--headless=new', 'about:blank',
+  // REAL_FONTS=1: Google Fonts real por internet (solo Gavriel se imita). HEADFUL=1: con ventana.
+  process.env.REAL_FONTS
+    ? `--host-resolver-rules=MAP ${HOST} 127.0.0.1:8443`
+    : `--host-resolver-rules=MAP ${HOST} 127.0.0.1:8443, MAP fonts.googleapis.com 127.0.0.1:8443, MAP fonts.gstatic.com 127.0.0.1:8443`,
+  '--ignore-certificate-errors',
+  '--no-first-run', '--no-default-browser-check', ...(process.env.HEADFUL ? [] : ['--headless=new']), 'about:blank',
 ], { stdio: ['ignore', 'ignore', 'ignore', 'pipe', 'pipe'] });
 
 // Extensions.loadUnpacked solo existe por la tubería de depuración (Chrome de marca ya no acepta --load-extension)
@@ -169,6 +173,20 @@ try {
   out.altCToast = await toast();
   out.altCClipboard = await evalJs(`navigator.clipboard.readText().catch(e=>'error:'+e.message)`);
   out.contentScriptAttrs = await evalJs(`document.documentElement.getAttributeNames().filter(a=>a.startsWith('data-gv')||a.startsWith('data-gavriel')).join(',')`);
+  // --- ¿Un depurador conectado (como el de la extensión de Claude) saltea el bloqueo de red?
+  const linkTest = () => evalJs(`new Promise((res) => { const l = document.createElement('link'); l.rel = 'stylesheet'; l.href = 'https://fonts.googleapis.com/css2?family=Geist:wght@400&display=swap&t=' + Math.random(); l.onload = () => res('cargó'); l.onerror = () => res('bloqueado'); document.head.append(l); setTimeout(() => res('sin respuesta'), 4000); })`);
+  out.fontLinkWithoutNetworkDomain = await linkTest();
+  // Pedido como el de la precarga de Chrome (sin destino de hoja de estilo): también debe bloquearse
+  out.fontNoCorsFetch = await evalJs(`fetch('https://fonts.googleapis.com/css2?family=Geist:wght@400&display=swap&f=' + Math.random(), { mode: 'no-cors' }).then(() => 'cargó').catch(() => 'bloqueado')`);
+  await send('Network.enable');
+  out.fontLinkWithNetworkDomain = await linkTest();
+  await send('Network.setCacheDisabled', { cacheDisabled: true });
+  out.fontLinkWithCacheDisabled = await linkTest();
+  await send('Fetch.enable', { patterns: [{ urlPattern: '*fonts.googleapis.com*' }] });
+  ws.addEventListener('message', (m) => { const d = JSON.parse(m.data); if (d.method === 'Fetch.requestPaused') ws.send(JSON.stringify({ id: 99999, method: 'Fetch.continueRequest', params: { requestId: d.params.requestId } })); });
+  out.fontLinkWithFetchInterception = await linkTest();
+  await send('Fetch.disable');
+  await send('Network.disable');
   // --- axios real (como Gavriel): el segundo pedido idéntico de la cuenta sale de memoria
   const before = hits['/api/accounts/acc1'] ?? 0;
   const run = (body) => evalJs(`(async () => { ${body} })()`);
@@ -219,6 +237,8 @@ assert.equal(out.axios.etag[1], out.axios.etag[0], 'la copia en memoria conserva
 assert.equal(out.axios.newToken[1], null, 'la copia en memoria no devuelve un token de renovación viejo');
 assert.equal(out.axiosHitsAfterWrite, 2, 'después de una escritura el pedido debe volver al servidor');
 assert.equal(out.axiosHitsOtherSession, 3, 'otra sesión nunca recibe la copia de la primera');
+assert.equal(out.fontNoCorsFetch, 'bloqueado', 'el pedido sin destino de hoja de estilo también debe bloquearse');
+assert.equal(out.fontLinkWithoutNetworkDomain, 'bloqueado');
 const net = JSON.parse(out.netStatus ?? '{}');
 assert.deepEqual([...(net.rulesets ?? [])].sort(), ['cache', 'fonts'], 'el fondo debe publicar las reglas activas');
 assert.equal(net.dynamic, 3, 'el fondo debe publicar los sonidos bloqueados');

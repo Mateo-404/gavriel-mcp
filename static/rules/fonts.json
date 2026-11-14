@@ -6,7 +6,7 @@
     "condition": {
       "urlFilter": "||fonts.googleapis.com/css2?family=Geist",
       "initiatorDomains": ["app.gavriel.com.ar"],
-      "resourceTypes": ["stylesheet"]
+      "resourceTypes": ["stylesheet", "xmlhttprequest", "other", "font"]
     }
   }
 ]
