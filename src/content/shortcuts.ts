@@ -39,6 +39,7 @@
  */
 import { DEFAULT_SETTINGS } from '../shared/constants';
 import { isArrowKey } from '../shared/grid';
+import { sanitizeTabs } from '../shared/media';
 import { digitFromKeyCode, filterFromLetterCode, isHangupLabel, parseContactName, shiftedDigit } from '../shared/labels';
 import { readSetting, readSettings, touches } from '../shared/storage';
 import { accountIdFromLocation } from '../shared/routes';
@@ -48,6 +49,7 @@ import { createClientCopy } from './client-copy';
 import { createAlertSender } from './alerts';
 import { createDataStore } from './data-store';
 import { createDialogConfirm } from './dialog-confirm';
+import { createMediaBar } from './media-bar';
 import { createLastContact } from './last-contact';
 import { createPanelActions } from './panel-actions';
 import { createSipClient } from './sip';
@@ -316,6 +318,41 @@ function main(): void {
   const panel = createPanelActions({ visible, ownText });
   const dialogConfirm = createDialogConfirm({ visible, ownText, toast });
   const sip = createSipClient();
+
+  // Reproductor de Spotify Web / YouTube Music en la barra de arriba (ver media-bar.ts)
+  const mediaBar = createMediaBar({
+    send: (message) => {
+      try {
+        void chrome.runtime.sendMessage(message).catch(() => {});
+      } catch {
+        /* contexto invalidado */
+      }
+    },
+  });
+  // Deja a la vista en <html> cuántas pestañas de música se conocen (o el error), para diagnosticar
+  const showMedia = (raw: unknown): void => {
+    try {
+      const tabs = sanitizeTabs(raw);
+      mediaBar.update(tabs);
+      root.setAttribute('data-gv-media', String(tabs.length));
+    } catch (error) {
+      root.setAttribute('data-gv-media', `error: ${String(error)}`);
+    }
+  };
+  try {
+    chrome.runtime.onMessage.addListener((message: unknown) => {
+      const m = message as { type?: string; tabs?: unknown } | null;
+      if (m?.type === 'media-update') showMedia(m.tabs);
+      return false;
+    });
+    void chrome.runtime
+      .sendMessage({ type: 'media-get' })
+      .then((answer: { tabs?: unknown } | undefined) => showMedia(answer?.tabs))
+      .catch(() => {});
+  } catch {
+    /* contexto invalidado */
+  }
+  void readSetting('mediaPlayer').then((on) => mediaBar.setEnabled(on));
   const copyClientMessage = createClientCopy({
     visible,
     toast,
@@ -408,6 +445,7 @@ function main(): void {
   };
 
   const decorate = guard('indicadores', (): void => {
+    mediaBar.ensureMounted(); // la barra de arriba se redibuja con la pantalla: se vuelve a ubicar el reproductor
     // Con un diálogo abierto no hay nada que indicar y escribir ahí dispara muchos cambios: no se toca el DOM
     if (dialogOpen()) {
       syncDialogBadge();
@@ -846,6 +884,7 @@ function main(): void {
   void readSetting('showCallCard').then((value) => callCard.setEnabled(value));
   chrome.storage.onChanged.addListener((changes, area) => {
     if (touches(changes, area, 'showCallCard')) void readSetting('showCallCard').then((v) => callCard.setEnabled(v));
+    if (touches(changes, area, 'mediaPlayer')) void readSetting('mediaPlayer').then((v) => mediaBar.setEnabled(v));
     if (touches(changes, area, SETTING)) {
       void readSetting(SETTING).then((value) => {
         enabled = value;

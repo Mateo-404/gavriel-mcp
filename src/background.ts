@@ -4,6 +4,7 @@
  * al abrir el navegador y cada vez que cambian los ajustes de sonido.
  */
 import { readSettings, touches } from './shared/storage';
+import { installMediaRouter } from './media-router';
 import { installNotifications } from './notifications';
 import { CACHE_RULESET, FONTS_RULESET, syncSoundRules } from './shared/sound-rules';
 
@@ -78,6 +79,7 @@ chrome.declarativeNetRequest.onRuleMatchedDebug?.addListener((info) => {
 });
 
 installNotifications();
+installMediaRouter();
 
 chrome.runtime.onInstalled.addListener(() => void sync());
 chrome.runtime.onStartup.addListener(() => void sync());

@@ -35,9 +35,10 @@ describe('manifest', () => {
     expect(existsSync(join('src', 'options', 'options.ts'))).toBe(true);
   });
 
-  test('solo actúa sobre app.gavriel.com.ar', () => {
+  test('solo actúa sobre app.gavriel.com.ar y, para el reproductor, sobre Spotify Web y YouTube Music', () => {
     for (const script of manifest.content_scripts) {
-      expect(script.matches).toEqual(['https://app.gavriel.com.ar/*']);
+      const isMusic = script.js.includes('content/music.js');
+      expect(script.matches).toEqual(isMusic ? ['https://open.spotify.com/*', 'https://music.youtube.com/*'] : ['https://app.gavriel.com.ar/*']);
     }
   });
 

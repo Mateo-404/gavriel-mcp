@@ -10,7 +10,7 @@ describe('manifest por navegador', () => {
     expect(chrome.minimum_chrome_version).toBe('120');
     expect(chrome.background).toEqual({ service_worker: 'background.js' });
     expect(chrome.browser_specific_settings).toBeUndefined();
-    expect(chrome.host_permissions).toEqual(['https://app.gavriel.com.ar/*']); // cambiar cabeceras exige permiso del sitio
+    expect(chrome.host_permissions).toEqual(['https://app.gavriel.com.ar/*', 'https://open.spotify.com/*', 'https://music.youtube.com/*']); // cambiar cabeceras exige permiso del sitio
   });
 
   test('Firefox: id, versión mínima, sin recolección de datos y permiso del sitio', () => {
@@ -22,7 +22,7 @@ describe('manifest por navegador', () => {
     expect(FIREFOX_ID).toMatch(/^[\w.-]+@[\w.-]+$/);
     expect(ff.browser_specific_settings.gecko.strict_min_version).toBe(FIREFOX_MIN_VERSION);
     expect(ff.browser_specific_settings.gecko.data_collection_permissions.required).toEqual(['none']);
-    expect(ff.host_permissions).toEqual(['https://app.gavriel.com.ar/*']);
+    expect(ff.host_permissions).toEqual(['https://app.gavriel.com.ar/*', 'https://open.spotify.com/*', 'https://music.youtube.com/*']);
     expect(ff.background).toEqual({ scripts: ['background.js'] });
   });
 

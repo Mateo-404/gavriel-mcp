@@ -15,6 +15,7 @@ const ENTRYPOINTS = [
   'src/content/bridge.ts',
   'src/content/main.ts', // cuenta + atajos: un solo script, un solo observador
   'src/content/mute.ts',
+  'src/content/music.ts', // pestañas de Spotify Web / YouTube Music
   'src/options/options.ts',
   'src/popup/popup.ts',
 ];

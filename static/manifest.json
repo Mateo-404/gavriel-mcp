@@ -47,6 +47,11 @@
       "run_at": "document_idle"
     },
     {
+      "matches": ["https://open.spotify.com/*", "https://music.youtube.com/*"],
+      "js": ["content/music.js"],
+      "run_at": "document_idle"
+    },
+    {
       "matches": ["https://app.gavriel.com.ar/*"],
       "js": ["content/mute.js"],
       "run_at": "document_start",

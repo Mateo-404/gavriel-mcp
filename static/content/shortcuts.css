@@ -177,3 +177,58 @@ html[data-gv-noanim] [class*="spinner"] {
   animation-duration: 1s !important;
   animation-iteration-count: infinite !important;
 }
+
+/* Reproductor de música en la barra de arriba de Gavriel (junto a «Tiempo real»), con los colores de la página */
+.gv-media {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  height: 36px;
+  max-width: 340px;
+  padding: 0 4px 0 12px;
+  border: 1px solid var(--border, rgba(169, 230, 189, 0.25));
+  border-radius: 9999px;
+  background: var(--card, transparent);
+  color: var(--foreground, #f4faf6);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.15;
+  overflow: hidden;
+}
+.gv-media[hidden] { display: none; }
+.gv-media-text { display: flex; flex-direction: column; min-width: 0; width: 120px; margin: 0 6px 0 8px; overflow: hidden; }
+.gv-media-title { white-space: nowrap; font-weight: 600; font-size: 12px; }
+.gv-media-sub { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--muted-foreground, #9db8a8); font-size: 10.5px; }
+.gv-media-btn {
+  display: inline-flex; align-items: center; justify-content: center; flex: none;
+  width: 28px; height: 28px; border: 0; border-radius: 9999px; padding: 0;
+  background: transparent; color: inherit; cursor: pointer;
+}
+.gv-media-btn:hover { background: var(--muted, rgba(255, 255, 255, 0.08)); }
+.gv-media-btn:focus-visible { outline: 2px solid var(--ring, #a9e6bd); outline-offset: 1px; }
+/* El color de la marca (celadon) solo en el botón de reproducir */
+.gv-media-play { background: var(--primary, #a9e6bd); color: var(--primary-foreground, #00170e); }
+.gv-media-play:hover { background: var(--primary, #a9e6bd); filter: brightness(1.08); }
+.gv-media-volbox { display: inline-flex; align-items: center; }
+.gv-media-volume { width: 0; opacity: 0; margin: 0; accent-color: var(--primary, #a9e6bd); transition: width 0.15s, opacity 0.15s; }
+.gv-media-volbox:hover .gv-media-volume,
+.gv-media-volbox:focus-within .gv-media-volume { width: 64px; opacity: 1; margin: 0 4px 0 0; }
+.gv-media-progress { position: absolute; left: 12px; right: 12px; bottom: 0; height: 3px; border-radius: 3px; background: var(--border, rgba(255, 255, 255, 0.12)); cursor: pointer; }
+.gv-media-progress i { display: block; height: 100%; width: 0; border-radius: 3px; background: var(--primary, #a9e6bd); }
+.gv-media-progress:hover { height: 5px; }
+.gv-media-swap[hidden] { display: none; }
+/* Ecualizador: se mueve solo mientras suena */
+.gv-eq { display: inline-flex; align-items: flex-end; gap: 2px; width: 14px; height: 14px; flex: none; }
+.gv-eq i { display: block; width: 3px; height: 4px; border-radius: 1px; background: var(--primary, #a9e6bd); }
+.gv-playing .gv-eq i { animation: gv-eq 0.9s ease-in-out infinite; }
+.gv-playing .gv-eq i:nth-child(2) { animation-delay: 0.2s; }
+.gv-playing .gv-eq i:nth-child(3) { animation-delay: 0.4s; }
+@keyframes gv-eq { 0%, 100% { height: 3px; } 50% { height: 14px; } }
+/* Título largo: se desplaza en un ida y vuelta suave */
+.gv-marquee .gv-media-title { display: inline-block; animation: gv-marquee 9s ease-in-out infinite alternate; }
+@keyframes gv-marquee { 0%, 15% { transform: translateX(0); } 85%, 100% { transform: translateX(calc(-100% + 120px)); } }
+@media (max-width: 1000px) { .gv-media-text { display: none; } .gv-media { padding-left: 10px; } }
+@media (prefers-reduced-motion: reduce) { .gv-playing .gv-eq i, .gv-marquee .gv-media-title { animation: none; } .gv-playing .gv-eq i { height: 10px; } }
+html[data-gv-noanim] .gv-playing .gv-eq i, html[data-gv-noanim] .gv-marquee .gv-media-title { animation: none !important; }
+html[data-gv-noanim] .gv-playing .gv-eq i { height: 10px; }

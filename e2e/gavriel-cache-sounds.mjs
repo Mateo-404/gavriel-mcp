@@ -29,12 +29,40 @@ const hits = {};
 let pendingCalls = 0;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-execFileSync('openssl', ['req', '-x509', '-newkey', 'rsa:2048', '-nodes', '-keyout', join(scratch, 'k.pem'), '-out', join(scratch, 'c.pem'), '-days', '1', '-subj', `/CN=${HOST}`, '-addext', `subjectAltName=DNS:${HOST},DNS:fonts.googleapis.com,DNS:fonts.gstatic.com`], { stdio: 'ignore' });
+execFileSync('openssl', ['req', '-x509', '-newkey', 'rsa:2048', '-nodes', '-keyout', join(scratch, 'k.pem'), '-out', join(scratch, 'c.pem'), '-days', '1', '-subj', `/CN=${HOST}`, '-addext', `subjectAltName=DNS:${HOST},DNS:fonts.googleapis.com,DNS:fonts.gstatic.com,DNS:open.spotify.com,DNS:music.youtube.com`], { stdio: 'ignore' });
 
 const NOSTORE = 'no-cache, no-store, must-revalidate';
 const server = createServer({ key: readFileSync(join(scratch, 'k.pem')), cert: readFileSync(join(scratch, 'c.pem')) }, (req, res) => {
   const path = req.url.split('?')[0];
-  const external = req.headers.host?.split(':')[0] !== HOST; // fonts.googleapis.com / fonts.gstatic.com
+  const reqHost = req.headers.host?.split(':')[0];
+  if (reqHost === 'open.spotify.com') {
+    res.writeHead(200, { 'content-type': 'text/html' });
+    return res.end(`<!doctype html><title>Spotify</title><body>
+<audio id="a" loop></audio>
+<button data-testid="control-button-skip-back">prev</button>
+<button data-testid="control-button-playpause">pp</button>
+<button data-testid="control-button-skip-forward">next</button>
+<script>
+// WAV silencioso de 60 s para que haya duración y posición
+const rate = 8000, n = rate * 60, buf = new ArrayBuffer(44 + n), v = new DataView(buf);
+const w = (o, t) => [...t].forEach((c, i) => v.setUint8(o + i, c.charCodeAt(0)));
+w(0, 'RIFF'); v.setUint32(4, 36 + n, true); w(8, 'WAVEfmt '); v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
+v.setUint32(24, rate, true); v.setUint32(28, rate, true); v.setUint16(32, 1, true); v.setUint16(34, 8, true); w(36, 'data'); v.setUint32(40, n, true);
+new Uint8Array(buf).fill(128, 44);
+const audio = document.getElementById('a');
+audio.src = URL.createObjectURL(new Blob([buf], { type: 'audio/wav' }));
+let track = 1;
+const meta = () => { navigator.mediaSession.metadata = new MediaMetadata({ title: 'Tema ' + track, artist: 'Banda de prueba' }); };
+meta();
+audio.addEventListener('play', () => (navigator.mediaSession.playbackState = 'playing'));
+audio.addEventListener('pause', () => (navigator.mediaSession.playbackState = 'paused'));
+document.querySelector('[data-testid="control-button-playpause"]').onclick = () => (audio.paused ? audio.play() : audio.pause());
+document.querySelector('[data-testid="control-button-skip-forward"]').onclick = () => { track++; meta(); };
+document.querySelector('[data-testid="control-button-skip-back"]').onclick = () => { track = Math.max(1, track - 1); meta(); };
+window.__music = () => ({ paused: audio.paused, volume: audio.volume, muted: audio.muted, track, t: audio.currentTime });
+</script></body>`);
+  }
+  const external = reqHost !== HOST; // fonts.googleapis.com / fonts.gstatic.com
   if (external) {
     const key = `${req.headers.host}${path}`;
     hits[key] = (hits[key] ?? 0) + 1;
@@ -79,6 +107,7 @@ const server = createServer({ key: readFileSync(join(scratch, 'k.pem')), cert: r
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500;700&display=swap">
 <p style="font-family:Geist,sans-serif">Atención: señal perdida · Ñandú</p><code style="font-family:'Geist Mono',monospace">E130</code>
 <script>fetch('/api/accounts/acc1').then(r=>r.json());fetch('/api/sip/calls?page=1&limit=30').then(r=>r.json());</script>
+<div id="topbar-actions"><div class="gv-scope monitoring-panel flex items-center gap-2"><span class="flex items-center gap-1">Tiempo real</span><button title="sonido">s</button><div class="monitoring-panel-view-buttonset"><button aria-label="Kanban">k</button></div></div></div>
 <script src="/__axios.js"></script>
 <script src="/__react.js"></script>
 <script src="/__react-dom.js"></script>
@@ -133,10 +162,10 @@ const chrome = spawn(CHROME, [
   `--user-data-dir=${profile}`, '--remote-debugging-pipe', '--remote-debugging-port=9333', '--enable-unsafe-extension-debugging',
   // REAL_FONTS=1: Google Fonts real por internet (solo Gavriel se imita). HEADFUL=1: con ventana.
   process.env.REAL_FONTS
-    ? `--host-resolver-rules=MAP ${HOST} 127.0.0.1:8443`
-    : `--host-resolver-rules=MAP ${HOST} 127.0.0.1:8443, MAP fonts.googleapis.com 127.0.0.1:8443, MAP fonts.gstatic.com 127.0.0.1:8443`,
+    ? `--host-resolver-rules=MAP ${HOST} 127.0.0.1:8443, MAP open.spotify.com 127.0.0.1:8443, MAP music.youtube.com 127.0.0.1:8443`
+    : `--host-resolver-rules=MAP ${HOST} 127.0.0.1:8443, MAP fonts.googleapis.com 127.0.0.1:8443, MAP fonts.gstatic.com 127.0.0.1:8443, MAP open.spotify.com 127.0.0.1:8443, MAP music.youtube.com 127.0.0.1:8443`,
   '--ignore-certificate-errors',
-  '--no-first-run', '--no-default-browser-check', ...(process.env.HEADFUL ? [] : ['--headless=new']), 'about:blank',
+  '--autoplay-policy=no-user-gesture-required', '--no-first-run', '--no-default-browser-check', ...(process.env.HEADFUL ? [] : ['--headless=new']), 'about:blank',
 ], { stdio: ['ignore', 'ignore', 'ignore', 'pipe', 'pipe'] });
 
 // Extensions.loadUnpacked solo existe por la tubería de depuración (Chrome de marca ya no acepta --load-extension)
@@ -174,7 +203,11 @@ try {
   const pending = new Map();
   ws.onmessage = (m) => { const d = JSON.parse(m.data); if (d.id && pending.has(d.id)) pending.get(d.id)(d); };
   const send = (method, params = {}) => new Promise((r) => { const i = ++id; pending.set(i, r); ws.send(JSON.stringify({ id: i, method, params })); });
-  const evalJs = async (expression) => (await send('Runtime.evaluate', { expression, awaitPromise: true, returnByValue: true })).result?.result?.value;
+  const evalJs = async (expression) => {
+    const r = (await send('Runtime.evaluate', { expression, awaitPromise: true, returnByValue: true })).result;
+    if (r?.exceptionDetails) throw new Error('Error en la página: ' + (r.exceptionDetails.exception?.description ?? r.exceptionDetails.text));
+    return r?.result?.value;
+  };
   await send('Page.enable');
 
   await sleep(4000); // el fondo sincroniza las reglas dinámicas al instalarse
@@ -257,6 +290,41 @@ try {
     w3.send(JSON.stringify({ id: 77, method: 'Runtime.evaluate', params: { expression: 'new Promise((res) => chrome.notifications.getAll((all) => res(Object.keys(all).sort())))', awaitPromise: true, returnByValue: true } }));
   });
   w3.close();
+  // --- Reproductor: una pestaña de «Spotify» y el control desde la barra de Gavriel
+  const music = await (await fetch('http://127.0.0.1:9333/json/new?https://open.spotify.com/', { method: 'PUT' })).json();
+  const mws = new WebSocket(music.webSocketDebuggerUrl);
+  await new Promise((r) => (mws.onopen = r));
+  let mid = 0;
+  const mpending = new Map();
+  mws.onmessage = (m) => { const d = JSON.parse(m.data); if (d.id && mpending.has(d.id)) mpending.get(d.id)(d); };
+  const musicEval = (expression) => new Promise((r) => { const i = ++mid; mpending.set(i, r); mws.send(JSON.stringify({ id: i, method: 'Runtime.evaluate', params: { expression, awaitPromise: true, returnByValue: true } })); }).then((d) => d.result?.result?.value);
+  await sleep(2500);
+  await send('Page.bringToFront');
+  await send('Page.navigate', { url: `https://${HOST}/monitoring-panel` });
+  await sleep(3000);
+  const bar = () => evalJs(`(() => { const r = document.querySelector('.gv-media'); if (!r) return null; return { hidden: r.hidden, title: r.querySelector('.gv-media-title').textContent, sub: r.querySelector('.gv-media-sub').textContent, play: r.querySelector('.gv-media-play').getAttribute('aria-label'), playing: r.classList.contains('gv-playing'), order: [...r.parentElement.children].map((c) => c.id || c.className.split(' ')[0] || c.tagName).join('>'), vol: r.querySelector('.gv-media-volume').value }; })()`);
+  const press = (label) => evalJs(`document.querySelector('.gv-media [aria-label="${label}"]').click()`);
+  out.mediaAttr = await evalJs("document.documentElement.getAttribute('data-gv-media')");
+  out.musicBar = { inicial: await bar() };
+  await press('Reproducir');
+  await sleep(1500);
+  out.musicBar.reproduciendo = { barra: await bar(), pestaña: await musicEval('window.__music()') };
+  await press('Siguiente');
+  await sleep(1200);
+  out.musicBar.siguiente = { barra: await bar(), pestaña: await musicEval('window.__music()') };
+  await evalJs(`(() => { const s = document.querySelector('.gv-media-volume'); s.value = '30'; s.dispatchEvent(new Event('input')); })()`);
+  await sleep(800);
+  out.musicBar.volumen = await musicEval('window.__music()');
+  await press('Silenciar');
+  await sleep(600);
+  out.musicBar.silencio = await musicEval('window.__music()');
+  await press('Pausar');
+  await sleep(1200);
+  out.musicBar.pausa = { barra: await bar(), pestaña: await musicEval('window.__music()') };
+  mws.close();
+  await fetch(`http://127.0.0.1:9333/json/close/${music.id}`);
+  await sleep(1500);
+  out.musicBar.cerrada = await bar();
   // --- Colgar: Ctrl+Enter llama a hangup() del contexto de React, sin abrir el panel ni cambiar de pestaña
   await evalJs('window.__mountSip()');
   await sleep(500);
@@ -304,6 +372,20 @@ assert.equal(out.axiosHitsOtherSession, 3, 'otra sesión nunca recibe la copia d
 assert.equal(out.fontNoCorsFetch, 'bloqueado', 'el pedido sin destino de hoja de estilo también debe bloquearse');
 assert.equal(out.fontLinkWithoutNetworkDomain, 'bloqueado');
 assert.deepEqual(out.notifications, ['gv-alert-acc8-E301-2', 'gv-alert-acc9-E130-2'], 'debían avisar el E130 (+1) y el E301 nuevos, y no la restauración ni lo que no cambió');
+assert.equal(out.musicBar.inicial?.hidden, false, 'el reproductor debía aparecer con una pestaña de Spotify abierta');
+assert.equal(out.musicBar.inicial.title, 'Tema 1');
+assert.equal(out.musicBar.inicial.sub, 'Banda de prueba · Spotify');
+assert.equal(out.musicBar.inicial.order, 'flex>BUTTON>gv-media>monitoring-panel-view-buttonset', 'debía ir entre el parlante y las vistas');
+assert.equal(out.musicBar.reproduciendo.pestaña.paused, false, 'el botón de reproducir debía hacer sonar la pestaña de música');
+assert.equal(out.musicBar.reproduciendo.barra.play, 'Pausar');
+assert.equal(out.musicBar.reproduciendo.barra.playing, true);
+assert.equal(out.musicBar.siguiente.pestaña.track, 2);
+assert.equal(out.musicBar.siguiente.barra.title, 'Tema 2');
+assert.equal(out.musicBar.volumen.volume, 0.3);
+assert.equal(out.musicBar.silencio.muted, true);
+assert.equal(out.musicBar.pausa.pestaña.paused, true);
+assert.equal(out.musicBar.pausa.barra.play, 'Reproducir');
+assert.ok(out.musicBar.cerrada === null || out.musicBar.cerrada.hidden === true, 'al cerrar la pestaña de música el reproductor debía desaparecer');
 assert.equal(out.sipClicks.hangup, 1, 'Ctrl+Enter debía llamar una vez a hangup() del softphone');
 assert.equal(out.sipClicks.panel, 0, 'no debía abrir el panel del softphone');
 assert.equal(out.sipToast, 'Llamada cortada');

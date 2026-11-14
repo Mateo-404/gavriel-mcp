@@ -39,6 +39,12 @@ Tipografías locales (Ajustes → Panel de monitoreo, activado por defecto): Gav
 
 Modo ahorro de recursos (Ajustes → Panel de monitoreo, activado por defecto): sin desenfoque detrás de los diálogos (obliga a la GPU a rehacer el fondo en cada cuadro), sin las animaciones que nunca paran (campana de eventos nuevos y parlante que suena). Los scripts de contenido ya no se inyectan en los iframes. También descarta los ~440 mensajes de depuración con emoji que Gavriel escribe en cada actualización (Chrome los guarda en memoria aunque las herramientas de desarrollo estén cerradas; `warn` y `error` pasan siempre).
 
+Avisos por tipo: notificaciones del sistema para BUR (robo), POW (corte de energía), PAN (pánico), MED (médica) e INC (incendio), cada tipo con su interruptor en Ajustes y un botón «Probar aviso». Salen de comparar las respuestas sucesivas de eventos pendientes que la página ya recibe (la primera es la base; las restauraciones no avisan; máximo 5 por 30 s y luego un resumen). No usa el token. Requiere una pestaña de Gavriel abierta; permiso nuevo: `notifications`.
+
+Música: si hay Spotify Web (`open.spotify.com`) o YouTube Music (`music.youtube.com`) abiertos en otra pestaña, aparece un reproductor en la barra, junto a «Tiempo real» (anterior, pausa, siguiente, volumen, silencio, progreso, cambiar de reproductor). Lee `navigator.mediaSession` y el elemento de audio. No controla la app de escritorio de Spotify. Los selectores de los botones pueden romperse si los sitios cambian.
+
+Animaciones: un interruptor en Ajustes las apaga todas (`data-gv-noanim`), incluidas las del reproductor.
+
 Rendimiento: el build sale minificado (de 66 KB en cuatro scripts a 32 KB en tres), con un único content script para cuenta y atajos; todos comparten un solo observador del DOM (que ignora lo que dibuja la extensión y se pausa con la pestaña oculta), una sola lectura de ajustes y, en Chrome, la Navigation API en lugar de sondear la URL. El JS sale moderno (ES más nuevo, Chrome 120 o más) y TypeScript compila con `target: ESNext`.
 
 Compatibilidad con otras herramientas: los indicadores (`Ctrl+Enter`, `Esc`, `Alt+N`…) no agregan texto a los botones; el texto lo dibuja el CSS (`::after` de un atributo). Un botón sigue valiendo exactamente lo que dice (por ejemplo `normalize-space(.)='Cerrar Intervención'` en un XPath de otra extensión de macros).
