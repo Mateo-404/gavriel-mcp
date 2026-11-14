@@ -149,15 +149,33 @@ $('reset-yes').addEventListener('click', () => {
   });
 });
 
+// ---------- Estado de las reglas de red (diagnóstico) ----------
+
+async function showNetStatus(): Promise<void> {
+  const el = $('net-status');
+  try {
+    const [rulesets, dynamic] = await Promise.all([
+      chrome.declarativeNetRequest.getEnabledRulesets(),
+      chrome.declarativeNetRequest.getDynamicRules(),
+    ]);
+    const sounds = dynamic.map((rule) => /sounds\/([\w.-]+?)\./.exec(rule.condition.urlFilter ?? '')?.[1]).filter(Boolean);
+    el.textContent = `Reglas de red activas: caché ${rulesets.includes('cache') ? 'sí' : 'no'} · tipografías ${rulesets.includes('fonts') ? 'sí' : 'no'} · sonidos bloqueados: ${sounds.length > 0 ? sounds.join(', ') : 'ninguno'}.`;
+  } catch {
+    el.textContent = 'No se pudo leer el estado de las reglas de red.';
+  }
+}
+
 // ---------- Inicio ----------
 
 $('version').textContent = `Gavriel Tools v${chrome.runtime.getManifest().version}`;
 renderCatalog();
 void readSettings().then(render);
+void showNetStatus();
 
 // Si algo cambia desde otro lado (el popup, otra pestaña), esta página se actualiza sola
 chrome.storage.onChanged.addListener((changes, area) => {
   if (touches(changes, area, 'shortcutsEnabled', 'openContactsTab', 'revealSecrets', 'showCallCard', 'hideSoundBanner', 'plainEvents', 'hideGridView', 'liteMode', 'cacheAssets', 'localFonts', 'muteEnabled', 'mutedSounds')) {
     void readSettings().then(render);
+    setTimeout(() => void showNetStatus(), 500); // el fondo actualiza las reglas un instante después
   }
 });
