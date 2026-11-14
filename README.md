@@ -5,10 +5,7 @@ Extensión de Chrome (Manifest V3, TypeScript, compilada con [Bun](https://bun.s
 
 ## Qué hace
 
-**Silenciar sonidos del panel de monitoreo.** En cualquier pantalla de Gavriel, silencia los sonidos que cada usuario
-elija en el popup (el ícono de la extensión, que maneja solo el sonido). Por defecto: `alarm`, `siren` y `beep`. Si Gavriel reproduce un sonido nuevo, aparece en la lista
-(sin silenciarse) para que se elija. Las llamadas, las grabaciones y cualquier otro audio no se tocan. Los eventos
-siguen apareciendo en pantalla: solo se silencia el audio, y solo en el navegador de quien instala la extensión.
+**Silenciar sonidos de Gavriel.** En cualquier pantalla, bloquea en la red los sonidos que cada usuario elija en el popup (el ícono de la extensión, que maneja solo el sonido): con `declarativeNetRequest` el navegador ni descarga `/sounds/<nombre>.mp3`, así que no se gasta ancho de banda (en una prueba, 15 descargas y 838 KB en pocos minutos) y Gavriel solo anota un error en su consola, que su propio código atrapa. Como respaldo, `mute.ts` también silencia el audio si llegara a reproducirse. Por defecto: `alarm`, `siren` y `beep`. Si Gavriel reproduce un sonido nuevo, aparece en la lista (sin bloquearse) para que se elija. Las llamadas, las grabaciones y cualquier otro audio no se tocan. Los eventos siguen apareciendo en pantalla, y solo se bloquea en el navegador de quien instala la extensión.
 
 **Atajos de teclado.** Los indicadores `Alt+N` solo se ven mientras se mantiene `Alt` y van dentro de cada componente, sin flotar encima:
 
@@ -31,6 +28,8 @@ siguen apareciendo en pantalla: solo se silencia el audio, y solo en el navegado
 **Ajustes.** Todo lo que no es sonido se maneja en una página propia: botón **Ajustes** del popup, o clic derecho en el ícono → *Opciones*. Ahí se activan o desactivan los atajos (con la lista completa y en qué pantalla funciona cada uno), las opciones de cuenta y un botón para restablecer. Se guarda al instante.
 
 **Al abrir una cuenta** (se puede desactivar cada cosa en Ajustes): entra directo a la pestaña **Contactos** y toca el ojito de **Clave** y **Contraclave**. Se aplica una sola vez por cuenta y solo si el botón existe: Gavriel dibuja el ojito únicamente si tu usuario tiene permiso para ver la clave.
+
+Modo ahorro de recursos (Ajustes → Panel de monitoreo, activado por defecto): sin desenfoque detrás de los diálogos (obliga a la GPU a rehacer el fondo en cada cuadro), sin las animaciones que nunca paran (campana de eventos nuevos y parlante que suena) y con `content-visibility: auto` en las tarjetas de eventos, para que el navegador no dibuje las que están fuera de pantalla. Los scripts de contenido ya no se inyectan en los iframes.
 
 Rendimiento: el build sale minificado (de 66 KB en cuatro scripts a 32 KB en tres), con un único content script para cuenta y atajos; todos comparten un solo observador del DOM (que ignora lo que dibuja la extensión y se pausa con la pestaña oculta), una sola lectura de ajustes y, en Chrome, la Navigation API en lugar de sondear la URL. El JS sale moderno (ES más nuevo, Chrome 120 o más) y TypeScript compila con `target: ESNext`.
 
@@ -85,6 +84,7 @@ src/
     events-nav.ts  recorrer los eventos del panel con las flechas
     call-card.ts   tarjeta flotante con a quién se llama
     client-copy.ts Alt+C: mensaje para el cliente con cuenta y dirección
+    ../background.ts  mantiene las reglas de bloqueo de sonidos (service worker / script de fondo)
     runtime.ts     aislamiento de errores y observador del DOM sin bucles
     main.ts        único content script (cuenta + atajos): un solo bundle y un solo observador
     account.ts     al abrir una cuenta: pestaña Contactos y ojito de la clave

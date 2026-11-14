@@ -16,6 +16,8 @@ export type Settings = {
   plainEvents: boolean;
   /** Oculta el botón de la vista Grilla del panel (quedan Kanban y Mapa). */
   hideGridView: boolean;
+  /** Modo ahorro: sin desenfoque ni animaciones continuas y con dibujado perezoso de las tarjetas. */
+  liteMode: boolean;
   /** Nombres (sin extensión) de los sonidos de /sounds/ que se silencian. */
   mutedSounds: string[];
   /** Sonidos que Gavriel ya reprodujo (lista que muestra el popup). */
@@ -38,6 +40,7 @@ export const DEFAULT_SETTINGS: Settings = {
   hideSoundBanner: true,
   plainEvents: true,
   hideGridView: true,
+  liteMode: true,
   mutedSounds: [...DEFAULT_SOUNDS],
   knownSounds: [...DEFAULT_SOUNDS],
 };

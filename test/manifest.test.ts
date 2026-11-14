@@ -41,6 +41,15 @@ describe('manifest', () => {
     }
   });
 
+  test('el bloqueo de sonidos tiene su permiso y su script de fondo', () => {
+    expect((manifest as unknown as { permissions: string[] }).permissions).toContain('declarativeNetRequest');
+    expect(existsSync(join('src', 'background.ts'))).toBe(true);
+  });
+
+  test('los content scripts no se inyectan en iframes', () => {
+    for (const script of manifest.content_scripts) expect((script as { all_frames?: boolean }).all_frames).toBeUndefined();
+  });
+
   test('solo mute.ts corre en el mundo de la página', () => {
     const inMain = manifest.content_scripts.filter((s) => s.world === 'MAIN').flatMap((s) => s.js);
     expect(inMain).toEqual(['content/mute.js']);

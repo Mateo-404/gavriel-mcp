@@ -11,13 +11,20 @@ const SITE = 'https://app.gavriel.com.ar/*';
 export const CHROME_MIN_VERSION = '120';
 
 export function forChrome(base: Manifest, version: string): Manifest {
-  return { ...base, version, minimum_chrome_version: CHROME_MIN_VERSION };
+  return {
+    ...base,
+    version,
+    minimum_chrome_version: CHROME_MIN_VERSION,
+    background: { service_worker: 'background.js' },
+  };
 }
 
 export function forFirefox(base: Manifest, version: string): Manifest {
   return {
     ...base,
     version,
+    // Firefox MV3 usa páginas de fondo (no service workers)
+    background: { scripts: ['background.js'] },
     // Firefox exige un id para guardar datos de forma estable y, desde la 140, declarar si recolecta datos
     browser_specific_settings: {
       gecko: {

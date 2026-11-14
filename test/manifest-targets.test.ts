@@ -8,6 +8,7 @@ describe('manifest por navegador', () => {
     const chrome = forChrome(base, '1.2.3');
     expect(chrome.version).toBe('1.2.3');
     expect(chrome.minimum_chrome_version).toBe('120');
+    expect(chrome.background).toEqual({ service_worker: 'background.js' });
     expect(chrome.browser_specific_settings).toBeUndefined();
     expect(chrome.host_permissions).toBeUndefined();
   });
@@ -22,6 +23,7 @@ describe('manifest por navegador', () => {
     expect(ff.browser_specific_settings.gecko.strict_min_version).toBe(FIREFOX_MIN_VERSION);
     expect(ff.browser_specific_settings.gecko.data_collection_permissions.required).toEqual(['none']);
     expect(ff.host_permissions).toEqual(['https://app.gavriel.com.ar/*']);
+    expect(ff.background).toEqual({ scripts: ['background.js'] });
   });
 
   test('Firefox conserva todo lo demás del manifest base', () => {

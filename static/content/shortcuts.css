@@ -148,3 +148,20 @@ html[data-gv-plain] .monitoring-panel-filter-btn.ring-warning {
   background-color: transparent !important;
   box-shadow: none !important;
 }
+
+/* Modo ahorro de recursos (Ajustes → Panel de monitoreo): menos trabajo para el navegador */
+/* El desenfoque detrás de los diálogos obliga a la GPU a rehacer el fondo en cada cuadro */
+html[data-gv-lite] [data-slot="dialog-overlay"] {
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+}
+/* Animaciones que no paran nunca (campana de eventos nuevos, parlante que suena) */
+html[data-gv-lite] .monitoring-panel-blink-icon,
+html[data-gv-lite] .monitoring-panel .animate-pulse {
+  animation: none !important;
+}
+/* Las tarjetas que no se ven no se dibujan hasta acercarse (la columna puede tener cientos) */
+html[data-gv-lite] .monitoring-panel-event-card {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 96px;
+}

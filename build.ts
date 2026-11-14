@@ -11,6 +11,7 @@ import { cp, readFile, rm, writeFile } from 'node:fs/promises';
 import { forChrome, forFirefox, type Manifest } from './manifest-targets';
 
 const ENTRYPOINTS = [
+  'src/background.ts',
   'src/content/bridge.ts',
   'src/content/main.ts', // cuenta + atajos: un solo script, un solo observador
   'src/content/mute.ts',
