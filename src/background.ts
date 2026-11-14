@@ -6,6 +6,38 @@
 import { readSettings, touches } from './shared/storage';
 import { CACHE_RULESET, FONTS_RULESET, syncSoundRules } from './shared/sound-rules';
 
+const FONTS_URL = 'https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500;700&display=swap';
+
+/**
+ * Diagnóstico: le pregunta a Chrome qué haría con el pedido del CSS de Google Fonts (¿nuestra regla
+ * coincide?) y qué reglas nuestras se dispararon de verdad en pedidos reales (getMatchedRules).
+ */
+async function diagnoseFonts(): Promise<Record<string, unknown>> {
+  const out: Record<string, unknown> = {};
+  try {
+    const test = await chrome.declarativeNetRequest.testMatchOutcome({
+      url: FONTS_URL,
+      initiator: 'https://app.gavriel.com.ar',
+      type: 'stylesheet',
+      method: 'get',
+    });
+    out.testMatches = test.matchedRules.map((m) => `${m.rulesetId}#${m.ruleId}`);
+  } catch (error) {
+    out.testError = String(error);
+  }
+  try {
+    const { rulesMatchedInfo } = await chrome.declarativeNetRequest.getMatchedRules({});
+    const fonts = rulesMatchedInfo.filter((m) => m.rule.rulesetId === FONTS_RULESET);
+    out.fontsFired = fonts.length;
+    out.firedByRuleset = Object.fromEntries(
+      [...new Set(rulesMatchedInfo.map((m) => m.rule.rulesetId))].map((id) => [id, rulesMatchedInfo.filter((m) => m.rule.rulesetId === id).length]),
+    );
+  } catch (error) {
+    out.matchedError = String(error);
+  }
+  return out;
+}
+
 /** Deja a la vista (Ajustes y atributo de <html>) qué reglas quedaron activas, o por qué fallaron. */
 async function publishStatus(error?: unknown): Promise<void> {
   try {
@@ -14,7 +46,13 @@ async function publishStatus(error?: unknown): Promise<void> {
       chrome.declarativeNetRequest.getDynamicRules(),
     ]);
     await chrome.storage.local.set({
-      netStatus: { version: chrome.runtime.getManifest().version, rulesets, dynamic: dynamic.length, error: error ? String(error) : null },
+      netStatus: {
+        version: chrome.runtime.getManifest().version,
+        rulesets,
+        dynamic: dynamic.length,
+        error: error ? String(error) : null,
+        diag: { ...(await diagnoseFonts()), live: fired },
+      },
     });
   } catch {
     /* sin estado que publicar */
@@ -36,6 +74,17 @@ async function sync(): Promise<void> {
     await publishStatus(error);
   }
 }
+
+// Diagnóstico en vivo: cuántas veces se dispara cada conjunto de reglas en pedidos reales (solo extensiones
+// sin empaquetar). Se publica junto con el resto del estado.
+const fired: Record<string, number> = {};
+let publishTimer: ReturnType<typeof setTimeout> | undefined;
+chrome.declarativeNetRequest.onRuleMatchedDebug?.addListener((info) => {
+  const key = `${info.rule.rulesetId}:${info.request.type}:${new URL(info.request.url).host}`;
+  fired[key] = (fired[key] ?? 0) + 1;
+  clearTimeout(publishTimer);
+  publishTimer = setTimeout(() => void publishStatus(), 800);
+});
 
 chrome.runtime.onInstalled.addListener(() => void sync());
 chrome.runtime.onStartup.addListener(() => void sync());
