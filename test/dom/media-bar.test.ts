@@ -130,8 +130,7 @@ describe('media-bar (DOM)', () => {
   test('la barra de progreso reparte la posición y un clic busca ese punto', () => {
     mountTopbar();
     bar.update([tab(5, { position: 50, duration: 200, playing: false })]);
-    const fill = bar.root.querySelector<HTMLElement>('.gv-media-progress i')!;
-    expect(fill.style.width).toBe('25%');
+    expect(bar.root.style.getPropertyValue('--gv-p')).toBe('0.25');
     const progress = bar.root.querySelector<HTMLElement>('.gv-media-progress')!;
     progress.getBoundingClientRect = () => ({ left: 0, width: 100, top: 0, right: 100, bottom: 3, height: 3, x: 0, y: 0, toJSON: () => ({}) }) as DOMRect;
     progress.dispatchEvent(new MouseEvent('click', { clientX: 50, bubbles: true }));

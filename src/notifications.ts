@@ -17,6 +17,7 @@ const isAlert = (value: unknown): value is Alert => {
   return !!a && isAlertType(a.type) && typeof a.accountId === 'string' && typeof a.code === 'string' && typeof a.added === 'number';
 };
 
+const NOTIFICATION_MS = 7000;
 const iconCache = new Map<string, string>();
 
 /** Ícono de la extensión con el fondo oscuro del color del tipo (Chrome no permite colorear la notificación en sí). */
@@ -68,8 +69,10 @@ function show(spec: { id: string; title: string; message: string; contextMessage
       message: spec.message,
       contextMessage: spec.contextMessage,
       priority: 2,
-      requireInteraction: spec.requireInteraction,
+      requireInteraction: false,
     });
+    // Como mucho 7 s en pantalla (el aviso queda en el centro de notificaciones del sistema)
+    setTimeout(() => chrome.notifications.clear(spec.id), NOTIFICATION_MS);
   });
 }
 

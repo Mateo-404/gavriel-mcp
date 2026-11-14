@@ -6,6 +6,9 @@
  * `div.monitoring-panel-view-buttonset` (grilla/mapa). El reproductor va entre el parlante y ese
  * grupo, con el mismo borde redondeado y los colores de la página (variables CSS de Gavriel).
  *
+ * En reposo es una píldora chica (ecualizador, tema y banda). Al pasar el mouse (o con el teclado) se
+ * abre debajo un panel con los controles: nada de eso pesa mientras no se lo mira (solo CSS).
+ *
  * Solo aparece si hay una pestaña de Spotify Web o YouTube Music abierta (ver music.ts y
  * media-router.ts). Las animaciones (ecualizador y título que se desplaza) se apagan con el
  * interruptor de Ajustes y con «reducir movimiento» del sistema.
@@ -82,6 +85,9 @@ export function createMediaBar({ send }: MediaBarDeps): MediaBar {
   root.setAttribute('role', 'group');
   root.setAttribute('aria-label', 'Reproductor de música');
 
+  const face = document.createElement('div');
+  face.className = 'gv-media-face';
+
   const eq = document.createElement('span');
   eq.className = 'gv-eq';
   eq.setAttribute('aria-hidden', 'true');
@@ -94,6 +100,11 @@ export function createMediaBar({ send }: MediaBarDeps): MediaBar {
   const sub = document.createElement('span');
   sub.className = 'gv-media-sub';
   text.append(title, sub);
+
+  const line = document.createElement('i');
+  line.className = 'gv-media-line';
+  line.setAttribute('aria-hidden', 'true');
+  face.append(eq, text, line);
 
   const back = button('Retroceder 5 segundos', 'back');
   const fwd = button('Adelantar 5 segundos', 'fwd');
@@ -111,19 +122,33 @@ export function createMediaBar({ send }: MediaBarDeps): MediaBar {
   volume.className = 'gv-media-volume';
   volume.setAttribute('aria-label', 'Volumen');
 
-  const volumeBox = document.createElement('span');
-  volumeBox.className = 'gv-media-volbox';
-  volumeBox.append(mute, volume);
+  const status = document.createElement('div');
+  status.className = 'gv-media-status';
+  const controls = document.createElement('div');
+  controls.className = 'gv-media-controls';
+  controls.append(back, prev, toggle, next, fwd);
 
   const bar = document.createElement('div');
   bar.className = 'gv-media-progress';
   bar.setAttribute('role', 'slider');
   bar.setAttribute('aria-label', 'Posición');
   bar.setAttribute('aria-valuemin', '0');
-  const fill = document.createElement('i');
-  bar.append(fill);
+  bar.append(document.createElement('i'));
+  const tNow = document.createElement('span');
+  const tEnd = document.createElement('span');
+  const timeline = document.createElement('div');
+  timeline.className = 'gv-media-timeline';
+  timeline.append(tNow, bar, tEnd);
 
-  root.append(eq, text, back, prev, toggle, next, fwd, volumeBox, swap, bar);
+  const bottom = document.createElement('div');
+  bottom.className = 'gv-media-bottom';
+  bottom.append(mute, volume, swap);
+
+  const pop = document.createElement('div');
+  pop.className = 'gv-media-pop';
+  pop.append(status, controls, timeline, bottom);
+
+  root.append(face, pop);
 
   const act = (action: MediaAction, value?: number): void => {
     if (current) send({ type: 'media-command', tabId: current.tabId, action, ...(value === undefined ? {} : { value }) });
@@ -163,16 +188,21 @@ export function createMediaBar({ send }: MediaBarDeps): MediaBar {
     return Math.min(current.duration || Infinity, current.position + advanced);
   };
 
+  /** El avance se dibuja con una sola variable CSS (transform, sin relayout); los textos solo si el panel está abierto. */
   const paintProgress = (): void => {
     if (!current || current.duration <= 0) {
-      fill.style.width = '0%';
+      root.style.setProperty('--gv-p', '0');
       return;
     }
     const position = livePosition();
-    fill.style.width = `${(position / current.duration) * 100}%`;
-    bar.setAttribute('aria-valuenow', String(Math.round(position)));
-    bar.setAttribute('aria-valuemax', String(Math.round(current.duration)));
-    bar.setAttribute('aria-valuetext', `${formatTime(position)} de ${formatTime(current.duration)}`);
+    root.style.setProperty('--gv-p', String(Math.min(1, position / current.duration)));
+    if (root.matches(':hover, :focus-within')) {
+      tNow.textContent = formatTime(position);
+      tEnd.textContent = formatTime(current.duration);
+      bar.setAttribute('aria-valuenow', String(Math.round(position)));
+      bar.setAttribute('aria-valuemax', String(Math.round(current.duration)));
+      bar.setAttribute('aria-valuetext', `${formatTime(position)} de ${formatTime(current.duration)}`);
+    }
   };
 
   const render = (): void => {
@@ -189,6 +219,7 @@ export function createMediaBar({ send }: MediaBarDeps): MediaBar {
       title.textContent = current.title || 'Sin título';
       sub.textContent = [current.artist, SOURCE_LABELS[current.source]].filter(Boolean).join(' · ');
       root.title = `${current.title} — ${current.artist} (${SOURCE_LABELS[current.source]})`;
+      status.textContent = `${current.playing ? '🎧 Sonando' : '⏸️ En pausa'} · ${SOURCE_LABELS[current.source]}`;
       root.classList.toggle('gv-playing', current.playing);
       root.dataset.source = current.source;
       setIcon(toggle, current.playing ? 'pause' : 'play', current.playing ? 'Pausar' : 'Reproducir');
@@ -202,6 +233,8 @@ export function createMediaBar({ send }: MediaBarDeps): MediaBar {
     paintProgress();
   };
 
+  root.addEventListener('pointerenter', paintProgress);
+  root.addEventListener('focusin', paintProgress);
   // La barra de progreso avanza una vez por segundo, solo mientras suena y la pestaña se ve
   setInterval(() => {
     if (current?.playing && !document.hidden && !root.hidden) paintProgress();
