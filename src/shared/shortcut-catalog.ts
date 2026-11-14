@@ -80,7 +80,7 @@ export const SHORTCUTS: readonly Shortcut[] = [
     scope: 'cuenta',
     keys: ['Alt', 'Shift'],
     chord: true,
-    description: 'Copia el nombre de la última persona a la que llamaste.',
+    description: 'Copia el nombre de la última persona a la que llamaste, al instante (del historial de llamadas que Gavriel ya trajo).',
   },
   {
     scope: 'llamadas',

@@ -58,6 +58,10 @@ export const MUTED_SOUNDS_ATTR = 'data-gavriel-muted-sounds';
 /** Evento con el que mute.ts avisa que Gavriel reprodujo un sonido (detail = nombre). */
 export const SOUND_SEEN_EVENT = 'gavriel:sound-seen';
 
+/** Eventos con los que net-tap.ts (mundo de la página) le pasa al mundo aislado los datos de Gavriel. */
+export const TAP_EVENT = 'gavriel:tap';
+export const TAP_REPLAY_EVENT = 'gavriel:tap-replay';
+
 /** Nombres de sonido aceptados al guardarlos (evita guardar basura de la página). */
 export const SOUND_NAME_PATTERN = /^[\w.-]{1,40}$/;
 

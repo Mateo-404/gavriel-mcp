@@ -160,18 +160,3 @@ html[data-gv-lite] .monitoring-panel-blink-icon,
 html[data-gv-lite] .monitoring-panel .animate-pulse {
   animation: none !important;
 }
-/* Las tarjetas que no se ven no se dibujan hasta acercarse (la columna puede tener cientos) */
-html[data-gv-lite] .monitoring-panel-event-card {
-  content-visibility: auto;
-  contain-intrinsic-size: auto 96px;
-}
-/* content-visibility recorta lo que sobresale de la tarjeta (pestaña Alt+N, anillo de la tarjeta marcada):
-   mientras se muestran esas marcas, las tarjetas se dibujan normales */
-html[data-gv-lite][data-gv-alt] .monitoring-panel-event-card,
-html[data-gv-lite] .monitoring-panel-event-card[data-gv-focus] {
-  content-visibility: visible;
-}
-/* Cada columna del tablero se redibuja por separado: una actualización no obliga a recalcular las demás */
-html[data-gv-lite] .monitoring-panel-column-card {
-  contain: layout style;
-}

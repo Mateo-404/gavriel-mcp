@@ -12,11 +12,13 @@ import { copyText } from './last-contact';
 interface Deps {
   visible: (el: Element) => boolean;
   toast: (message: string) => void;
+  /** Camino rápido: el mensaje armado con los datos que la página ya recibió, o null. */
+  known?: () => string | null;
 }
 
 const text = (el: Element | null | undefined): string => (el?.textContent ?? '').replace(/\s+/g, ' ').trim();
 
-export function createClientCopy({ visible, toast }: Deps): () => Promise<void> {
+export function createClientCopy({ visible, toast, known }: Deps): () => Promise<void> {
   const accountName = (): string => text([...document.querySelectorAll('h1')].find(visible));
 
   const address = (): string => {
@@ -27,6 +29,11 @@ export function createClientCopy({ visible, toast }: Deps): () => Promise<void> 
   };
 
   return async () => {
+    const quick = known?.();
+    if (quick) {
+      const ok = await copyText(quick);
+      return toast(ok ? `Copiado: ${quick.split('*')[1] ?? 'mensaje'}` : 'No pude copiar al portapapeles');
+    }
     const name = accountName();
     const where = address();
     const message = formatClientMessage(name, where);

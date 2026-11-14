@@ -23,6 +23,8 @@ const GAP_PX = 10;
 interface Deps {
   isCalling: () => boolean;
   visible: (el: Element) => boolean;
+  /** Se llama al iniciar una llamada saliente a un contacto conocido (para recordar a quién se llamó). */
+  onCallStart?: (contact: CalledContact) => void;
 }
 
 /** Líneas de texto de un componente (una por elemento hoja), sin íconos ni nuestros indicadores. */
@@ -39,7 +41,7 @@ function leafLines(root: Element): string[] {
   return lines;
 }
 
-export function createCallCard({ isCalling, visible }: Deps): {
+export function createCallCard({ isCalling, visible, onCallStart }: Deps): {
   update: () => void;
   setEnabled: (on: boolean) => void;
 } {
@@ -136,6 +138,7 @@ export function createCallCard({ isCalling, visible }: Deps): {
       if (!contact) return;
       pending = contact;
       pendingAt = Date.now();
+      onCallStart?.(contact);
     },
     true,
   );

@@ -45,6 +45,7 @@ import { accountIdFromLocation } from '../shared/routes';
 import { createEventsNav, FOCUS_ATTR } from './events-nav';
 import { createCallCard } from './call-card';
 import { createClientCopy } from './client-copy';
+import { createDataStore } from './data-store';
 import { createDialogConfirm } from './dialog-confirm';
 import { createLastContact } from './last-contact';
 import { createPanelActions } from './panel-actions';
@@ -281,11 +282,34 @@ function main(): void {
   // ---------- Eventos del panel (flechas, Enter, Alt+N) ----------
 
   const events = createEventsNav({ visible, toast });
-  const copyLastContact = createLastContact({ visible, toast });
-  const callCard = createCallCard({ isCalling, visible });
+  const dataStore = createDataStore();
+  const currentAccountId = (): string | null => accountIdFromLocation(location.pathname, location.search);
+  const copyLastContact = createLastContact({
+    visible,
+    toast,
+    known: () => {
+      const id = currentAccountId();
+      return id ? dataStore.lastCalledName(id) : null;
+    },
+  });
+  const callCard = createCallCard({
+    isCalling,
+    visible,
+    onCallStart: (contact) => {
+      const id = currentAccountId();
+      if (id) dataStore.recordLocalCall(id, contact.name);
+    },
+  });
   const panel = createPanelActions({ visible, ownText });
   const dialogConfirm = createDialogConfirm({ visible, ownText, toast });
-  const copyClientMessage = createClientCopy({ visible, toast });
+  const copyClientMessage = createClientCopy({
+    visible,
+    toast,
+    known: () => {
+      const id = currentAccountId();
+      return id ? dataStore.clientMessage(id) : null;
+    },
+  });
 
   const EDITABLE = 'input, textarea, select, [contenteditable=""], [contenteditable="true"]';
 

@@ -42,12 +42,22 @@ const server = createServer({ key: readFileSync(join(scratch, 'k.pem')), cert: r
   }
   if (path === '/favicon.ico') return res.writeHead(404).end();
   hits[path] = (hits[path] ?? 0) + 1;
-  if (path === '/') {
+  if (path === '/api/accounts/acc1') {
+    res.writeHead(200, { 'content-type': 'application/json' });
+    return res.end(JSON.stringify({ id: 'acc1', name: 'MERLO FERNANDO', accountNumber: '2904', address: 'J. M. NOLLI 1820', city: 'RAFAELA', state: 'Santa Fe', accountContacts: [{ order: 1, name: 'Ana Pérez', phone: '3416636288', description: 'Titular' }, { order: 2, name: 'Beto Gómez', phone: '3415016202', description: 'Hijo' }] }));
+  }
+  if (path === '/api/sip/calls') {
+    res.writeHead(200, { 'content-type': 'application/json' });
+    return res.end(JSON.stringify({ data: [{ accountId: 'acc1', direction: 'outbound', remoteNumber: '703415016202', startedAt: '2026-11-14T19:31:00.920Z', recordingUrl: 'https://bucket/x?X-Amz-Signature=secreto' }, { accountId: 'acc1', direction: 'outbound', remoteNumber: '703416636288', startedAt: '2026-11-14T17:00:00.000Z' }] }));
+  }
+  if (!path.startsWith('/assets/') && !path.startsWith('/sounds/') && !path.startsWith('/api/')) {
+    // como una SPA: cualquier pantalla devuelve la misma página
     // Gavriel responde con aislamiento de origen cruzado: se imita para comprobar que las tipografías locales cargan igual
     res.writeHead(200, { 'content-type': 'text/html', 'cache-control': NOSTORE, 'cross-origin-opener-policy': 'same-origin', 'cross-origin-embedder-policy': 'credentialless' });
     return res.end(`<!doctype html><title>t</title><body>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500;700&display=swap">
 <p style="font-family:Geist,sans-serif">Atención: señal perdida · Ñandú</p><code style="font-family:'Geist Mono',monospace">E130</code>
+<script>fetch('/api/accounts/acc1').then(r=>r.json());fetch('/api/sip/calls?page=1&limit=30').then(r=>r.json());</script>
 <script src="/assets/index-ABCD1234.js"></script>
 <script src="/assets/plain.js"></script>
 <script>
@@ -134,6 +144,21 @@ try {
   out.plainInCache = await cached('/assets/plain.js');
   // ¿qué tipografías cargó la página realmente? (FontFace con estado 'loaded' y de dónde vinieron)
   out.fontsLoaded = await evalJs(`document.fonts.ready.then(()=>[...document.fonts].filter(f=>f.status==='loaded').map(f=>f.family+':'+f.unicodeRange.slice(0,8)))`);
+  // --- Alt+Shift y Alt+C con teclas reales sobre «una cuenta»: deben salir de los datos que la página recibió
+  await send('Browser.grantPermissions', { permissions: ['clipboardReadWrite', 'clipboardSanitizedWrite'], origin: `https://${HOST}` }).catch(() => {});
+  await send('Page.navigate', { url: `https://${HOST}/monitoring-panel/account-analysis?accountId=acc1` });
+  await sleep(2500);
+  const key = (type, k, code, vk, modifiers) => send('Input.dispatchKeyEvent', { type, key: k, code, windowsVirtualKeyCode: vk, modifiers });
+  const toast = () => evalJs(`document.querySelector('.gv-toast')?.textContent ?? ''`);
+  await key('keyDown', 'Alt', 'AltLeft', 18, 1); await key('keyDown', 'Shift', 'ShiftLeft', 16, 9);
+  await key('keyUp', 'Shift', 'ShiftLeft', 16, 1); await key('keyUp', 'Alt', 'AltLeft', 18, 0);
+  await sleep(500);
+  out.altShiftToast = await toast();
+  out.altShiftClipboard = await evalJs(`navigator.clipboard.readText().catch(e=>'error:'+e.message)`);
+  await key('keyDown', 'c', 'KeyC', 67, 1); await key('keyUp', 'c', 'KeyC', 67, 1);
+  await sleep(500);
+  out.altCToast = await toast();
+  out.altCClipboard = await evalJs(`navigator.clipboard.readText().catch(e=>'error:'+e.message)`);
   out.contentScriptAttrs = await evalJs(`document.documentElement.getAttributeNames().filter(a=>a.startsWith('data-gv')||a.startsWith('data-gavriel')).join(',')`);
   ws.close();
 } catch (e) {
@@ -159,6 +184,10 @@ assert.equal(out.hits['fonts.googleapis.com/css2'], undefined, 'el CSS de Google
 assert.equal(out.hits['fonts.gstatic.com/x.woff2'], undefined, 'no debía pedirse nada a gstatic');
 assert.ok(out.fontsLoaded.some((f) => f.startsWith('Geist:')), 'Geist no cargó desde la extensión');
 assert.ok(out.fontsLoaded.some((f) => f.startsWith('Geist Mono:')), 'Geist Mono no cargó desde la extensión');
+assert.equal(out.altShiftToast, 'Copiado: Beto Gómez', 'Alt+Shift debía copiar al último contacto llamado desde los datos de la página');
+assert.equal(out.altShiftClipboard, 'Beto Gómez');
+// Windows entrega el portapapeles con CRLF
+assert.equal(out.altCClipboard.replaceAll(String.fromCharCode(13, 10), String.fromCharCode(10)), 'Estimado/a cliente: *MERLO FERNANDO*\nAlarma de: *J. M. NOLLI 1820, RAFAELA · Santa Fe*');
 assert.match(out.contentScriptAttrs, /data-gavriel-mute/, 'los content scripts no arrancaron');
 console.log('OK: caché, bloqueo de sonidos y content scripts verificados');
 process.exit(0);

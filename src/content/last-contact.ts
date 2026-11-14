@@ -23,6 +23,8 @@ const MAX_CARDS_TO_READ = 5;
 export interface LastContactDeps {
   visible: (el: Element) => boolean;
   toast: (message: string) => void;
+  /** Camino rápido: el nombre ya conocido por los datos que Gavriel recibió (sin tocar la pantalla). */
+  known?: () => string | null;
 }
 
 const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
@@ -67,7 +69,7 @@ export async function copyText(text: string): Promise<boolean> {
   }
 }
 
-export function createLastContact({ visible, toast }: LastContactDeps): () => Promise<void> {
+export function createLastContact({ visible, toast, known }: LastContactDeps): () => Promise<void> {
   let running = false;
 
   const firstLine = (el: HTMLElement): string => el.innerText.split('\n').find((line) => line.trim() !== '') ?? '';
@@ -148,6 +150,13 @@ export function createLastContact({ visible, toast }: LastContactDeps): () => Pr
     if (running) return;
     running = true;
     try {
+      // 1) Instantáneo: del historial de llamadas y los contactos que la página ya recibió
+      const quick = known?.();
+      if (quick) {
+        const copiedQuick = await copyText(quick);
+        return toast(copiedQuick ? `Copiado: ${quick}` : `No pude copiar (${quick})`);
+      }
+      // 2) Respaldo: leerlo de la pantalla (Historial de eventos)
       toast('Buscando la última llamada…');
       await showHistory();
       const name = await findLastName();
