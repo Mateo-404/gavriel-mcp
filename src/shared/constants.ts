@@ -22,6 +22,8 @@ export type Settings = {
   cacheAssets: boolean;
   /** Usa las tipografías Geist de la extensión y bloquea el CSS de Google Fonts (cero pedidos externos). */
   localFonts: boolean;
+  /** Responde desde memoria el segundo pedido idéntico de la cuenta (abrir una cuenta es ~1 s más rápido). */
+  dedupeAccount: boolean;
   /** Nombres (sin extensión) de los sonidos de /sounds/ que se silencian. */
   mutedSounds: string[];
   /** Sonidos que Gavriel ya reprodujo (lista que muestra el popup). */
@@ -47,6 +49,7 @@ export const DEFAULT_SETTINGS: Settings = {
   liteMode: true,
   cacheAssets: true,
   localFonts: true,
+  dedupeAccount: true,
   mutedSounds: [...DEFAULT_SOUNDS],
   knownSounds: [...DEFAULT_SOUNDS],
 };

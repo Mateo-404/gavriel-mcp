@@ -21,6 +21,9 @@ describe('humo: los content scripts minificados arrancan sin errores', () => {
     expect(fonts).toContain('url("chrome-extension://test-extension/fonts/geist-latin.woff2")');
     expect(fonts).not.toContain('https://');
     expect(JSON.parse(document.documentElement.getAttribute('data-gavriel-muted-sounds') ?? '[]')).toContain('alarm');
+    // El observador de enlaces de Google del bundle se apaga al terminar el análisis del documento: así no
+    // interfiere con otros archivos de prueba que comparten este mismo documento
+    document.dispatchEvent(new Event('DOMContentLoaded'));
   });
 
   test('main.js (cuenta + atajos) arranca, se protege de doble carga y no deja texto en los botones', async () => {

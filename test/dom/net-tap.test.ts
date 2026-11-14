@@ -1,4 +1,4 @@
-import { beforeAll, describe, expect, test } from 'bun:test';
+import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
 import { createDataStore } from '../../src/content/data-store';
 import { installNetTap } from '../../src/content/net-tap';
 
@@ -24,6 +24,10 @@ const callsBody = {
     },
   ],
 };
+
+// Se guardan los originales para devolverlos al terminar: otros archivos de prueba usan el XHR y el fetch del DOM
+const realXhr = (globalThis as unknown as { XMLHttpRequest: unknown }).XMLHttpRequest;
+const realFetch = (globalThis as unknown as { fetch: unknown }).fetch;
 
 // Un fetch falso con la misma forma que usa Gavriel (respuesta con clone().json())
 const fakeResponse = (body: unknown, ok = true) => ({ ok, clone: () => ({ json: async () => body }), marker: 'original' });
@@ -54,6 +58,11 @@ class FakeXhr {
   }
 }
 (globalThis as unknown as { XMLHttpRequest: unknown }).XMLHttpRequest = FakeXhr;
+
+afterAll(() => {
+  (globalThis as unknown as { XMLHttpRequest: unknown }).XMLHttpRequest = realXhr;
+  (globalThis as unknown as { fetch: unknown }).fetch = realFetch;
+});
 
 let store: ReturnType<typeof createDataStore>;
 

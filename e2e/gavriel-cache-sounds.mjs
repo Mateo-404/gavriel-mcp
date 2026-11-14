@@ -43,8 +43,16 @@ const server = createServer({ key: readFileSync(join(scratch, 'k.pem')), cert: r
   if (path === '/favicon.ico') return res.writeHead(404).end();
   hits[path] = (hits[path] ?? 0) + 1;
   if (path === '/api/accounts/acc1') {
-    res.writeHead(200, { 'content-type': 'application/json' });
+    res.writeHead(200, { 'content-type': 'application/json', 'x-new-token': 'token-nuevo', etag: 'W/"acc"' });
     return res.end(JSON.stringify({ id: 'acc1', name: 'MERLO FERNANDO', accountNumber: '2904', address: 'J. M. NOLLI 1820', city: 'RAFAELA', state: 'Santa Fe', accountContacts: [{ order: 1, name: 'Ana Pérez', phone: '3416636288', description: 'Titular' }, { order: 2, name: 'Beto Gómez', phone: '3415016202', description: 'Hijo' }] }));
+  }
+  if (path === '/__axios.js') {
+    res.writeHead(200, { 'content-type': 'application/javascript' });
+    return res.end(readFileSync(join(process.cwd(), 'node_modules/axios/dist/axios.min.js')));
+  }
+  if (path === '/api/interventions/start' && req.method === 'POST') {
+    res.writeHead(200, { 'content-type': 'application/json' });
+    return res.end('{"ok":true}');
   }
   if (path === '/api/sip/calls') {
     res.writeHead(200, { 'content-type': 'application/json' });
@@ -58,6 +66,7 @@ const server = createServer({ key: readFileSync(join(scratch, 'k.pem')), cert: r
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500;700&display=swap">
 <p style="font-family:Geist,sans-serif">Atención: señal perdida · Ñandú</p><code style="font-family:'Geist Mono',monospace">E130</code>
 <script>fetch('/api/accounts/acc1').then(r=>r.json());fetch('/api/sip/calls?page=1&limit=30').then(r=>r.json());</script>
+<script src="/__axios.js"></script>
 <script src="/assets/index-ABCD1234.js"></script>
 <script src="/assets/plain.js"></script>
 <script>
@@ -160,6 +169,20 @@ try {
   out.altCToast = await toast();
   out.altCClipboard = await evalJs(`navigator.clipboard.readText().catch(e=>'error:'+e.message)`);
   out.contentScriptAttrs = await evalJs(`document.documentElement.getAttributeNames().filter(a=>a.startsWith('data-gv')||a.startsWith('data-gavriel')).join(',')`);
+  // --- axios real (como Gavriel): el segundo pedido idéntico de la cuenta sale de memoria
+  const before = hits['/api/accounts/acc1'] ?? 0;
+  const run = (body) => evalJs(`(async () => { ${body} })()`);
+  out.axios = await run(`
+    const get = () => axios.get('/api/accounts/acc1', { headers: { Authorization: 'Bearer prueba' } });
+    const a = await get(); const b = await get();
+    return { name: [a.data.name, b.data.name], status: [a.status, b.status], etag: [a.headers.etag, b.headers.etag], newToken: [a.headers['x-new-token'] ?? null, b.headers['x-new-token'] ?? null] };
+  `);
+  out.axiosHitsAfterTwoGets = (hits['/api/accounts/acc1'] ?? 0) - before;
+  await run(`await axios.post('/api/interventions/start', {}, { headers: { Authorization: 'Bearer prueba' } });`);
+  await run(`await axios.get('/api/accounts/acc1', { headers: { Authorization: 'Bearer prueba' } });`);
+  out.axiosHitsAfterWrite = (hits['/api/accounts/acc1'] ?? 0) - before;
+  await run(`await axios.get('/api/accounts/acc1', { headers: { Authorization: 'Bearer otra-sesion' } });`);
+  out.axiosHitsOtherSession = (hits['/api/accounts/acc1'] ?? 0) - before;
   out.netStatus = await evalJs(`document.documentElement.getAttribute('data-gv-net')`);
   ws.close();
 } catch (e) {
@@ -189,6 +212,13 @@ assert.equal(out.altShiftToast, 'Copiado: Beto Gómez', 'Alt+Shift debía copiar
 assert.equal(out.altShiftClipboard, 'Beto Gómez');
 // Windows entrega el portapapeles con CRLF
 assert.equal(out.altCClipboard.replaceAll(String.fromCharCode(13, 10), String.fromCharCode(10)), 'Estimado/a cliente: *MERLO FERNANDO*\nAlarma de: *J. M. NOLLI 1820, RAFAELA · Santa Fe*');
+assert.deepEqual(out.axios.name, ['MERLO FERNANDO', 'MERLO FERNANDO'], 'axios debía recibir la cuenta las dos veces');
+assert.deepEqual(out.axios.status, [200, 200]);
+assert.equal(out.axiosHitsAfterTwoGets, 1, 'el segundo pedido idéntico debía salir de memoria (1 solo pedido al servidor)');
+assert.equal(out.axios.etag[1], out.axios.etag[0], 'la copia en memoria conserva las cabeceras');
+assert.equal(out.axios.newToken[1], null, 'la copia en memoria no devuelve un token de renovación viejo');
+assert.equal(out.axiosHitsAfterWrite, 2, 'después de una escritura el pedido debe volver al servidor');
+assert.equal(out.axiosHitsOtherSession, 3, 'otra sesión nunca recibe la copia de la primera');
 const net = JSON.parse(out.netStatus ?? '{}');
 assert.deepEqual([...(net.rulesets ?? [])].sort(), ['cache', 'fonts'], 'el fondo debe publicar las reglas activas');
 assert.equal(net.dynamic, 3, 'el fondo debe publicar los sonidos bloqueados');

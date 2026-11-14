@@ -11,15 +11,23 @@
  * versión de cada respuesta y se reenvía cuando el aislado lo pide (evento de repetición).
  */
 import { TAP_EVENT, TAP_REPLAY_EVENT } from '../shared/constants';
+import { ResponseCache, isApiPath, isMutation } from '../shared/dedupe';
 import { classifyUrl, parseAccount, parseCalls } from '../shared/gavriel-data';
+import { serveFromCache } from './xhr-dedupe';
 
 declare global {
   interface XMLHttpRequest {
     __gvUrl?: string;
+    __gvMethod?: string;
+    __gvAuth?: string;
   }
 }
 
+/** Interruptor de Ajustes (bridge.ts lo refleja en <html>). */
+const dedupeOn = (): boolean => document.documentElement.hasAttribute('data-gv-dedupe');
+
 export function installNetTap(): void {
+  const responses = new ResponseCache();
   const latest = new Map<string, string>(); // 'calls' | 'account:<id>' -> detalle ya serializado
 
   const emit = (key: string, detail: string): void => {
@@ -61,12 +69,40 @@ export function installNetTap(): void {
   const open = XMLHttpRequest.prototype.open;
   XMLHttpRequest.prototype.open = function (this: XMLHttpRequest, method: string, url: string | URL, ...rest: unknown[]) {
     this.__gvUrl = String(url);
+    this.__gvMethod = String(method);
+    this.__gvAuth = undefined;
     return (open as (...a: unknown[]) => void).call(this, method, url, ...rest);
   } as typeof XMLHttpRequest.prototype.open;
+
+  const setHeader = XMLHttpRequest.prototype.setRequestHeader;
+  XMLHttpRequest.prototype.setRequestHeader = function (this: XMLHttpRequest, name: string, value: string) {
+    if (name.toLowerCase() === 'authorization') this.__gvAuth = value;
+    return setHeader.call(this, name, value);
+  };
 
   const send = XMLHttpRequest.prototype.send;
   XMLHttpRequest.prototype.send = function (this: XMLHttpRequest, ...args: Parameters<XMLHttpRequest['send']>) {
     const url = this.__gvUrl;
+    const method = this.__gvMethod ?? 'GET';
+    // Cualquier escritura a la API puede cambiar lo guardado: se descarta todo
+    if (url && isMutation(method) && isApiPath(url)) responses.clear();
+    if (url && method.toUpperCase() === 'GET' && classifyUrl(url) === 'account' && dedupeOn()) {
+      const key = ResponseCache.key(url, this.__gvAuth);
+      const hit = responses.get(key);
+      if (hit && serveFromCache(this, url, hit)) return; // el segundo pedido idéntico se responde desde memoria
+      this.addEventListener('load', () => {
+        try {
+          responses.set(key, {
+            status: this.status,
+            statusText: this.statusText,
+            text: this.responseType === '' || this.responseType === 'text' ? this.responseText : JSON.stringify(this.response),
+            headers: this.getAllResponseHeaders(),
+          });
+        } catch {
+          /* sin cache */
+        }
+      });
+    }
     if (url && classifyUrl(url)) {
       this.addEventListener('load', () => {
         try {

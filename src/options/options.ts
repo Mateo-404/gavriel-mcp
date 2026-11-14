@@ -7,7 +7,7 @@ import { DEFAULT_SETTINGS, FRIENDLY_SOUND_NAMES, type Settings } from '../shared
 import { SCOPE_TITLES, shortcutsFor, type Shortcut, type ShortcutScope } from '../shared/shortcut-catalog';
 import { readSettings, touches, writeSettings } from '../shared/storage';
 
-type SwitchKey = 'shortcutsEnabled' | 'openContactsTab' | 'revealSecrets' | 'showCallCard' | 'hideSoundBanner' | 'plainEvents' | 'hideGridView' | 'liteMode' | 'cacheAssets' | 'localFonts';
+type SwitchKey = 'shortcutsEnabled' | 'openContactsTab' | 'revealSecrets' | 'showCallCard' | 'hideSoundBanner' | 'plainEvents' | 'hideGridView' | 'liteMode' | 'cacheAssets' | 'localFonts' | 'dedupeAccount';
 
 const SWITCHES: readonly { key: SwitchKey; id: string }[] = [
   { key: 'shortcutsEnabled', id: 'keys' },
@@ -20,6 +20,7 @@ const SWITCHES: readonly { key: SwitchKey; id: string }[] = [
   { key: 'liteMode', id: 'opt-lite' },
   { key: 'cacheAssets', id: 'opt-cache' },
   { key: 'localFonts', id: 'opt-fonts' },
+  { key: 'dedupeAccount', id: 'opt-dedupe' },
 ];
 
 const SCOPES: readonly ShortcutScope[] = ['panel', 'cuenta', 'llamadas'];
@@ -142,6 +143,7 @@ $('reset-yes').addEventListener('click', () => {
     liteMode: DEFAULT_SETTINGS.liteMode,
     cacheAssets: DEFAULT_SETTINGS.cacheAssets,
     localFonts: DEFAULT_SETTINGS.localFonts,
+    dedupeAccount: DEFAULT_SETTINGS.dedupeAccount,
   }).then(async () => {
     render(await readSettings());
     showResetConfirm(false);
@@ -174,7 +176,7 @@ void showNetStatus();
 
 // Si algo cambia desde otro lado (el popup, otra pestaña), esta página se actualiza sola
 chrome.storage.onChanged.addListener((changes, area) => {
-  if (touches(changes, area, 'shortcutsEnabled', 'openContactsTab', 'revealSecrets', 'showCallCard', 'hideSoundBanner', 'plainEvents', 'hideGridView', 'liteMode', 'cacheAssets', 'localFonts', 'muteEnabled', 'mutedSounds')) {
+  if (touches(changes, area, 'shortcutsEnabled', 'openContactsTab', 'revealSecrets', 'showCallCard', 'hideSoundBanner', 'plainEvents', 'hideGridView', 'liteMode', 'cacheAssets', 'localFonts', 'dedupeAccount', 'muteEnabled', 'mutedSounds')) {
     void readSettings().then(render);
     setTimeout(() => void showNetStatus(), 500); // el fondo actualiza las reglas un instante después
   }
