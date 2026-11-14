@@ -19,7 +19,7 @@ const isAlert = (value: unknown): value is Alert => {
 
 const iconCache = new Map<string, string>();
 
-/** Ícono de la extensión teñido con el color del tipo (Chrome no permite colorear la notificación en sí). */
+/** Ícono de la extensión con el fondo oscuro del color del tipo (Chrome no permite colorear la notificación en sí). */
 async function tintedIcon(type: AlertType | undefined): Promise<string> {
   const plain = chrome.runtime.getURL('icons/icon128.png');
   if (!type) return plain;
@@ -30,10 +30,17 @@ async function tintedIcon(type: AlertType | undefined): Promise<string> {
     const canvas = new OffscreenCanvas(128, 128);
     const g = canvas.getContext('2d')!;
     g.drawImage(bitmap, 0, 0, 128, 128);
-    g.globalCompositeOperation = 'source-atop';
-    g.globalAlpha = 0.75;
-    g.fillStyle = ALERT_COLORS[type];
-    g.fillRect(0, 0, 128, 128);
+    // Solo el fondo oscuro toma el color del tipo; el escudo (claro) queda como está
+    const [cr, cg, cb] = ALERT_COLORS[type].match(/ww/g)!.map((h) => parseInt(h, 16)) as [number, number, number];
+    const img = g.getImageData(0, 0, 128, 128);
+    const px = img.data;
+    for (let i = 0; i < px.length; i += 4) {
+      const t = 1 - Math.min(1, Math.max(px[i]!, px[i + 1]!, px[i + 2]!) / 110); // 1 = negro, 0 = claro
+      px[i] = px[i]! * (1 - t) + cr * t;
+      px[i + 1] = px[i + 1]! * (1 - t) + cg * t;
+      px[i + 2] = px[i + 2]! * (1 - t) + cb * t;
+    }
+    g.putImageData(img, 0, 0);
     const blob = await canvas.convertToBlob({ type: 'image/png' });
     const url = await new Promise<string>((resolve, reject) => {
       const reader = new FileReader();
