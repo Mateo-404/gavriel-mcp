@@ -22,6 +22,8 @@ const ICONS = {
   pause: '<rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/>',
   volume: '<path d="M11 5 6 9H2v6h4l5 4V5Z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M19 5a10 10 0 0 1 0 14"/>',
   muted: '<path d="M11 5 6 9H2v6h4l5 4V5Z"/><path d="m22 9-6 6"/><path d="m16 9 6 6"/>',
+  back: '<path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/>',
+  fwd: '<path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 4v5h-5"/>',
   swap: '<path d="m17 2 4 4-4 4"/><path d="M3 11V9a3 3 0 0 1 3-3h15"/><path d="m7 22-4-4 4-4"/><path d="M21 13v2a3 3 0 0 1-3 3H3"/>',
 } as const;
 
@@ -93,6 +95,8 @@ export function createMediaBar({ send }: MediaBarDeps): MediaBar {
   sub.className = 'gv-media-sub';
   text.append(title, sub);
 
+  const back = button('Retroceder 5 segundos', 'back');
+  const fwd = button('Adelantar 5 segundos', 'fwd');
   const prev = button('Anterior', 'prev');
   const toggle = button('Reproducir', 'play', 'gv-media-play');
   const next = button('Siguiente', 'next');
@@ -119,11 +123,13 @@ export function createMediaBar({ send }: MediaBarDeps): MediaBar {
   const fill = document.createElement('i');
   bar.append(fill);
 
-  root.append(eq, text, prev, toggle, next, volumeBox, swap, bar);
+  root.append(eq, text, back, prev, toggle, next, fwd, volumeBox, swap, bar);
 
   const act = (action: MediaAction, value?: number): void => {
     if (current) send({ type: 'media-command', tabId: current.tabId, action, ...(value === undefined ? {} : { value }) });
   };
+  back.addEventListener('click', () => act('skip', -5));
+  fwd.addEventListener('click', () => act('skip', 5));
   prev.addEventListener('click', () => act('prev'));
   next.addEventListener('click', () => act('next'));
   toggle.addEventListener('click', () => act('toggle'));

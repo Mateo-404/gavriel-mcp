@@ -145,3 +145,51 @@ describe('runCommand', () => {
     expect(runCommand('spotify', 'seek', 10)).toBe(false);
   });
 });
+
+describe('Spotify como control remoto (sin audio propio en la pestaña)', () => {
+  const mountUi = (): { vol: HTMLInputElement; prog: HTMLInputElement; play: HTMLElement } => {
+    document.body.innerHTML =
+      '<button data-testid="control-button-playpause" aria-label="Pausar"></button>' +
+      '<div data-testid="volume-bar"><input type="range" min="0" max="1" step="0.01" value="0.6"></div>' +
+      '<div data-testid="playback-progressbar"><input type="range" min="0" max="200000" value="30000"></div>' +
+      '<div data-testid="context-item-info-title">Tema UI</div><div data-testid="context-item-info-subtitles">Banda UI</div>';
+    return {
+      vol: document.querySelector('[data-testid="volume-bar"] input')!,
+      prog: document.querySelector('[data-testid="playback-progressbar"] input')!,
+      play: document.querySelector('[data-testid="control-button-playpause"]')!,
+    };
+  };
+
+  test('lee estado, título y posición de la interfaz', () => {
+    mountUi();
+    const s = readState('spotify', 1)!;
+    expect(s).toMatchObject({ title: 'Tema UI', artist: 'Banda UI', playing: true, volume: 0.6, muted: false, position: 30, duration: 200 });
+  });
+
+  test('volumen, silencio (con vuelta al volumen anterior), posición y adelantar usan los controles', () => {
+    const { vol, prog } = mountUi();
+    expect(runCommand('spotify', 'volume', 0.3)).toBe(true);
+    expect(vol.value).toBe('0.3');
+    runCommand('spotify', 'mute');
+    expect(vol.value).toBe('0');
+    expect(readState('spotify')!.muted).toBe(true);
+    runCommand('spotify', 'mute');
+    expect(vol.value).toBe('0.3');
+    runCommand('spotify', 'seek', 100);
+    expect(prog.value).toBe('100000');
+    runCommand('spotify', 'skip', 5);
+    expect(prog.value).toBe('105000');
+    runCommand('spotify', 'skip', -500);
+    expect(prog.value).toBe('0');
+  });
+});
+
+test('adelantar y retroceder con un reproductor propio acota a la duración', () => {
+  const media = mountMedia({ currentTime: 10, duration: 20 });
+  runCommand('ytmusic', 'skip', 5);
+  expect(media.currentTime).toBe(15);
+  runCommand('ytmusic', 'skip', 99);
+  expect(media.currentTime).toBe(20);
+  runCommand('ytmusic', 'skip', -99);
+  expect(media.currentTime).toBe(0);
+});

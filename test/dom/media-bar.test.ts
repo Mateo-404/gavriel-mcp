@@ -138,3 +138,14 @@ describe('media-bar (DOM)', () => {
     expect(sent).toEqual([{ type: 'media-command', tabId: 5, action: 'seek', value: 100 }]);
   });
 });
+
+test('adelantar y retroceder 5 segundos mandan skip', () => {
+  mountTopbar();
+  bar.update([tab(9)]);
+  (bar.root.querySelector('[aria-label="Adelantar 5 segundos"]') as HTMLElement).click();
+  (bar.root.querySelector('[aria-label="Retroceder 5 segundos"]') as HTMLElement).click();
+  expect(sent).toEqual([
+    { type: 'media-command', tabId: 9, action: 'skip', value: 5 },
+    { type: 'media-command', tabId: 9, action: 'skip', value: -5 },
+  ]);
+});

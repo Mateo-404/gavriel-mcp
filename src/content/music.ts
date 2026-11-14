@@ -51,9 +51,86 @@ const clickFirst = (selectors: readonly string[]): boolean => {
   return false;
 };
 
+/**
+ * Spotify Web suele ser solo el control remoto de la app de escritorio (Spotify Connect): entonces la
+ * pestaña no tiene <audio> propio y todo se lee y se maneja desde la interfaz del reproductor.
+ */
+const SPOTIFY_UI = {
+  play: '[data-testid="control-button-playpause"]',
+  volume: '[data-testid="volume-bar"] input[type="range"]',
+  progress: '[data-testid="playback-progressbar"] input[type="range"]',
+  title: '[data-testid="context-item-info-title"]',
+  artist: '[data-testid="context-item-info-subtitles"], [data-testid="context-item-info-artist"]',
+};
+
+const spotifyRange = (selector: string): HTMLInputElement | null => document.querySelector<HTMLInputElement>(selector);
+
+/** Cambia un <input type=range> de React: hay que usar el setter nativo y avisar. */
+function setRange(input: HTMLInputElement, value: number): void {
+  Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(input, String(value));
+  input.dispatchEvent(new Event('input', { bubbles: true }));
+  input.dispatchEvent(new Event('change', { bubbles: true }));
+}
+
+/** Volumen que había antes de silenciar (el silencio de Spotify se simula con volumen 0). */
+let volumeBeforeMute = 0.5;
+
+function readSpotifyUi(): Pick<MediaState, 'playing' | 'volume' | 'muted' | 'position' | 'duration'> | null {
+  const play = document.querySelector<HTMLElement>(SPOTIFY_UI.play);
+  if (!play) return null;
+  const volume = spotifyRange(SPOTIFY_UI.volume);
+  const progress = spotifyRange(SPOTIFY_UI.progress);
+  const vol = volume ? Number(volume.value) : 1;
+  return {
+    playing: /paus/i.test(play.getAttribute('aria-label') ?? ''),
+    volume: Number.isFinite(vol) ? vol : 1,
+    muted: vol === 0,
+    position: progress ? Number(progress.value) / 1000 : 0,
+    duration: progress ? Number(progress.max) / 1000 : 0,
+  };
+}
+
+function runSpotifyUi(action: MediaAction, value?: number): boolean | null {
+  const volume = spotifyRange(SPOTIFY_UI.volume);
+  const progress = spotifyRange(SPOTIFY_UI.progress);
+  const ok = typeof value === 'number' && Number.isFinite(value);
+  switch (action) {
+    case 'volume':
+      if (!volume || !ok) return false;
+      setRange(volume, Math.min(1, Math.max(0, value)));
+      return true;
+    case 'mute': {
+      if (!volume) return false;
+      const now = Number(volume.value);
+      if (now > 0) {
+        volumeBeforeMute = now;
+        setRange(volume, 0);
+      } else setRange(volume, volumeBeforeMute || 0.5);
+      return true;
+    }
+    case 'seek':
+      if (!progress || !ok) return false;
+      setRange(progress, Math.min(Number(progress.max), Math.max(0, value * 1000)));
+      return true;
+    case 'skip':
+      if (!progress || !ok) return false;
+      setRange(progress, Math.min(Number(progress.max), Math.max(0, Number(progress.value) + value * 1000)));
+      return true;
+    default:
+      return null; // reproducir, anterior y siguiente siguen por los botones de siempre
+  }
+}
+
 export function readState(source: MediaSource, now = Date.now()): MediaState | null {
   const meta = navigator.mediaSession?.metadata;
   const media = mediaElement();
+  if (source === 'spotify' && !media?.currentSrc) {
+    const ui = readSpotifyUi();
+    if (ui) {
+      const text = (sel: string): string => document.querySelector(sel)?.textContent?.trim() ?? '';
+      return { source, title: meta?.title || text(SPOTIFY_UI.title), artist: meta?.artist || text(SPOTIFY_UI.artist), ...ui, at: now };
+    }
+  }
   if (!meta && !media) return null;
   const playing = navigator.mediaSession?.playbackState === 'playing' || (!!media && !media.paused && !media.ended);
   return {
@@ -71,7 +148,15 @@ export function readState(source: MediaSource, now = Date.now()): MediaState | n
 
 export function runCommand(source: MediaSource, action: MediaAction, value?: number): boolean {
   const media = mediaElement();
+  if (source === 'spotify' && !media?.currentSrc && document.querySelector(SPOTIFY_UI.play)) {
+    const handled = runSpotifyUi(action, value);
+    if (handled !== null) return handled;
+  }
   switch (action) {
+    case 'skip':
+      if (!media || typeof value !== 'number' || !Number.isFinite(value) || !Number.isFinite(media.duration)) return false;
+      media.currentTime = Math.min(media.duration, Math.max(0, media.currentTime + value));
+      return true;
     case 'toggle':
       if (clickFirst(ADAPTERS[source].toggle)) return true;
       if (!media) return false;

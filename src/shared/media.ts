@@ -4,7 +4,7 @@
  */
 
 export type MediaSource = 'spotify' | 'ytmusic';
-export type MediaAction = 'toggle' | 'next' | 'prev' | 'mute' | 'volume' | 'seek';
+export type MediaAction = 'toggle' | 'next' | 'prev' | 'mute' | 'volume' | 'seek' | 'skip';
 
 export interface MediaState {
   source: MediaSource;
@@ -99,4 +99,4 @@ export function sanitizeTabs(value: unknown, now = Date.now()): TabMedia[] {
 }
 
 export const isMediaAction = (value: unknown): value is MediaAction =>
-  value === 'toggle' || value === 'next' || value === 'prev' || value === 'mute' || value === 'volume' || value === 'seek';
+  value === 'toggle' || value === 'next' || value === 'prev' || value === 'mute' || value === 'volume' || value === 'seek' || value === 'skip';
