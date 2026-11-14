@@ -171,3 +171,7 @@ html[data-gv-lite][data-gv-alt] .monitoring-panel-event-card,
 html[data-gv-lite] .monitoring-panel-event-card[data-gv-focus] {
   content-visibility: visible;
 }
+/* Cada columna del tablero se redibuja por separado: una actualización no obliga a recalcular las demás */
+html[data-gv-lite] .monitoring-panel-column-card {
+  contain: layout style;
+}

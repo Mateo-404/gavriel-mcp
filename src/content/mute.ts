@@ -13,6 +13,7 @@
  * Comunicación con bridge.ts (mundo aislado), por atributos de <html> y un evento.
  */
 import { DEFAULT_SOUNDS, MUTE_ATTR, MUTED_SOUNDS_ATTR, SOUND_SEEN_EVENT } from '../shared/constants';
+import { isDebugNoise } from '../shared/console-filter';
 import { soundNameFromUrl } from '../shared/sounds';
 
 declare global {
@@ -32,6 +33,15 @@ interface Wanted {
 
 function main(): void {
   const root = document.documentElement;
+
+  // Modo ahorro: se descartan los mensajes de depuración con emoji de Gavriel (ver console-filter.ts)
+  for (const method of ['log', 'info', 'debug'] as const) {
+    const original = console[method].bind(console);
+    console[method] = (...args: unknown[]): void => {
+      if (root.hasAttribute('data-gv-lite') && isDebugNoise(args)) return;
+      original(...args);
+    };
+  }
 
   const enabled = (): boolean => root.getAttribute(MUTE_ATTR) !== '0';
   const mutedSounds = (): Set<string> => {
