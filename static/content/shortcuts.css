@@ -165,3 +165,9 @@ html[data-gv-lite] .monitoring-panel-event-card {
   content-visibility: auto;
   contain-intrinsic-size: auto 96px;
 }
+/* content-visibility recorta lo que sobresale de la tarjeta (pestaña Alt+N, anillo de la tarjeta marcada):
+   mientras se muestran esas marcas, las tarjetas se dibujan normales */
+html[data-gv-lite][data-gv-alt] .monitoring-panel-event-card,
+html[data-gv-lite] .monitoring-panel-event-card[data-gv-focus] {
+  content-visibility: visible;
+}
