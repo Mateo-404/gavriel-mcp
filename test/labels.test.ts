@@ -42,3 +42,24 @@ describe('digitFromKeyCode', () => {
     expect(digitFromKeyCode('Digit10')).toBeNull();
   });
 });
+
+import { filterFromLetterCode, shiftedDigit } from '../src/shared/labels';
+
+describe('filtros por letra y Shift+dígito', () => {
+  test('Alt+Q… elige el filtro N y se saltea E, D y F', () => {
+    expect(filterFromLetterCode('KeyQ')).toBe(1);
+    expect(filterFromLetterCode('KeyW')).toBe(2);
+    expect(filterFromLetterCode('KeyR')).toBe(3);
+    expect(filterFromLetterCode('KeyP')).toBe(9);
+    for (const code of ['KeyE', 'KeyD', 'KeyF', 'KeyC', 'Digit1']) expect(filterFromLetterCode(code)).toBeNull();
+  });
+
+  test('Shift+dígito por code o, si falta, por el símbolo', () => {
+    expect(shiftedDigit('Digit2', '@')).toBe(2);
+    expect(shiftedDigit('Numpad3', '3')).toBe(3);
+    expect(shiftedDigit('', '"')).toBe(2);
+    expect(shiftedDigit('', '!')).toBe(1);
+    expect(shiftedDigit('', '(')).toBe(8);
+    expect(shiftedDigit('KeyA', 'A')).toBeNull();
+  });
+});

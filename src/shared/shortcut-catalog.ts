@@ -38,7 +38,7 @@ export const SHORTCUTS: readonly Shortcut[] = [
     scope: 'panel',
     keys: ['Alt', 'Shift', '1…9'],
     chord: true,
-    description: 'Activa o desactiva el filtro N por tipo de evento (los botones de colores bajo el buscador), de izquierda a derecha.',
+    description: 'Activa o desactiva el filtro N por tipo de evento (los botones de colores bajo el buscador), de izquierda a derecha. Alternativa sin Shift: Alt+Q, W, R, T, Y, U, I, O, P.',
   },
   {
     scope: 'panel',

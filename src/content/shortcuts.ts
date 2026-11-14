@@ -39,7 +39,7 @@
  */
 import { DEFAULT_SETTINGS } from '../shared/constants';
 import { isArrowKey } from '../shared/grid';
-import { digitFromKeyCode, isHangupLabel, parseContactName } from '../shared/labels';
+import { digitFromKeyCode, filterFromLetterCode, isHangupLabel, parseContactName, shiftedDigit } from '../shared/labels';
 import { readSetting, touches } from '../shared/storage';
 import { accountIdFromLocation } from '../shared/routes';
 import { createEventsNav, FOCUS_ATTR } from './events-nav';
@@ -80,6 +80,8 @@ interface BadgeSpec {
 
 const SETTING = 'shortcutsEnabled' as const;
 const HINT_ATTR = 'data-gv-hint';
+/** Letra de cada filtro (ver FILTER_LETTER_CODES): la etiqueta que se muestra. */
+const FILTER_KEYS = ['Q', 'W', 'R', 'T', 'Y', 'U', 'I', 'O', 'P'];
 /** Atributo de <html> mientras se mantiene Alt: el CSS muestra solo entonces los indicadores Alt+N. */
 const ALT_ATTR = 'data-gv-alt';
 const LOCK_MS = 1500;
@@ -385,7 +387,7 @@ function main(): void {
       }
       if (events.active()) {
         panel.filters().forEach((chip, index) => {
-          wanted.set(chip, { text: `Alt+⇧${index + 1}`, place: 'inside', altOnly: true });
+          wanted.set(chip, { text: `Alt+⇧${index + 1} · Alt+${FILTER_KEYS[index]}`, place: 'inside', altOnly: true });
         });
         const clear = panel.clearButton();
         if (clear && !modalOpen()) wanted.set(clear, { text: 'Esc', place: 'inside', altOnly: false });
@@ -672,7 +674,7 @@ function main(): void {
     }
     // Alt + Shift + N: activa o desactiva el filtro N por tipo de evento (en el panel)
     if (event.altKey && event.shiftKey && !event.ctrlKey && !event.getModifierState('AltGraph')) {
-      const position = digitFromKeyCode(event.code);
+      const position = shiftedDigit(event.code, event.key);
       if (position && events.active()) {
         consume(event);
         if (modalOpen()) toast('Cerrá el menú o diálogo abierto para filtrar');
@@ -681,6 +683,17 @@ function main(): void {
       return;
     }
     if (event.shiftKey) return;
+
+    // Alt + Q/W/R/T/Y/U/I/O/P: lo mismo que Alt+Shift+1…9 (para teclados donde Alt+Shift cambia el idioma)
+    if (event.altKey && !event.ctrlKey && !event.getModifierState('AltGraph')) {
+      const letter = filterFromLetterCode(event.code);
+      if (letter && events.active() && !isEditable(event.target)) {
+        consume(event);
+        if (modalOpen()) toast('Cerrá el menú o diálogo abierto para filtrar');
+        else if (!panel.toggleFilter(letter)) toast(`No hay filtro ${letter}`);
+        return;
+      }
+    }
 
     // Mantener Alt solo (sin Ctrl/Shift/Meta): se muestran los indicadores Alt+N y, tras un
     // instante, se abre el menú de contactos
