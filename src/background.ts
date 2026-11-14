@@ -6,6 +6,21 @@
 import { readSettings, touches } from './shared/storage';
 import { CACHE_RULESET, FONTS_RULESET, syncSoundRules } from './shared/sound-rules';
 
+/** Deja a la vista (Ajustes y atributo de <html>) qué reglas quedaron activas, o por qué fallaron. */
+async function publishStatus(error?: unknown): Promise<void> {
+  try {
+    const [rulesets, dynamic] = await Promise.all([
+      chrome.declarativeNetRequest.getEnabledRulesets(),
+      chrome.declarativeNetRequest.getDynamicRules(),
+    ]);
+    await chrome.storage.local.set({
+      netStatus: { version: chrome.runtime.getManifest().version, rulesets, dynamic: dynamic.length, error: error ? String(error) : null },
+    });
+  } catch {
+    /* sin estado que publicar */
+  }
+}
+
 async function sync(): Promise<void> {
   try {
     const { mutedSounds, muteEnabled, cacheAssets, localFonts } = await readSettings();
@@ -15,8 +30,10 @@ async function sync(): Promise<void> {
       enableRulesetIds: [cacheAssets && CACHE_RULESET, localFonts && FONTS_RULESET].filter((id): id is string => !!id),
       disableRulesetIds: [!cacheAssets && CACHE_RULESET, !localFonts && FONTS_RULESET].filter((id): id is string => !!id),
     });
+    await publishStatus();
   } catch (error) {
     console.warn('[Gavriel Tools] no se pudo actualizar el bloqueo de sonidos:', error);
+    await publishStatus(error);
   }
 }
 

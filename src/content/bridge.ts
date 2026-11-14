@@ -33,7 +33,18 @@ function apply(settings: Pick<Settings, 'muteEnabled' | 'mutedSounds'>): void {
   root.setAttribute(MUTED_SOUNDS_ATTR, JSON.stringify(settings.mutedSounds));
 }
 
+/** Estado de las reglas de red que publica el fondo: visible en <html data-gv-net> para diagnosticar. */
+async function showNetStatus(): Promise<void> {
+  try {
+    const { netStatus } = await chrome.storage.local.get('netStatus');
+    if (netStatus) root.setAttribute('data-gv-net', JSON.stringify(netStatus));
+  } catch {
+    /* contexto invalidado */
+  }
+}
+
 async function load(): Promise<void> {
+  void showNetStatus();
   const settings = await readSettings();
   apply(settings);
   applyLook(settings);
@@ -44,6 +55,7 @@ apply(DEFAULT_SETTINGS); // valores por defecto hasta leer lo guardado
 void load();
 
 chrome.storage.onChanged.addListener((changes, area) => {
+  if (area === 'local' && 'netStatus' in changes) void showNetStatus();
   if (touches(changes, area, 'muteEnabled', 'mutedSounds', 'hideSoundBanner', 'plainEvents', 'hideGridView', 'liteMode', 'localFonts')) void load();
 });
 

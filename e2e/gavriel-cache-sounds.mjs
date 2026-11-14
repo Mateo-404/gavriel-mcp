@@ -160,6 +160,7 @@ try {
   out.altCToast = await toast();
   out.altCClipboard = await evalJs(`navigator.clipboard.readText().catch(e=>'error:'+e.message)`);
   out.contentScriptAttrs = await evalJs(`document.documentElement.getAttributeNames().filter(a=>a.startsWith('data-gv')||a.startsWith('data-gavriel')).join(',')`);
+  out.netStatus = await evalJs(`document.documentElement.getAttribute('data-gv-net')`);
   ws.close();
 } catch (e) {
   out.error = String(e);
@@ -188,6 +189,10 @@ assert.equal(out.altShiftToast, 'Copiado: Beto Gómez', 'Alt+Shift debía copiar
 assert.equal(out.altShiftClipboard, 'Beto Gómez');
 // Windows entrega el portapapeles con CRLF
 assert.equal(out.altCClipboard.replaceAll(String.fromCharCode(13, 10), String.fromCharCode(10)), 'Estimado/a cliente: *MERLO FERNANDO*\nAlarma de: *J. M. NOLLI 1820, RAFAELA · Santa Fe*');
+const net = JSON.parse(out.netStatus ?? '{}');
+assert.deepEqual([...(net.rulesets ?? [])].sort(), ['cache', 'fonts'], 'el fondo debe publicar las reglas activas');
+assert.equal(net.dynamic, 3, 'el fondo debe publicar los sonidos bloqueados');
+assert.equal(net.error, null);
 assert.match(out.contentScriptAttrs, /data-gavriel-mute/, 'los content scripts no arrancaron');
 console.log('OK: caché, bloqueo de sonidos y content scripts verificados');
 process.exit(0);
