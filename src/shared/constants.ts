@@ -18,6 +18,8 @@ export type Settings = {
   hideGridView: boolean;
   /** Modo ahorro: sin desenfoque ni animaciones continuas y con dibujado perezoso de las tarjetas. */
   liteMode: boolean;
+  /** Guarda en el navegador los archivos con hash de Gavriel (el servidor pide no guardarlos nunca). */
+  cacheAssets: boolean;
   /** Nombres (sin extensión) de los sonidos de /sounds/ que se silencian. */
   mutedSounds: string[];
   /** Sonidos que Gavriel ya reprodujo (lista que muestra el popup). */
@@ -41,6 +43,7 @@ export const DEFAULT_SETTINGS: Settings = {
   plainEvents: true,
   hideGridView: true,
   liteMode: true,
+  cacheAssets: true,
   mutedSounds: [...DEFAULT_SOUNDS],
   knownSounds: [...DEFAULT_SOUNDS],
 };

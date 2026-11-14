@@ -37,6 +37,9 @@ export function buildRules(mutedSounds: readonly string[], enabled: boolean): Bl
   }));
 }
 
+/** Identificador del conjunto de reglas estáticas de caché (static/rules/cache.json). */
+export const CACHE_RULESET = 'cache';
+
 /** Lo mínimo de chrome.declarativeNetRequest que se usa (permite probarlo sin navegador). */
 export interface RulesApi {
   updateDynamicRules(options: { removeRuleIds: number[]; addRules: BlockRule[] }): Promise<void>;

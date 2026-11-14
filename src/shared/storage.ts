@@ -21,6 +21,7 @@ export function sanitizeSettings(raw: Record<string, unknown>): Settings {
     plainEvents: typeof raw.plainEvents === 'boolean' ? raw.plainEvents : DEFAULT_SETTINGS.plainEvents,
     hideGridView: typeof raw.hideGridView === 'boolean' ? raw.hideGridView : DEFAULT_SETTINGS.hideGridView,
     liteMode: typeof raw.liteMode === 'boolean' ? raw.liteMode : DEFAULT_SETTINGS.liteMode,
+    cacheAssets: typeof raw.cacheAssets === 'boolean' ? raw.cacheAssets : DEFAULT_SETTINGS.cacheAssets,
     mutedSounds: isNames(raw.mutedSounds) ? raw.mutedSounds : [...DEFAULT_SETTINGS.mutedSounds],
     knownSounds: isNames(raw.knownSounds) ? raw.knownSounds : [...DEFAULT_SETTINGS.knownSounds],
   };

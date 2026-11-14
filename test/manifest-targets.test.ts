@@ -4,13 +4,13 @@ import { FIREFOX_ID, FIREFOX_MIN_VERSION, forChrome, forFirefox, type Manifest }
 const base = (await Bun.file('static/manifest.json').json()) as Manifest;
 
 describe('manifest por navegador', () => {
-  test('Chrome: versión y versión mínima, sin claves de Firefox', () => {
+  test('Chrome: versión, versión mínima y permiso del sitio, sin claves de Firefox', () => {
     const chrome = forChrome(base, '1.2.3');
     expect(chrome.version).toBe('1.2.3');
     expect(chrome.minimum_chrome_version).toBe('120');
     expect(chrome.background).toEqual({ service_worker: 'background.js' });
     expect(chrome.browser_specific_settings).toBeUndefined();
-    expect(chrome.host_permissions).toBeUndefined();
+    expect(chrome.host_permissions).toEqual(['https://app.gavriel.com.ar/*']); // cambiar cabeceras exige permiso del sitio
   });
 
   test('Firefox: id, versión mínima, sin recolección de datos y permiso del sitio', () => {

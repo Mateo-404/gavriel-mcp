@@ -16,6 +16,8 @@ export function forChrome(base: Manifest, version: string): Manifest {
     version,
     minimum_chrome_version: CHROME_MIN_VERSION,
     background: { service_worker: 'background.js' },
+    // Cambiar cabeceras de respuesta (caché) exige permiso sobre el sitio
+    host_permissions: [SITE],
   };
 }
 

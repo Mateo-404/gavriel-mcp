@@ -4,6 +4,9 @@
   "version": "0.0.0",
   "description": "Herramientas extra para Gavriel: silenciar los sonidos del panel de monitoreo y atajos de teclado para llamar.",
   "permissions": ["storage", "declarativeNetRequest"],
+  "declarative_net_request": {
+    "rule_resources": [{ "id": "cache", "enabled": true, "path": "rules/cache.json" }]
+  },
   "options_ui": {
     "page": "options/options.html",
     "open_in_tab": true
