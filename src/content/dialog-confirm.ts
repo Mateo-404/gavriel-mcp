@@ -7,7 +7,7 @@
  * hasta completar los campos obligatorios. Se hace exactamente lo que haría un clic: si el botón
  * está deshabilitado no se fuerza nada, solo se avisa.
  */
-import { type FooterButton, pickPrimary } from '../shared/dialog';
+import { type FooterButton, pickDismiss, pickPrimary } from '../shared/dialog';
 
 /** Solo los diálogos modales de Gavriel: el panel «Detalle de …» del mapa también es role="dialog" pero no es modal. */
 const DIALOG = '[data-slot="dialog-content"], [role="alertdialog"]';
@@ -23,6 +23,10 @@ interface Deps {
 export interface DialogConfirm {
   /** Botón principal del diálogo que está arriba de todo, o null. */
   primary: () => HTMLButtonElement | null;
+  /** Botón de salida («Cancelar», «Cerrar»…) del diálogo de arriba, o null. */
+  dismissButton: () => HTMLButtonElement | null;
+  /** Aprieta el botón de salida. Devuelve true si lo hizo (la tecla se consume). */
+  dismiss: () => boolean;
   /** Aprieta el botón principal. Devuelve true si había uno (la tecla se consume). */
   confirm: () => boolean;
 }
@@ -32,17 +36,33 @@ export function createDialogConfirm({ visible, ownText, toast }: Deps): DialogCo
 
   const topDialog = (): Element | undefined => [...document.querySelectorAll(DIALOG)].filter(visible).pop();
 
-  const primary = (): HTMLButtonElement | null => {
+  const footerButtons = (): HTMLButtonElement[] => {
     const dialog = topDialog();
-    if (!dialog) return null;
+    if (!dialog) return [];
     const scope = dialog.querySelector(FOOTER) ?? dialog;
-    const buttons = [...scope.querySelectorAll<HTMLButtonElement>('button')].filter(visible);
-    const info: FooterButton[] = buttons.map((b) => ({ className: b.className, label: ownText(b) }));
-    return buttons[pickPrimary(info)] ?? null;
+    return [...scope.querySelectorAll<HTMLButtonElement>('button')].filter(visible);
+  };
+  const info = (buttons: HTMLButtonElement[]): FooterButton[] =>
+    buttons.map((b) => ({ className: b.className, label: ownText(b) }));
+
+  const primary = (): HTMLButtonElement | null => {
+    const buttons = footerButtons();
+    return buttons[pickPrimary(info(buttons))] ?? null;
+  };
+  const dismissButton = (): HTMLButtonElement | null => {
+    const buttons = footerButtons();
+    return buttons[pickDismiss(info(buttons))] ?? null;
   };
 
   return {
     primary,
+    dismissButton,
+    dismiss() {
+      const button = dismissButton();
+      if (!button || button.disabled) return false; // sin botón de salida (o ocupado) Esc queda para Radix
+      button.click();
+      return true;
+    },
     confirm() {
       const button = primary();
       if (!button) return false;

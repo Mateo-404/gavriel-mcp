@@ -18,6 +18,11 @@ const PRIMARY_TOKENS = ['bg-primary', 'bg-destructive'];
  * `ghost`/`outline` y las opciones alternativas son `secondary`. Si hay más de un candidato no se
  * adivina: ningún atajo es mejor que confirmar la acción equivocada.
  */
+/** Índice del botón de salida («Cancelar», «Cerrar»…) del pie de un diálogo, o -1. Si hay varios, el primero. */
+export function pickDismiss(buttons: readonly FooterButton[]): number {
+  return buttons.findIndex((b) => DISMISS.test(b.label.trim()));
+}
+
 export function pickPrimary(buttons: readonly FooterButton[]): number {
   const found: number[] = [];
   buttons.forEach((button, index) => {

@@ -66,6 +66,12 @@ export const SHORTCUTS: readonly Shortcut[] = [
   },
   {
     scope: 'cuenta',
+    keys: ['Esc'],
+    chord: false,
+    description: 'Vuelve al panel («Volver a panel»). No actúa mientras escribís, con un menú o diálogo abierto ni en pantalla completa.',
+  },
+  {
+    scope: 'cuenta',
     keys: ['Alt', 'C'],
     chord: true,
     description: 'Copia «Estimado/a cliente: *cuenta*» y «Alarma de: *dirección*» (dos líneas) para pegarlo en el mensaje.',
@@ -75,6 +81,12 @@ export const SHORTCUTS: readonly Shortcut[] = [
     keys: ['Alt', 'Shift'],
     chord: true,
     description: 'Copia el nombre de la última persona a la que llamaste.',
+  },
+  {
+    scope: 'llamadas',
+    keys: ['Esc'],
+    chord: false,
+    description: 'Con un diálogo abierto, aprieta su botón de salida («Cancelar» o «Cerrar»), también mientras escribís.',
   },
   {
     scope: 'llamadas',

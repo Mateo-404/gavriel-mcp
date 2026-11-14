@@ -46,3 +46,21 @@ describe('pickPrimary', () => {
     expect(pickPrimary([{ className: 'bg-primary/10 text-primary', label: 'Algo' }])).toBe(-1);
   });
 });
+
+import { pickDismiss } from '../src/shared/dialog';
+
+describe('pickDismiss', () => {
+  test('Cancelar es el botón de salida', () => {
+    expect(pickDismiss([{ className: ghost, label: 'Cancelar' }, { className: primary, label: 'Confirmar' }])).toBe(0);
+  });
+
+  test('Cerrar también, y con varios gana el primero', () => {
+    expect(pickDismiss([{ className: primary, label: 'Guardar' }, { className: ghost, label: ' Cerrar ' }])).toBe(1);
+    expect(pickDismiss([{ className: ghost, label: 'Cancelar' }, { className: ghost, label: 'Cancelar' }])).toBe(0);
+  });
+
+  test('sin botón de salida no hay atajo (Esc queda para el diálogo)', () => {
+    expect(pickDismiss([{ className: primary, label: 'Listo' }])).toBe(-1);
+    expect(pickDismiss([])).toBe(-1);
+  });
+});

@@ -226,6 +226,22 @@ function main(): void {
   const findCloseIntervention = (): HTMLButtonElement | undefined =>
     buttons().find((b) => !b.disabled && ownText(b) === 'Cerrar intervención' && visible(b));
 
+  /** «Volver a panel» de la cuenta (a veces solo con el ícono: se reconoce por su aria-label). */
+  const backButton = (): HTMLButtonElement | null => {
+    const b = document.querySelector<HTMLButtonElement>('button[aria-label="Volver a panel"]');
+    return b && !b.disabled && visible(b) ? b : null;
+  };
+
+  /** Esc vuelve al panel desde una cuenta, salvo que esté escribiendo, haya un menú o diálogo, o pantalla completa. */
+  const canGoBack = (target: EventTarget | null): boolean =>
+    !!accountIdFromLocation(location.pathname, location.search) &&
+    !modalOpen() &&
+    !dialogOpen() &&
+    !document.fullscreenElement &&
+    !isEditable(target) &&
+    !(target instanceof Element && target.closest('[role="menu"], [role="listbox"], [role="combobox"]')) &&
+    backButton() !== null;
+
   const dialInput = (): HTMLInputElement | null => document.querySelector<HTMLInputElement>(DIAL_INPUT);
 
   const dialButtonFor = (input: HTMLElement): HTMLButtonElement | null => {
@@ -321,23 +337,31 @@ function main(): void {
   };
 
   /** Deja exactamente los indicadores que corresponden; no toca el DOM si ya están bien. */
-  /** Con un diálogo abierto solo se mantiene el indicador de su botón principal. */
-  let dialogBadgeHost: Element | undefined;
+  /** Con un diálogo abierto solo se mantienen los indicadores de sus botones: principal (Ctrl+Enter) y salir (Esc). */
+  const dialogBadgeHosts = new Map<Element, string>();
   const syncDialogBadge = (): void => {
-    const target = enabled ? dialogConfirm.primary() : null;
-    if (dialogBadgeHost && dialogBadgeHost !== target) {
-      shown.get(dialogBadgeHost)?.remove();
-      shown.delete(dialogBadgeHost);
-      dialogBadgeHost = undefined;
+    const wantedNow = new Map<Element, string>();
+    if (enabled) {
+      const main = dialogConfirm.primary();
+      const out = dialogConfirm.dismissButton();
+      if (main) wantedNow.set(main, 'Ctrl+Enter');
+      if (out) wantedNow.set(out, 'Esc');
     }
-    if (!target) return;
-    let badge = shown.get(target);
-    if (!badge) {
-      badge = makeBadge({ text: 'Ctrl+Enter', place: 'inside', altOnly: false });
-      shown.set(target, badge);
+    for (const host of [...dialogBadgeHosts.keys()]) {
+      if (wantedNow.get(host) === dialogBadgeHosts.get(host)) continue;
+      shown.get(host)?.remove();
+      shown.delete(host);
+      dialogBadgeHosts.delete(host);
     }
-    if (!badge.isConnected) place(target, badge, 'inside');
-    dialogBadgeHost = target;
+    for (const [host, text] of wantedNow) {
+      let badge = shown.get(host);
+      if (!badge) {
+        badge = makeBadge({ text, place: 'inside', altOnly: false });
+        shown.set(host, badge);
+      }
+      if (!badge.isConnected) place(host, badge, 'inside');
+      dialogBadgeHosts.set(host, text);
+    }
   };
 
   const decorate = guard('indicadores', (): void => {
@@ -366,6 +390,8 @@ function main(): void {
         const clear = panel.clearButton();
         if (clear && !modalOpen()) wanted.set(clear, { text: 'Esc', place: 'inside', altOnly: false });
       }
+      const back = accountIdFromLocation(location.pathname, location.search) ? backButton() : null;
+      if (back && !modalOpen()) wanted.set(back, { text: 'Esc', place: 'inside', altOnly: false });
       const action = plan();
       const target =
         action === 'confirm'
@@ -702,9 +728,16 @@ function main(): void {
         consume(event);
         return;
       }
-      if (event.key === 'Escape') {
+      if (event.key === 'Escape' && dialogOpen()) {
+        // Esc en un diálogo = su botón de salida («Cancelar»); si no tiene, Radix lo cierra solo
+        if (dialogConfirm.dismiss()) consume(event);
+      } else if (event.key === 'Escape') {
         if (events.hasFocus()) events.clear(); // sin consumir: Gavriel también la usa
         else if (events.active() && !modalOpen() && !isEditable(event.target) && panel.clearFilters()) consume(event);
+        else if (canGoBack(event.target)) {
+          consume(event);
+          backButton()?.click();
+        }
       }
     }
 
