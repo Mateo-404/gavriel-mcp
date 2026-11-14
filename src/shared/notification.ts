@@ -1,4 +1,4 @@
-import { ALERT_LABELS, type Alert, type AlertType } from './event-alerts';
+import { ALERT_EMOJI, ALERT_LABELS, type Alert, type AlertType } from './event-alerts';
 
 export interface NotificationSpec {
   /** Estable por cuenta+código+cantidad: varias pestañas de Gavriel producen el mismo id y Chrome lo reemplaza. */
@@ -18,7 +18,7 @@ export function buildNotification(alert: Alert, total: number): NotificationSpec
   const who = alert.accountNumber ? `${alert.accountName} · #${alert.accountNumber}` : alert.accountName;
   return {
     id: `gv-alert-${alert.accountId}-${alert.code}-${total}`,
-    title: `${alert.type} · ${ALERT_LABELS[alert.type]}${more}`,
+    title: `${ALERT_EMOJI[alert.type]} ${alert.type} · ${ALERT_LABELS[alert.type]}${more}`,
     message: who || 'Cuenta sin nombre',
     contextMessage: [alert.code, alert.codeName, alert.zone && `Zona ${alert.zone}`].filter(Boolean).join(' · '),
     requireInteraction: EMERGENCY.includes(alert.type),

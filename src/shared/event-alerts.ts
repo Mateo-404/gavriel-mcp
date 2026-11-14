@@ -20,6 +20,9 @@ export const ALERT_LABELS: Readonly<Record<AlertType, string>> = {
   INC: 'Incendio',
 };
 
+/** Emoji que encabeza el título del aviso, para reconocer el tipo de un vistazo. */
+export const ALERT_EMOJI: Readonly<Record<AlertType, string>> = { BUR: '🚨', PAN: '🆘', MED: '🩺', INC: '🔥', POW: '⚡' };
+
 /** Color de cada tipo en el aviso (el ícono de la notificación se tiñe con él). */
 export const ALERT_COLORS: Readonly<Record<AlertType, string>> = {
   BUR: '#e5383b', // rojo

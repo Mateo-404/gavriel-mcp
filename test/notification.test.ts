@@ -18,7 +18,7 @@ const alert = (over: Partial<Alert> = {}): Alert => ({
 describe('buildNotification', () => {
   test('título con el tipo, cuenta y detalle', () => {
     const spec = buildNotification(alert(), 1);
-    expect(spec.title).toBe('BUR · Robo / intrusión');
+    expect(spec.title).toBe('🚨 BUR · Robo / intrusión');
     expect(spec.message).toBe('MERLO FERNANDO · #2904');
     expect(spec.contextMessage).toBe('E130 · Burglary · Zona 3 - OFICINA');
     expect(spec.accountId).toBe('acc1');
@@ -26,7 +26,7 @@ describe('buildNotification', () => {
 
   test('si entraron varios, lo dice; sin número de cuenta ni zona no deja huecos', () => {
     const spec = buildNotification(alert({ added: 3, accountNumber: '', zone: '' }), 1);
-    expect(spec.title).toBe('BUR · Robo / intrusión (+3)');
+    expect(spec.title).toBe('🚨 BUR · Robo / intrusión (+3)');
     expect(spec.message).toBe('MERLO FERNANDO');
     expect(spec.contextMessage).toBe('E130 · Burglary');
   });
