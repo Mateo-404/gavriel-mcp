@@ -65,6 +65,10 @@ export const SOUND_SEEN_EVENT = 'gavriel:sound-seen';
 export const TAP_EVENT = 'gavriel:tap';
 export const TAP_REPLAY_EVENT = 'gavriel:tap-replay';
 
+/** Pedido (aislado -> página) y respuesta (página -> aislado) para colgar/atender/rechazar (sip-bridge.ts). */
+export const SIP_REQUEST_EVENT = 'gavriel:sip-request';
+export const SIP_RESULT_EVENT = 'gavriel:sip-result';
+
 /** Nombres de sonido aceptados al guardarlos (evita guardar basura de la página). */
 export const SOUND_NAME_PATTERN = /^[\w.-]{1,40}$/;
 

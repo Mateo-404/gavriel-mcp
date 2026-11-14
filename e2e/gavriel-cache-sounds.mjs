@@ -46,6 +46,10 @@ const server = createServer({ key: readFileSync(join(scratch, 'k.pem')), cert: r
     res.writeHead(200, { 'content-type': 'application/json', 'x-new-token': 'token-nuevo', etag: 'W/"acc"' });
     return res.end(JSON.stringify({ id: 'acc1', name: 'MERLO FERNANDO', accountNumber: '2904', address: 'J. M. NOLLI 1820', city: 'RAFAELA', state: 'Santa Fe', accountContacts: [{ order: 1, name: 'Ana Pérez', phone: '3416636288', description: 'Titular' }, { order: 2, name: 'Beto Gómez', phone: '3415016202', description: 'Hijo' }] }));
   }
+  if (path === '/__react.js' || path === '/__react-dom.js') {
+    res.writeHead(200, { 'content-type': 'application/javascript' });
+    return res.end(readFileSync(join(process.cwd(), path === '/__react.js' ? 'node_modules/react/umd/react.production.min.js' : 'node_modules/react-dom/umd/react-dom.production.min.js')));
+  }
   if (path === '/__axios.js') {
     res.writeHead(200, { 'content-type': 'application/javascript' });
     return res.end(readFileSync(join(process.cwd(), 'node_modules/axios/dist/axios.min.js')));
@@ -67,6 +71,36 @@ const server = createServer({ key: readFileSync(join(scratch, 'k.pem')), cert: r
 <p style="font-family:Geist,sans-serif">Atención: señal perdida · Ñandú</p><code style="font-family:'Geist Mono',monospace">E130</code>
 <script>fetch('/api/accounts/acc1').then(r=>r.json());fetch('/api/sip/calls?page=1&limit=30').then(r=>r.json());</script>
 <script src="/__axios.js"></script>
+<script src="/__react.js"></script>
+<script src="/__react-dom.js"></script>
+<script>
+window.__sipClicks = { hangup: 0, panel: 0, colgar: 0 };
+window.__mountSip = () => {
+  const h = React.createElement;
+  const Ctx = React.createContext(null);
+  function SipProvider({ children }) {
+    const [calling, setCalling] = React.useState(true);
+    const value = React.useMemo(() => ({
+      status: 'registrado', connected: true, calling, incoming: null,
+      call: () => {}, answer: () => {}, reject: () => {},
+      hangup: () => { window.__sipClicks.hangup++; setCalling(false); },
+    }), [calling]);
+    return h(Ctx.Provider, { value }, h('audio', { autoPlay: true, playsInline: true, style: { display: 'none' } }), children);
+  }
+  function Fab() {
+    const sip = React.useContext(Ctx);
+    // Como en Gavriel: el botón flotante se pone rojo durante la llamada; «Colgar» solo existe dentro del panel
+    return h('div', { className: 'fixed' }, h('button', {
+      'aria-label': sip.calling ? 'Abrir softphone' : 'Abrir softphone',
+      className: sip.calling ? 'bg-destructive' : '',
+      onClick: () => { window.__sipClicks.panel++; },
+    }, 'tel'));
+  }
+  const root = document.createElement('div');
+  document.body.append(root);
+  ReactDOM.createRoot(root).render(h(SipProvider, null, h(Fab)));
+};
+</script>
 <script src="/assets/index-ABCD1234.js"></script>
 <script src="/assets/plain.js"></script>
 <script>
@@ -201,6 +235,14 @@ try {
   out.axiosHitsAfterWrite = (hits['/api/accounts/acc1'] ?? 0) - before;
   await run(`await axios.get('/api/accounts/acc1', { headers: { Authorization: 'Bearer otra-sesion' } });`);
   out.axiosHitsOtherSession = (hits['/api/accounts/acc1'] ?? 0) - before;
+  // --- Colgar: Ctrl+Enter llama a hangup() del contexto de React, sin abrir el panel ni cambiar de pestaña
+  await evalJs('window.__mountSip()');
+  await sleep(500);
+  await key('keyDown', 'Control', 'ControlLeft', 17, 2); await key('keyDown', 'Enter', 'Enter', 13, 2);
+  await key('keyUp', 'Enter', 'Enter', 13, 2); await key('keyUp', 'Control', 'ControlLeft', 17, 0);
+  await sleep(500);
+  out.sipClicks = await evalJs('window.__sipClicks');
+  out.sipToast = await toast();
   out.netStatus = await evalJs(`document.documentElement.getAttribute('data-gv-net')`);
   ws.close();
 } catch (e) {
@@ -239,6 +281,9 @@ assert.equal(out.axiosHitsAfterWrite, 2, 'después de una escritura el pedido de
 assert.equal(out.axiosHitsOtherSession, 3, 'otra sesión nunca recibe la copia de la primera');
 assert.equal(out.fontNoCorsFetch, 'bloqueado', 'el pedido sin destino de hoja de estilo también debe bloquearse');
 assert.equal(out.fontLinkWithoutNetworkDomain, 'bloqueado');
+assert.equal(out.sipClicks.hangup, 1, 'Ctrl+Enter debía llamar una vez a hangup() del softphone');
+assert.equal(out.sipClicks.panel, 0, 'no debía abrir el panel del softphone');
+assert.equal(out.sipToast, 'Llamada cortada');
 const net = JSON.parse(out.netStatus ?? '{}');
 assert.deepEqual([...(net.rulesets ?? [])].sort(), ['cache', 'fonts'], 'el fondo debe publicar las reglas activas');
 assert.equal(net.dynamic, 3, 'el fondo debe publicar los sonidos bloqueados');

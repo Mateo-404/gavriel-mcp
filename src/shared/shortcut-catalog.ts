@@ -93,7 +93,7 @@ export const SHORTCUTS: readonly Shortcut[] = [
     keys: ['Ctrl', 'Enter'],
     chord: true,
     description:
-      'Con un diálogo abierto (Cerrar intervención, Dejar en observación, Procesar masivo…) aprieta su botón principal, incluso escribiendo en un campo; si falta completar algo, avisa. Sin diálogo: corta la llamada en curso, atiende una entrante o llama desde el marcador. Sin llamada, en una cuenta intervenida, abre «Cerrar intervención» con el cursor en Resolución.',
+      'Con un diálogo abierto (Cerrar intervención, Dejar en observación, Procesar masivo…) aprieta su botón principal, incluso escribiendo en un campo; si falta completar algo, avisa. Sin diálogo: corta la llamada en curso al instante (llama a la función de colgar del softphone, sin abrir el panel), atiende una entrante o llama desde el marcador. Sin llamada, en una cuenta intervenida, abre «Cerrar intervención» con el cursor en Resolución.',
   },
 ];
 

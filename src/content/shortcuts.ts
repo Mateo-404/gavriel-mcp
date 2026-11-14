@@ -49,6 +49,7 @@ import { createDataStore } from './data-store';
 import { createDialogConfirm } from './dialog-confirm';
 import { createLastContact } from './last-contact';
 import { createPanelActions } from './panel-actions';
+import { createSipClient } from './sip';
 import { guard, watchDom } from './runtime';
 
 declare global {
@@ -302,6 +303,7 @@ function main(): void {
   });
   const panel = createPanelActions({ visible, ownText });
   const dialogConfirm = createDialogConfirm({ visible, ownText, toast });
+  const sip = createSipClient();
   const copyClientMessage = createClientCopy({
     visible,
     toast,
@@ -653,15 +655,30 @@ function main(): void {
     if (action === 'confirm') {
       dialogConfirm.confirm();
     } else if (action === 'hangup') {
-      if (!hangingUp) void hangUp();
+      if (hangingUp) return;
+      // Primero se llama a hangup() del softphone (lo mismo que hace «Colgar», sin abrir panel ni pestañas);
+      // si no se lo encuentra, se hace el recorrido por la interfaz de siempre
+      hangingUp = true;
+      void sip.run('hangup').then((direct) => {
+        hangingUp = false;
+        if (direct) {
+          toast('Llamada cortada');
+          schedule();
+        } else {
+          void hangUp();
+        }
+      });
     } else if (action === 'bulk') {
       toast('Procesar masivo: escribí el motivo');
       void panel.openBulk();
     } else if (action === 'close') {
       if (!closing) void openCloseIntervention();
     } else if (action === 'answer') {
-      toast('Atendiendo llamada…');
-      findAnswer()?.click();
+      void sip.run('answer').then((direct) => {
+        toast('Atendiendo llamada…');
+        if (!direct) findAnswer()?.click();
+        schedule();
+      });
     } else {
       const input = dialInput();
       const dial = input && dialButtonFor(input);
