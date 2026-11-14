@@ -10,7 +10,7 @@ const FONTS_URL = 'https://fonts.googleapis.com/css2?family=Geist:wght@400;500;6
 
 /**
  * Diagnóstico: le pregunta a Chrome qué haría con el pedido del CSS de Google Fonts (¿nuestra regla
- * coincide?) y qué reglas nuestras se dispararon de verdad en pedidos reales (getMatchedRules).
+ * coincide?). Lo que se dispara de verdad lo cuenta onRuleMatchedDebug (getMatchedRules tiene un cupo muy bajo).
  */
 async function diagnoseFonts(): Promise<Record<string, unknown>> {
   const out: Record<string, unknown> = {};
@@ -24,16 +24,6 @@ async function diagnoseFonts(): Promise<Record<string, unknown>> {
     out.testMatches = test.matchedRules.map((m) => `${m.rulesetId}#${m.ruleId}`);
   } catch (error) {
     out.testError = String(error);
-  }
-  try {
-    const { rulesMatchedInfo } = await chrome.declarativeNetRequest.getMatchedRules({});
-    const fonts = rulesMatchedInfo.filter((m) => m.rule.rulesetId === FONTS_RULESET);
-    out.fontsFired = fonts.length;
-    out.firedByRuleset = Object.fromEntries(
-      [...new Set(rulesMatchedInfo.map((m) => m.rule.rulesetId))].map((id) => [id, rulesMatchedInfo.filter((m) => m.rule.rulesetId === id).length]),
-    );
-  } catch (error) {
-    out.matchedError = String(error);
   }
   return out;
 }
