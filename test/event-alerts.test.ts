@@ -116,3 +116,10 @@ describe('limitBurst', () => {
     expect(r.summarized).toBe(2);
   });
 });
+
+import { ALERT_COLORS, ALERT_TYPES } from '../src/shared/event-alerts';
+test('cada tipo tiene su propio color', () => {
+  const colors = ALERT_TYPES.map((t) => ALERT_COLORS[t]);
+  expect(new Set(colors).size).toBe(ALERT_TYPES.length);
+  for (const c of colors) expect(c).toMatch(/^#[0-9a-f]{6}$/);
+});

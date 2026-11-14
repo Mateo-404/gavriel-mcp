@@ -20,6 +20,15 @@ export const ALERT_LABELS: Readonly<Record<AlertType, string>> = {
   INC: 'Incendio',
 };
 
+/** Color de cada tipo en el aviso (el ícono de la notificación se tiñe con él). */
+export const ALERT_COLORS: Readonly<Record<AlertType, string>> = {
+  BUR: '#e5383b', // rojo
+  PAN: '#c026d3', // magenta
+  MED: '#2563eb', // azul
+  INC: '#f97316', // naranja
+  POW: '#eab308', // ámbar
+};
+
 /** Rango de códigos Contact ID (los tres dígitos tras la «E») de cada tipo. */
 const CODE_RANGES: readonly { type: AlertType; test: (n: number) => boolean }[] = [
   { type: 'MED', test: (n) => n >= 100 && n <= 109 },
