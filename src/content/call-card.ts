@@ -30,6 +30,9 @@ function leafLines(root: Element): string[] {
   const lines: string[] = [];
   for (const el of root.querySelectorAll('*')) {
     if (el.children.length > 0 || el.closest('svg') || el.closest(`[${HINT_ATTR}]`)) continue;
+    // El texto de los botones de la tarjeta (llamar, SMS…) no es dato del contacto
+    const button = el.closest('button');
+    if (button && button !== root && root.contains(button)) continue;
     const text = el.textContent?.trim();
     if (text) lines.push(text);
   }

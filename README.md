@@ -32,6 +32,8 @@ siguen apareciendo en pantalla: solo se silencia el audio, y solo en el navegado
 
 **Al abrir una cuenta** (se puede desactivar cada cosa en Ajustes): entra directo a la pestaña **Contactos** y toca el ojito de **Clave** y **Contraclave**. Se aplica una sola vez por cuenta y solo si el botón existe: Gavriel dibuja el ojito únicamente si tu usuario tiene permiso para ver la clave.
 
+Rendimiento: el build sale minificado (de 66 KB en cuatro scripts a 32 KB en tres), con un único content script para cuenta y atajos; todos comparten un solo observador del DOM (que ignora lo que dibuja la extensión y se pausa con la pestaña oculta), una sola lectura de ajustes y, en Chrome, la Navigation API en lugar de sondear la URL. El JS sale moderno (ES más nuevo, Chrome 120 o más) y TypeScript compila con `target: ESNext`.
+
 Compatibilidad con otras herramientas: los indicadores (`Ctrl+Enter`, `Esc`, `Alt+N`…) no agregan texto a los botones; el texto lo dibuja el CSS (`::after` de un atributo). Un botón sigue valiendo exactamente lo que dice (por ejemplo `normalize-space(.)='Cerrar Intervención'` en un XPath de otra extensión de macros).
 
 Protecciones: ignora teclas repetidas, `AltGr`, `Shift`/`Meta`; bloquea llamadas dobles durante 1,5 s; no llama si ya
@@ -68,7 +70,8 @@ Al cambiar el código: `bun run build` (o `bun run dev` para recompilar al guard
 | `bun run build`     | Compila a `dist/` (la versión sale de `package.json`) |
 | `bun run dev`       | Recompila al guardar                               |
 | `bun run typecheck` | `tsc --noEmit` en modo estricto                    |
-| `bun test`          | Tests unitarios de la lógica pura                  |
+| `bun test`          | Tests unitarios (lógica pura) y de DOM con happy-dom (diálogos, filtros, tarjeta de llamada, observador, bundles minificados) |
+| `bun run outdated` / `bun run update:latest` | Ver y subir Bun, TypeScript y dependencias a lo último |
 | `bun run check`     | Tipos + tests + build                              |
 
 ## Estructura
@@ -83,6 +86,7 @@ src/
     call-card.ts   tarjeta flotante con a quién se llama
     client-copy.ts Alt+C: mensaje para el cliente con cuenta y dirección
     runtime.ts     aislamiento de errores y observador del DOM sin bucles
+    main.ts        único content script (cuenta + atajos): un solo bundle y un solo observador
     account.ts     al abrir una cuenta: pestaña Contactos y ojito de la clave
   popup/popup.ts   popup: solo sonidos (interruptor general y lista) + botón Ajustes
   options/options.ts   página de ajustes: atajos, opciones de cuenta, restablecer

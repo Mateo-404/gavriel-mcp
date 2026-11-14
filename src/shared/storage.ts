@@ -25,12 +25,33 @@ export function sanitizeSettings(raw: Record<string, unknown>): Settings {
   };
 }
 
-export async function readSettings(): Promise<Settings> {
-  try {
-    return sanitizeSettings(await chrome.storage.local.get(DEFAULT_SETTINGS));
-  } catch {
-    return sanitizeSettings({}); // contexto invalidado o almacenamiento caído: valores por defecto
+let cached: Promise<Settings> | null = null;
+let watching = false;
+
+/**
+ * Lee los ajustes. Dentro de una misma página se comparte una sola lectura: los content scripts
+ * piden los ajustes varias veces al arrancar y cada cambio en chrome.storage invalida el cache.
+ */
+export function readSettings(): Promise<Settings> {
+  if (!watching) {
+    watching = true;
+    try {
+      // se registra antes que cualquier otro oyente, así los demás ya ven el cache invalidado
+      chrome.storage.onChanged.addListener((_changes, area) => {
+        if (area === 'local') cached = null;
+      });
+    } catch {
+      watching = false; // sin chrome.storage (contexto invalidado): se vuelve a intentar la próxima vez
+    }
   }
+  cached ??= (async () => {
+    try {
+      return sanitizeSettings(await chrome.storage.local.get(DEFAULT_SETTINGS));
+    } catch {
+      return sanitizeSettings({}); // contexto invalidado o almacenamiento caído: valores por defecto
+    }
+  })();
+  return cached;
 }
 
 export async function readSetting<K extends keyof Settings>(key: K): Promise<Settings[K]> {

@@ -4,9 +4,10 @@ import { FIREFOX_ID, FIREFOX_MIN_VERSION, forChrome, forFirefox, type Manifest }
 const base = (await Bun.file('static/manifest.json').json()) as Manifest;
 
 describe('manifest por navegador', () => {
-  test('Chrome: solo cambia la versión, sin claves de Firefox', () => {
+  test('Chrome: versión y versión mínima, sin claves de Firefox', () => {
     const chrome = forChrome(base, '1.2.3');
     expect(chrome.version).toBe('1.2.3');
+    expect(chrome.minimum_chrome_version).toBe('120');
     expect(chrome.browser_specific_settings).toBeUndefined();
     expect(chrome.host_permissions).toBeUndefined();
   });

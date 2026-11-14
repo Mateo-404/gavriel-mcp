@@ -11,13 +11,14 @@ import { cp, readFile, rm, writeFile } from 'node:fs/promises';
 import { forChrome, forFirefox, type Manifest } from './manifest-targets';
 
 const ENTRYPOINTS = [
-  'src/content/account.ts',
   'src/content/bridge.ts',
+  'src/content/main.ts', // cuenta + atajos: un solo script, un solo observador
   'src/content/mute.ts',
-  'src/content/shortcuts.ts',
   'src/options/options.ts',
   'src/popup/popup.ts',
 ];
+
+const watching = process.argv.includes('--watch');
 
 async function build(): Promise<void> {
   const started = performance.now();
@@ -31,7 +32,9 @@ async function build(): Promise<void> {
     root: 'src',
     target: 'browser',
     format: 'iife',
-    minify: false,
+    // Producción: minificado (menos que parsear en cada página). En `bun run dev` queda legible y con mapa.
+    minify: !watching,
+    sourcemap: watching ? 'linked' : 'none',
   });
   if (!result.success) {
     for (const log of result.logs) console.error(log);
@@ -55,7 +58,7 @@ async function build(): Promise<void> {
 
 await build();
 
-if (process.argv.includes('--watch')) {
+if (watching) {
   console.log('Mirando src/ y static/ … (Ctrl+C para salir)');
   let timer: ReturnType<typeof setTimeout> | undefined;
   const rebuild = (): void => {

@@ -7,8 +7,11 @@ export const FIREFOX_ID = 'gavriel-tools@gavriel-extension.local';
 export const FIREFOX_MIN_VERSION = '128.0';
 const SITE = 'https://app.gavriel.com.ar/*';
 
+/** Versión mínima de Chrome: el código sale en JS moderno (sin transpilar a versiones viejas). */
+export const CHROME_MIN_VERSION = '120';
+
 export function forChrome(base: Manifest, version: string): Manifest {
-  return { ...base, version };
+  return { ...base, version, minimum_chrome_version: CHROME_MIN_VERSION };
 }
 
 export function forFirefox(base: Manifest, version: string): Manifest {
