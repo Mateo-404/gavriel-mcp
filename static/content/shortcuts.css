@@ -160,3 +160,20 @@ html[data-gv-lite] .monitoring-panel-blink-icon,
 html[data-gv-lite] .monitoring-panel .animate-pulse {
   animation: none !important;
 }
+
+/* Apagar todas las animaciones y transiciones CSS de Gavriel (Ajustes). Los indicadores de carga se conservan. */
+html[data-gv-noanim] *,
+html[data-gv-noanim] *::before,
+html[data-gv-noanim] *::after {
+  animation-duration: 0.001ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.001ms !important;
+  transition-delay: 0s !important;
+  scroll-behavior: auto !important;
+}
+html[data-gv-noanim] .animate-spin,
+html[data-gv-noanim] .pi-spin,
+html[data-gv-noanim] [class*="spinner"] {
+  animation-duration: 1s !important;
+  animation-iteration-count: infinite !important;
+}

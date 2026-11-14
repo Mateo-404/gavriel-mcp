@@ -40,11 +40,12 @@
 import { DEFAULT_SETTINGS } from '../shared/constants';
 import { isArrowKey } from '../shared/grid';
 import { digitFromKeyCode, filterFromLetterCode, isHangupLabel, parseContactName, shiftedDigit } from '../shared/labels';
-import { readSetting, touches } from '../shared/storage';
+import { readSetting, readSettings, touches } from '../shared/storage';
 import { accountIdFromLocation } from '../shared/routes';
 import { createEventsNav, FOCUS_ATTR } from './events-nav';
 import { createCallCard } from './call-card';
 import { createClientCopy } from './client-copy';
+import { createAlertSender } from './alerts';
 import { createDataStore } from './data-store';
 import { createDialogConfirm } from './dialog-confirm';
 import { createLastContact } from './last-contact';
@@ -283,7 +284,18 @@ function main(): void {
   // ---------- Eventos del panel (flechas, Enter, Alt+N) ----------
 
   const events = createEventsNav({ visible, toast });
-  const dataStore = createDataStore();
+  // Eventos nuevos (de los tipos elegidos en Ajustes) -> notificación del navegador, desde el fondo
+  const sendAlerts = createAlertSender({
+    settings: readSettings,
+    send: (message) => {
+      try {
+        void chrome.runtime.sendMessage(message).catch(() => {});
+      } catch {
+        /* contexto invalidado: ya no hay a quién avisar */
+      }
+    },
+  });
+  const dataStore = createDataStore((alerts) => void sendAlerts(alerts));
   const currentAccountId = (): string | null => accountIdFromLocation(location.pathname, location.search);
   const copyLastContact = createLastContact({
     visible,

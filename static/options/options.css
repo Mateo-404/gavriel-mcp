@@ -181,3 +181,6 @@ input:focus-visible + .switch { outline: 2px solid var(--ring); outline-offset: 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { transition: none !important; }
 }
+
+.types { display: grid; gap: 8px; margin-left: 12px; }
+.types .row { padding: 10px 14px; }

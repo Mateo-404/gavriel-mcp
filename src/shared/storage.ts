@@ -1,3 +1,4 @@
+import { isAlertType } from './event-alerts';
 import { DEFAULT_SETTINGS, SOUND_NAME_PATTERN, type Settings } from './constants';
 
 const isNames = (value: unknown): value is string[] =>
@@ -24,6 +25,11 @@ export function sanitizeSettings(raw: Record<string, unknown>): Settings {
     cacheAssets: typeof raw.cacheAssets === 'boolean' ? raw.cacheAssets : DEFAULT_SETTINGS.cacheAssets,
     localFonts: typeof raw.localFonts === 'boolean' ? raw.localFonts : DEFAULT_SETTINGS.localFonts,
     dedupeAccount: typeof raw.dedupeAccount === 'boolean' ? raw.dedupeAccount : DEFAULT_SETTINGS.dedupeAccount,
+    disableAnimations:
+      typeof raw.disableAnimations === 'boolean' ? raw.disableAnimations : DEFAULT_SETTINGS.disableAnimations,
+    notifyEnabled: typeof raw.notifyEnabled === 'boolean' ? raw.notifyEnabled : DEFAULT_SETTINGS.notifyEnabled,
+    notifyTypes: Array.isArray(raw.notifyTypes) ? [...new Set(raw.notifyTypes.filter(isAlertType))] : [...DEFAULT_SETTINGS.notifyTypes],
+    mediaPlayer: typeof raw.mediaPlayer === 'boolean' ? raw.mediaPlayer : DEFAULT_SETTINGS.mediaPlayer,
     mutedSounds: isNames(raw.mutedSounds) ? raw.mutedSounds : [...DEFAULT_SETTINGS.mutedSounds],
     knownSounds: isNames(raw.knownSounds) ? raw.knownSounds : [...DEFAULT_SETTINGS.knownSounds],
   };

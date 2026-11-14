@@ -26,6 +26,7 @@ if (!CHROME) throw new Error('No encontré Chrome: definí CHROME_PATH');
 const HOST = 'app.gavriel.com.ar';
 const NUL = String.fromCharCode(0);
 const hits = {};
+let pendingCalls = 0;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 execFileSync('openssl', ['req', '-x509', '-newkey', 'rsa:2048', '-nodes', '-keyout', join(scratch, 'k.pem'), '-out', join(scratch, 'c.pem'), '-days', '1', '-subj', `/CN=${HOST}`, '-addext', `subjectAltName=DNS:${HOST},DNS:fonts.googleapis.com,DNS:fonts.gstatic.com`], { stdio: 'ignore' });
@@ -49,6 +50,14 @@ const server = createServer({ key: readFileSync(join(scratch, 'k.pem')), cert: r
   if (path === '/__react.js' || path === '/__react-dom.js') {
     res.writeHead(200, { 'content-type': 'application/javascript' });
     return res.end(readFileSync(join(process.cwd(), path === '/__react.js' ? 'node_modules/react/umd/react.production.min.js' : 'node_modules/react-dom/umd/react-dom.production.min.js')));
+  }
+  if (path === '/api/events/accounts-with-pending-events') {
+    const n = pendingCalls++;
+    const group = (code, name, count) => ({ code: { id: code, code, name, eventsType: { title: name } }, count, last_event: { zone: { code: '3', name: 'OFICINA' } } });
+    const body = [{ account: { id: 'acc9', name: 'CUENTA NUEVA', accountNumber: '9009' }, events_by_code: { a: group('E130', 'Burglary', n >= 1 ? 2 : 1), b: group('E354', 'Test', 1) } }];
+    if (n >= 1) body.push({ account: { id: 'acc8', name: 'OTRA CUENTA', accountNumber: '8008' }, events_by_code: { c: group('E301', 'AC Loss', 1), d: group('R301', 'AC Restoral', 1) } });
+    res.writeHead(200, { 'content-type': 'application/json' });
+    return res.end(JSON.stringify(body));
   }
   if (path === '/__axios.js') {
     res.writeHead(200, { 'content-type': 'application/javascript' });
@@ -235,6 +244,19 @@ try {
   out.axiosHitsAfterWrite = (hits['/api/accounts/acc1'] ?? 0) - before;
   await run(`await axios.get('/api/accounts/acc1', { headers: { Authorization: 'Bearer otra-sesion' } });`);
   out.axiosHitsOtherSession = (hits['/api/accounts/acc1'] ?? 0) - before;
+  // --- Avisos por tipo: base, luego eventos nuevos
+  await evalJs("fetch('/api/events/accounts-with-pending-events').then((r) => r.json())");
+  await sleep(300);
+  await evalJs("fetch('/api/events/accounts-with-pending-events').then((r) => r.json())");
+  await sleep(900);
+  const sw3 = (await (await fetch('http://127.0.0.1:9333/json/list')).json()).find((t) => t.type === 'service_worker' && mine && t.url.includes(mine));
+  const w3 = new WebSocket(sw3.webSocketDebuggerUrl);
+  await new Promise((r) => (w3.onopen = r));
+  out.notifications = await new Promise((r) => {
+    w3.onmessage = (m) => { const d = JSON.parse(m.data); if (d.id === 77) r(d.result?.result?.value); };
+    w3.send(JSON.stringify({ id: 77, method: 'Runtime.evaluate', params: { expression: 'new Promise((res) => chrome.notifications.getAll((all) => res(Object.keys(all).sort())))', awaitPromise: true, returnByValue: true } }));
+  });
+  w3.close();
   // --- Colgar: Ctrl+Enter llama a hangup() del contexto de React, sin abrir el panel ni cambiar de pestaña
   await evalJs('window.__mountSip()');
   await sleep(500);
@@ -281,6 +303,7 @@ assert.equal(out.axiosHitsAfterWrite, 2, 'después de una escritura el pedido de
 assert.equal(out.axiosHitsOtherSession, 3, 'otra sesión nunca recibe la copia de la primera');
 assert.equal(out.fontNoCorsFetch, 'bloqueado', 'el pedido sin destino de hoja de estilo también debe bloquearse');
 assert.equal(out.fontLinkWithoutNetworkDomain, 'bloqueado');
+assert.deepEqual(out.notifications, ['gv-alert-acc8-E301-2', 'gv-alert-acc9-E130-2'], 'debían avisar el E130 (+1) y el E301 nuevos, y no la restauración ni lo que no cambió');
 assert.equal(out.sipClicks.hangup, 1, 'Ctrl+Enter debía llamar una vez a hangup() del softphone');
 assert.equal(out.sipClicks.panel, 0, 'no debía abrir el panel del softphone');
 assert.equal(out.sipToast, 'Llamada cortada');

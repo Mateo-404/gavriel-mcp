@@ -19,10 +19,11 @@ const root = document.documentElement;
 
 /** Interruptores visuales: el CSS (shortcuts.css) actúa según estos atributos de <html>. */
 function applyLook(
-  settings: Pick<Settings, 'hideSoundBanner' | 'plainEvents' | 'hideGridView' | 'liteMode' | 'localFonts' | 'dedupeAccount'>,
+  settings: Pick<Settings, 'hideSoundBanner' | 'plainEvents' | 'hideGridView' | 'liteMode' | 'localFonts' | 'dedupeAccount' | 'disableAnimations'>,
 ): void {
   setLocalFonts(settings.localFonts);
   root.toggleAttribute('data-gv-dedupe', settings.dedupeAccount);
+  root.toggleAttribute('data-gv-noanim', settings.disableAnimations);
   root.toggleAttribute('data-gv-nobanner', settings.hideSoundBanner);
   root.toggleAttribute('data-gv-plain', settings.plainEvents);
   root.toggleAttribute('data-gv-nogrid', settings.hideGridView);
@@ -57,7 +58,7 @@ void load();
 
 chrome.storage.onChanged.addListener((changes, area) => {
   if (area === 'local' && 'netStatus' in changes) void showNetStatus();
-  if (touches(changes, area, 'muteEnabled', 'mutedSounds', 'hideSoundBanner', 'plainEvents', 'hideGridView', 'liteMode', 'localFonts', 'dedupeAccount')) void load();
+  if (touches(changes, area, 'muteEnabled', 'mutedSounds', 'hideSoundBanner', 'plainEvents', 'hideGridView', 'liteMode', 'localFonts', 'dedupeAccount', 'disableAnimations')) void load();
 });
 
 // Sonido nuevo detectado: se agrega a la lista del popup (sin silenciarlo)

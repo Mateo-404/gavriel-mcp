@@ -22,6 +22,8 @@
       <a href="#cuenta">Al abrir una cuenta</a>
       <a href="#llamada">Durante una llamada</a>
       <a href="#panel">Panel de monitoreo</a>
+      <a href="#avisos">Avisos</a>
+      <a href="#musica">Música</a>
       <a href="#sonidos">Sonidos</a>
       <a href="#mantenimiento">Mantenimiento</a>
     </nav>
@@ -139,12 +141,79 @@
           <span class="switch" aria-hidden="true"></span>
         </label>
 
+        <label class="row" for="opt-noanim">
+          <span class="row-text">
+            <strong>Apagar todas las animaciones de Gavriel</strong>
+            <small>Quita transiciones y animaciones CSS (desplazamientos, pulsos, desvanecidos). Los indicadores de carga se conservan. No alcanza a las animaciones hechas con JavaScript o canvas.</small>
+          </span>
+          <input type="checkbox" id="opt-noanim" role="switch">
+          <span class="switch" aria-hidden="true"></span>
+        </label>
+
         <label class="row" for="opt-dedupe">
           <span class="row-text">
             <strong>Abrir una cuenta más rápido</strong>
             <small>Gavriel pide dos veces seguidas los datos completos de la cuenta (360 KB cada vez) y la tarjeta de contactos espera al segundo pedido. Con esto el segundo se responde desde memoria (vale 10 segundos y se descarta si hay cualquier cambio). Ahorra cerca de 1 segundo al abrir un evento.</small>
           </span>
           <input type="checkbox" id="opt-dedupe" role="switch">
+          <span class="switch" aria-hidden="true"></span>
+        </label>
+      </section>
+
+      <section id="avisos" class="block" aria-labelledby="h-avisos">
+        <h2 id="h-avisos">Avisos por tipo de evento</h2>
+        <p class="lead">Una notificación del navegador cuando entra un evento nuevo de los tipos que elijas. La extensión lee los eventos pendientes que la propia página de Gavriel ya recibe, así que <strong>necesita una pestaña de Gavriel abierta</strong> (puede estar en segundo plano o fijada). Las restauraciones no avisan, y si entran más de 5 en 30 segundos se muestran los primeros y un resumen del resto.</p>
+
+        <label class="row" for="opt-notify">
+          <span class="row-text">
+            <strong>Avisar por eventos nuevos</strong>
+            <small>Interruptor general de los avisos.</small>
+          </span>
+          <input type="checkbox" id="opt-notify" role="switch">
+          <span class="switch" aria-hidden="true"></span>
+        </label>
+        <div class="types">
+          <label class="row" for="opt-type-BUR">
+            <span class="row-text"><strong id="opt-type-BUR-label">BUR</strong></span>
+            <input type="checkbox" id="opt-type-BUR" role="switch">
+            <span class="switch" aria-hidden="true"></span>
+          </label>
+          <label class="row" for="opt-type-POW">
+            <span class="row-text"><strong id="opt-type-POW-label">POW</strong></span>
+            <input type="checkbox" id="opt-type-POW" role="switch">
+            <span class="switch" aria-hidden="true"></span>
+          </label>
+          <label class="row" for="opt-type-PAN">
+            <span class="row-text"><strong id="opt-type-PAN-label">PAN</strong></span>
+            <input type="checkbox" id="opt-type-PAN" role="switch">
+            <span class="switch" aria-hidden="true"></span>
+          </label>
+          <label class="row" for="opt-type-MED">
+            <span class="row-text"><strong id="opt-type-MED-label">MED</strong></span>
+            <input type="checkbox" id="opt-type-MED" role="switch">
+            <span class="switch" aria-hidden="true"></span>
+          </label>
+          <label class="row" for="opt-type-INC">
+            <span class="row-text"><strong id="opt-type-INC-label">INC</strong></span>
+            <input type="checkbox" id="opt-type-INC" role="switch">
+            <span class="switch" aria-hidden="true"></span>
+          </label>
+        </div>
+        <div class="actions">
+          <button type="button" class="btn" id="notify-test">Probar aviso</button>
+        </div>
+        <p class="note" id="notify-test-state"></p>
+      </section>
+
+      <section id="musica" class="block" aria-labelledby="h-musica">
+        <h2 id="h-musica">Música en la barra de Gavriel</h2>
+        <p class="lead">Un reproductor junto a «Tiempo real» que controla Spotify Web o YouTube Music abiertos en otra pestaña del navegador: reproducir y pausar, anterior y siguiente, volumen, silenciar y posición. Si hay dos abiertos, elige el que suena. La app de escritorio de Spotify no se puede controlar desde una extensión.</p>
+        <label class="row" for="opt-media">
+          <span class="row-text">
+            <strong>Mostrar el reproductor</strong>
+            <small>Aparece solo cuando hay una pestaña de Spotify Web o YouTube Music abierta.</small>
+          </span>
+          <input type="checkbox" id="opt-media" role="switch">
           <span class="switch" aria-hidden="true"></span>
         </label>
       </section>

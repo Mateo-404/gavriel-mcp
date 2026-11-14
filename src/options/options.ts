@@ -5,9 +5,10 @@
  */
 import { DEFAULT_SETTINGS, FRIENDLY_SOUND_NAMES, type Settings } from '../shared/constants';
 import { SCOPE_TITLES, shortcutsFor, type Shortcut, type ShortcutScope } from '../shared/shortcut-catalog';
+import { ALERT_LABELS, ALERT_TYPES } from '../shared/event-alerts';
 import { readSettings, touches, writeSettings } from '../shared/storage';
 
-type SwitchKey = 'shortcutsEnabled' | 'openContactsTab' | 'revealSecrets' | 'showCallCard' | 'hideSoundBanner' | 'plainEvents' | 'hideGridView' | 'liteMode' | 'cacheAssets' | 'localFonts' | 'dedupeAccount';
+type SwitchKey = 'shortcutsEnabled' | 'openContactsTab' | 'revealSecrets' | 'showCallCard' | 'hideSoundBanner' | 'plainEvents' | 'hideGridView' | 'liteMode' | 'cacheAssets' | 'localFonts' | 'dedupeAccount' | 'disableAnimations' | 'notifyEnabled' | 'mediaPlayer';
 
 const SWITCHES: readonly { key: SwitchKey; id: string }[] = [
   { key: 'shortcutsEnabled', id: 'keys' },
@@ -21,6 +22,9 @@ const SWITCHES: readonly { key: SwitchKey; id: string }[] = [
   { key: 'cacheAssets', id: 'opt-cache' },
   { key: 'localFonts', id: 'opt-fonts' },
   { key: 'dedupeAccount', id: 'opt-dedupe' },
+  { key: 'disableAnimations', id: 'opt-noanim' },
+  { key: 'notifyEnabled', id: 'opt-notify' },
+  { key: 'mediaPlayer', id: 'opt-media' },
 ];
 
 const SCOPES: readonly ShortcutScope[] = ['panel', 'cuenta', 'llamadas'];
@@ -90,6 +94,11 @@ function render(settings: Settings): void {
   $('keys-state').textContent = settings.shortcutsEnabled ? 'Activados' : 'Desactivados';
   $('catalog').classList.toggle('off', !settings.shortcutsEnabled);
   renderSoundSummary(settings);
+  for (const type of ALERT_TYPES) {
+    const box = $<HTMLInputElement>(`opt-type-${type}`);
+    box.checked = settings.notifyTypes.includes(type);
+    box.disabled = !settings.notifyEnabled;
+  }
 }
 
 function renderSoundSummary(settings: Settings): void {
@@ -118,6 +127,26 @@ for (const { key, id } of SWITCHES) {
   });
 }
 
+// ---------- Avisos por tipo de evento ----------
+
+for (const type of ALERT_TYPES) {
+  $<HTMLInputElement>(`opt-type-${type}`).addEventListener('change', () => {
+    const chosen = ALERT_TYPES.filter((t) => $<HTMLInputElement>(`opt-type-${t}`).checked);
+    void writeSettings({ notifyTypes: chosen }).then(async () => {
+      render(await readSettings());
+      flashSaved();
+    });
+  });
+}
+
+$('notify-test').addEventListener('click', () => {
+  void chrome.runtime.sendMessage({ type: 'gv-test-alert' });
+  const label = $('notify-test-state');
+  label.textContent = 'Aviso de prueba enviado: si no lo ves, revisá los permisos de notificaciones de Chrome y de Windows.';
+});
+
+for (const type of ALERT_TYPES) $(`opt-type-${type}-label`).textContent = `${type} · ${ALERT_LABELS[type]}`;
+
 // ---------- Restablecer (con confirmación dentro de la página) ----------
 
 const resetAsk = $('reset-ask');
@@ -144,6 +173,10 @@ $('reset-yes').addEventListener('click', () => {
     cacheAssets: DEFAULT_SETTINGS.cacheAssets,
     localFonts: DEFAULT_SETTINGS.localFonts,
     dedupeAccount: DEFAULT_SETTINGS.dedupeAccount,
+    disableAnimations: DEFAULT_SETTINGS.disableAnimations,
+    notifyEnabled: DEFAULT_SETTINGS.notifyEnabled,
+    notifyTypes: [...DEFAULT_SETTINGS.notifyTypes],
+    mediaPlayer: DEFAULT_SETTINGS.mediaPlayer,
   }).then(async () => {
     render(await readSettings());
     showResetConfirm(false);
@@ -176,7 +209,7 @@ void showNetStatus();
 
 // Si algo cambia desde otro lado (el popup, otra pestaña), esta página se actualiza sola
 chrome.storage.onChanged.addListener((changes, area) => {
-  if (touches(changes, area, 'shortcutsEnabled', 'openContactsTab', 'revealSecrets', 'showCallCard', 'hideSoundBanner', 'plainEvents', 'hideGridView', 'liteMode', 'cacheAssets', 'localFonts', 'dedupeAccount', 'muteEnabled', 'mutedSounds')) {
+  if (touches(changes, area, 'shortcutsEnabled', 'openContactsTab', 'revealSecrets', 'showCallCard', 'hideSoundBanner', 'plainEvents', 'hideGridView', 'liteMode', 'cacheAssets', 'localFonts', 'dedupeAccount', 'disableAnimations', 'notifyEnabled', 'notifyTypes', 'mediaPlayer', 'muteEnabled', 'mutedSounds')) {
     void readSettings().then(render);
     setTimeout(() => void showNetStatus(), 500); // el fondo actualiza las reglas un instante después
   }

@@ -14,6 +14,7 @@ import {
   parseCalls,
 } from '../shared/gavriel-data';
 import { formatClientMessage } from '../shared/client-message';
+import { type Alert, type PendingAccount, diffPending, sanitizePending } from '../shared/event-alerts';
 
 const MAX_ACCOUNTS = 20;
 
@@ -27,17 +28,24 @@ export interface DataStore {
   clientMessage: (accountId: string) => string | null;
 }
 
-export function createDataStore(): DataStore {
+export function createDataStore(onAlerts?: (alerts: Alert[]) => void): DataStore {
   const accounts = new Map<string, AccountData>();
   const local = new Map<string, LocalCall>();
   let calls: CallRecord[] = [];
+  let pending: PendingAccount[] | null = null;
 
   const ingest = (raw: unknown): void => {
     if (typeof raw !== 'string' || raw.length > 2_000_000) return;
     try {
-      const data = JSON.parse(raw) as { kind?: string; calls?: unknown; account?: unknown };
+      const data = JSON.parse(raw) as { kind?: string; calls?: unknown; account?: unknown; pending?: unknown };
       if (data.kind === 'calls') {
         calls = parseCalls(data.calls);
+      } else if (data.kind === 'pending') {
+        // La primera respuesta es la base; las siguientes se comparan con la anterior para detectar eventos nuevos
+        const next = sanitizePending(data.pending);
+        const alerts = diffPending(pending, next);
+        pending = next;
+        if (alerts.length > 0) onAlerts?.(alerts);
       } else if (data.kind === 'account') {
         const account = parseAccount(data.account);
         if (!account) return;

@@ -24,6 +24,14 @@ export type Settings = {
   localFonts: boolean;
   /** Responde desde memoria el segundo pedido idéntico de la cuenta (abrir una cuenta es ~1 s más rápido). */
   dedupeAccount: boolean;
+  /** Apaga todas las animaciones y transiciones CSS de Gavriel (quedan los indicadores de carga). */
+  disableAnimations: boolean;
+  /** Avisos del navegador por tipo de evento nuevo (hace falta una pestaña de Gavriel abierta). */
+  notifyEnabled: boolean;
+  /** Tipos que avisan: BUR, POW, PAN, MED, INC. */
+  notifyTypes: string[];
+  /** Reproductor de Spotify Web / YouTube Music en la barra de arriba de Gavriel. */
+  mediaPlayer: boolean;
   /** Nombres (sin extensión) de los sonidos de /sounds/ que se silencian. */
   mutedSounds: string[];
   /** Sonidos que Gavriel ya reprodujo (lista que muestra el popup). */
@@ -50,6 +58,10 @@ export const DEFAULT_SETTINGS: Settings = {
   cacheAssets: true,
   localFonts: true,
   dedupeAccount: true,
+  disableAnimations: false,
+  notifyEnabled: true,
+  notifyTypes: ['BUR', 'POW', 'PAN', 'MED', 'INC'],
+  mediaPlayer: true,
   mutedSounds: [...DEFAULT_SOUNDS],
   knownSounds: [...DEFAULT_SOUNDS],
 };

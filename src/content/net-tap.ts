@@ -12,6 +12,7 @@
  */
 import { TAP_EVENT, TAP_REPLAY_EVENT } from '../shared/constants';
 import { ResponseCache, isApiPath, isMutation } from '../shared/dedupe';
+import { parsePending } from '../shared/event-alerts';
 import { classifyUrl, parseAccount, parseCalls } from '../shared/gavriel-data';
 import { serveFromCache } from './xhr-dedupe';
 
@@ -41,6 +42,8 @@ export function installNetTap(): void {
       const kind = classifyUrl(url);
       if (kind === 'calls') {
         emit('calls', JSON.stringify({ kind, calls: parseCalls(body) }));
+      } else if (kind === 'pending') {
+        emit('pending', JSON.stringify({ kind, pending: parsePending(body) }));
       } else if (kind === 'account') {
         const account = parseAccount(body);
         if (account) emit(`account:${account.id}`, JSON.stringify({ kind, account }));

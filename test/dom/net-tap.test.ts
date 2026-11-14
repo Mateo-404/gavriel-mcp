@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
 import { createDataStore } from '../../src/content/data-store';
 import { installNetTap } from '../../src/content/net-tap';
+import { parsePending } from '../../src/shared/event-alerts';
 
 const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
 
@@ -117,5 +118,30 @@ describe('net-tap + data-store', () => {
     const late = createDataStore();
     await sleep(10);
     expect(late.account('acc1')?.name).toBe('MERLO FERNANDO');
+  });
+});
+
+describe('eventos pendientes: avisos por diferencia', () => {
+  const pendingBody = (count: number, extra = false) => [
+    {
+      account: { id: 'acc1', name: 'MERLO FERNANDO', accountNumber: '2904' },
+      events_by_code: { a: { code: { code: 'E130', name: 'Burglary', eventsType: { title: 'Robo' } }, count, last_event: { zone: { code: '3', name: 'OFICINA' } } } },
+    },
+    ...(extra ? [{ account: { id: 'acc2', name: 'OTRA', accountNumber: '1' }, events_by_code: { b: { code: { code: 'R130', name: 'Burglary Restoral' }, count: 1 } } }] : []),
+  ];
+
+  test('la primera respuesta es la base y las siguientes avisan solo lo nuevo', async () => {
+    document.body.innerHTML = '';
+    const got: { type: string; added: number }[][] = [];
+    const local = createDataStore((alerts) => got.push(alerts.map((a) => ({ type: a.type, added: a.added }))));
+    const send = (body: unknown): void => {
+      document.dispatchEvent(new CustomEvent('gavriel:tap', { detail: JSON.stringify({ kind: 'pending', pending: parsePending(body) }) }));
+    };
+    send(pendingBody(1)); // base
+    send(pendingBody(1, true)); // sin cambios (la restauración no avisa)
+    expect(got).toEqual([]);
+    send(pendingBody(3)); // dos nuevos
+    expect(got).toEqual([[{ type: 'BUR', added: 2 }]]);
+    void local;
   });
 });

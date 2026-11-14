@@ -43,8 +43,8 @@ const MAX_CONTACTS = 200;
 const text = (value: unknown): string => (typeof value === 'string' ? value.trim() : '');
 const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null;
 
-/** Qué es una URL de la API de Gavriel que nos interesa: 'calls', 'account' o null. */
-export function classifyUrl(url: string): 'calls' | 'account' | null {
+/** Qué es una URL de la API de Gavriel que nos interesa: 'calls', 'account', 'pending' o null. */
+export function classifyUrl(url: string): 'calls' | 'account' | 'pending' | null {
   let path: string;
   try {
     path = new URL(url, 'https://app.gavriel.com.ar').pathname;
@@ -52,6 +52,7 @@ export function classifyUrl(url: string): 'calls' | 'account' | null {
     return null;
   }
   if (path === '/api/sip/calls') return 'calls';
+  if (path === '/api/events/accounts-with-pending-events') return 'pending';
   return /^\/api\/accounts\/[A-Za-z0-9_-]+$/.test(path) ? 'account' : null;
 }
 
