@@ -20,6 +20,9 @@
 }
 
 /* Los Alt+N solo se ven mientras se mantiene Alt (shortcuts.ts pone data-gv-alt en <html>) */
+.gv-kbd::after {
+  content: attr(data-gv-text);
+}
 .gv-kbd[data-gv-altonly] {
   display: none;
 }

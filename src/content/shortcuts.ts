@@ -80,6 +80,7 @@ interface BadgeSpec {
 
 const SETTING = 'shortcutsEnabled' as const;
 const HINT_ATTR = 'data-gv-hint';
+const TEXT_ATTR = 'data-gv-text';
 /** Letra de cada filtro (ver FILTER_LETTER_CODES): la etiqueta que se muestra. */
 const FILTER_KEYS = ['Q', 'W', 'R', 'T', 'Y', 'U', 'I', 'O', 'P'];
 /** Atributo de <html> mientras se mantiene Alt: el CSS muestra solo entonces los indicadores Alt+N. */
@@ -329,7 +330,9 @@ function main(): void {
     badge.setAttribute(HINT_ATTR, '');
     badge.setAttribute('aria-hidden', 'true');
     if (spec.altOnly) badge.setAttribute('data-gv-altonly', '');
-    badge.textContent = spec.text;
+    // El texto va en un atributo y lo dibuja el CSS (::after): así el botón que lo contiene conserva
+    // exactamente su texto y otras herramientas (macros con XPath, lectores) no ven nada nuevo
+    badge.setAttribute(TEXT_ATTR, spec.text);
     return badge;
   };
 
@@ -423,8 +426,8 @@ function main(): void {
       if (!badge) {
         badge = makeBadge(spec);
         shown.set(host, badge);
-      } else if (badge.textContent !== spec.text) {
-        badge.textContent = spec.text;
+      } else if (badge.getAttribute(TEXT_ATTR) !== spec.text) {
+        badge.setAttribute(TEXT_ATTR, spec.text);
       }
       if (!badge.isConnected) place(host, badge, spec.place); // React pudo haberlo descartado al re-renderizar
     }

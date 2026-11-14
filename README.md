@@ -32,6 +32,8 @@ siguen apareciendo en pantalla: solo se silencia el audio, y solo en el navegado
 
 **Al abrir una cuenta** (se puede desactivar cada cosa en Ajustes): entra directo a la pestaña **Contactos** y toca el ojito de **Clave** y **Contraclave**. Se aplica una sola vez por cuenta y solo si el botón existe: Gavriel dibuja el ojito únicamente si tu usuario tiene permiso para ver la clave.
 
+Compatibilidad con otras herramientas: los indicadores (`Ctrl+Enter`, `Esc`, `Alt+N`…) no agregan texto a los botones; el texto lo dibuja el CSS (`::after` de un atributo). Un botón sigue valiendo exactamente lo que dice (por ejemplo `normalize-space(.)='Cerrar Intervención'` en un XPath de otra extensión de macros).
+
 Protecciones: ignora teclas repetidas, `AltGr`, `Shift`/`Meta`; bloquea llamadas dobles durante 1,5 s; no llama si ya
 hay una llamada en curso ni con un menú o diálogo modal abierto.
 
