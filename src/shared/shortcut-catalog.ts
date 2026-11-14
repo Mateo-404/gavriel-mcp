@@ -81,6 +81,13 @@ export const SHORTCUTS: readonly Shortcut[] = [
     keys: ['Ctrl', 'Enter'],
     chord: true,
     description:
+      'Con un diálogo abierto (Cerrar intervención, Dejar en observación, Procesar masivo…), aprieta su botón principal, incluso escribiendo en un campo. Si el botón sigue deshabilitado, avisa qué falta. Tiene prioridad sobre cortar una llamada.',
+  },
+  {
+    scope: 'llamadas',
+    keys: ['Ctrl', 'Enter'],
+    chord: true,
+    description:
       'Corta la llamada en curso, atiende una entrante o llama desde el marcador. Sin llamada, en una cuenta intervenida, abre «Cerrar intervención» con el cursor en Resolución.',
   },
 ];

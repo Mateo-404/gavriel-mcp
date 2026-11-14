@@ -45,6 +45,7 @@ import { accountIdFromLocation } from '../shared/routes';
 import { createEventsNav, FOCUS_ATTR } from './events-nav';
 import { createCallCard } from './call-card';
 import { createClientCopy } from './client-copy';
+import { createDialogConfirm } from './dialog-confirm';
 import { createLastContact } from './last-contact';
 import { createPanelActions } from './panel-actions';
 import { guard, watchDom } from './runtime';
@@ -55,7 +56,7 @@ declare global {
   }
 }
 
-type Action = 'hangup' | 'answer' | 'dial' | 'bulk' | 'close';
+type Action = 'confirm' | 'hangup' | 'answer' | 'dial' | 'bulk' | 'close';
 
 interface Contact {
   /** Posición en la lista, empezando en 1: es el número del atajo. */
@@ -238,7 +239,7 @@ function main(): void {
 
   /** Radix abre el menú o diálogo modal bloqueando los clics del resto de la página. */
   const modalOpen = (): boolean => document.body.style.pointerEvents === 'none';
-  const dialogOpen = (): boolean => modalOpen() || document.querySelector('[role="dialog"]') !== null;
+  const dialogOpen = (): boolean => modalOpen() || document.querySelector('[data-slot="dialog-content"], [role="alertdialog"]') !== null;
 
   // ---------- Aviso breve ----------
 
@@ -264,6 +265,7 @@ function main(): void {
   const copyLastContact = createLastContact({ visible, toast });
   const callCard = createCallCard({ isCalling, visible });
   const panel = createPanelActions({ visible, ownText });
+  const dialogConfirm = createDialogConfirm({ visible, ownText, toast });
   const copyClientMessage = createClientCopy({ visible, toast });
 
   const EDITABLE = 'input, textarea, select, [contenteditable=""], [contenteditable="true"]';
@@ -287,6 +289,8 @@ function main(): void {
 
   /** Qué haría Ctrl+Enter ahora mismo (null = no interceptar). */
   const plan = (): Action | null => {
+    // Con un diálogo abierto, Ctrl+Enter es de ese diálogo (confirmar), antes que cualquier otra cosa
+    if (dialogConfirm.primary()) return 'confirm';
     if (isCalling()) return 'hangup';
     if (findAnswer()) return 'answer';
     const input = dialInput();
@@ -317,9 +321,29 @@ function main(): void {
   };
 
   /** Deja exactamente los indicadores que corresponden; no toca el DOM si ya están bien. */
+  /** Con un diálogo abierto solo se mantiene el indicador de su botón principal. */
+  let dialogBadgeHost: Element | undefined;
+  const syncDialogBadge = (): void => {
+    const target = enabled ? dialogConfirm.primary() : null;
+    if (dialogBadgeHost && dialogBadgeHost !== target) {
+      shown.get(dialogBadgeHost)?.remove();
+      shown.delete(dialogBadgeHost);
+      dialogBadgeHost = undefined;
+    }
+    if (!target) return;
+    let badge = shown.get(target);
+    if (!badge) {
+      badge = makeBadge({ text: 'Ctrl+Enter', place: 'inside', altOnly: false });
+      shown.set(target, badge);
+    }
+    if (!badge.isConnected) place(target, badge, 'inside');
+    dialogBadgeHost = target;
+  };
+
   const decorate = guard('indicadores', (): void => {
     // Con un diálogo abierto no hay nada que indicar y escribir ahí dispara muchos cambios: no se toca el DOM
     if (dialogOpen()) {
+      syncDialogBadge();
       callCard.update();
       return;
     }
@@ -344,7 +368,9 @@ function main(): void {
       }
       const action = plan();
       const target =
-        action === 'hangup'
+        action === 'confirm'
+          ? dialogConfirm.primary()
+          : action === 'hangup'
           ? findHangup()
           : action === 'answer'
             ? findAnswer()
@@ -569,7 +595,9 @@ function main(): void {
   };
 
   const runPrimary = (action: Action): void => {
-    if (action === 'hangup') {
+    if (action === 'confirm') {
+      dialogConfirm.confirm();
+    } else if (action === 'hangup') {
       if (!hangingUp) void hangUp();
     } else if (action === 'bulk') {
       toast('Procesar masivo: escribí el motivo');
