@@ -28,16 +28,26 @@ const NUL = String.fromCharCode(0);
 const hits = {};
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-execFileSync('openssl', ['req', '-x509', '-newkey', 'rsa:2048', '-nodes', '-keyout', join(scratch, 'k.pem'), '-out', join(scratch, 'c.pem'), '-days', '1', '-subj', `/CN=${HOST}`, '-addext', `subjectAltName=DNS:${HOST}`], { stdio: 'ignore' });
+execFileSync('openssl', ['req', '-x509', '-newkey', 'rsa:2048', '-nodes', '-keyout', join(scratch, 'k.pem'), '-out', join(scratch, 'c.pem'), '-days', '1', '-subj', `/CN=${HOST}`, '-addext', `subjectAltName=DNS:${HOST},DNS:fonts.googleapis.com,DNS:fonts.gstatic.com`], { stdio: 'ignore' });
 
 const NOSTORE = 'no-cache, no-store, must-revalidate';
 const server = createServer({ key: readFileSync(join(scratch, 'k.pem')), cert: readFileSync(join(scratch, 'c.pem')) }, (req, res) => {
   const path = req.url.split('?')[0];
+  const external = req.headers.host?.split(':')[0] !== HOST; // fonts.googleapis.com / fonts.gstatic.com
+  if (external) {
+    const key = `${req.headers.host}${path}`;
+    hits[key] = (hits[key] ?? 0) + 1;
+    res.writeHead(200, { 'content-type': path.endsWith('.css') || req.url.includes('css2') ? 'text/css' : 'font/woff2', 'access-control-allow-origin': '*', 'cross-origin-resource-policy': 'cross-origin' });
+    return res.end(req.url.includes('css2') ? "@font-face{font-family:'Geist';src:url(https://fonts.gstatic.com/x.woff2)}" : Buffer.alloc(10));
+  }
   if (path === '/favicon.ico') return res.writeHead(404).end();
   hits[path] = (hits[path] ?? 0) + 1;
   if (path === '/') {
-    res.writeHead(200, { 'content-type': 'text/html', 'cache-control': NOSTORE });
+    // Gavriel responde con aislamiento de origen cruzado: se imita para comprobar que las tipografías locales cargan igual
+    res.writeHead(200, { 'content-type': 'text/html', 'cache-control': NOSTORE, 'cross-origin-opener-policy': 'same-origin', 'cross-origin-embedder-policy': 'credentialless' });
     return res.end(`<!doctype html><title>t</title><body>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500;700&display=swap">
+<p style="font-family:Geist,sans-serif">Atención: señal perdida · Ñandú</p><code style="font-family:'Geist Mono',monospace">E130</code>
 <script src="/assets/index-ABCD1234.js"></script>
 <script src="/assets/plain.js"></script>
 <script>
@@ -59,7 +69,7 @@ await new Promise((r) => server.listen(8443, '127.0.0.1', r));
 const profile = mkdtempSync(join(tmpdir(), 'gv-e2e-'));
 const chrome = spawn(CHROME, [
   `--user-data-dir=${profile}`, '--remote-debugging-pipe', '--remote-debugging-port=9333', '--enable-unsafe-extension-debugging',
-  `--host-resolver-rules=MAP ${HOST} 127.0.0.1:8443`, '--ignore-certificate-errors',
+  `--host-resolver-rules=MAP ${HOST} 127.0.0.1:8443, MAP fonts.googleapis.com 127.0.0.1:8443, MAP fonts.gstatic.com 127.0.0.1:8443`, '--ignore-certificate-errors',
   '--no-first-run', '--no-default-browser-check', '--headless=new', 'about:blank',
 ], { stdio: ['ignore', 'ignore', 'ignore', 'pipe', 'pipe'] });
 
@@ -122,6 +132,8 @@ try {
   const cached = (u) => evalJs(`fetch('${u}',{cache:'only-if-cached',mode:'same-origin'}).then(r=>r.status).catch(e=>'no-esta-en-cache')`);
   out.hashedInCache = await cached('/assets/index-ABCD1234.js');
   out.plainInCache = await cached('/assets/plain.js');
+  // ¿qué tipografías cargó la página realmente? (FontFace con estado 'loaded' y de dónde vinieron)
+  out.fontsLoaded = await evalJs(`document.fonts.ready.then(()=>[...document.fonts].filter(f=>f.status==='loaded').map(f=>f.family+':'+f.unicodeRange.slice(0,8)))`);
   out.contentScriptAttrs = await evalJs(`document.documentElement.getAttributeNames().filter(a=>a.startsWith('data-gv')||a.startsWith('data-gavriel')).join(',')`);
   ws.close();
 } catch (e) {
@@ -135,7 +147,7 @@ console.log(JSON.stringify(out, null, 2));
 // --- verificaciones
 assert.equal(out.error, undefined, out.error);
 assert.ok(out.loadUnpacked?.id, 'la extensión no cargó');
-assert.deepEqual(out.enabledRulesets, ['cache'], 'el conjunto de reglas de caché no está activo');
+assert.deepEqual([...out.enabledRulesets].sort(), ['cache', 'fonts'], 'los conjuntos de reglas de caché y tipografías deben estar activos');
 assert.equal(out.hits['/assets/index-ABCD1234.js'], 1, 'el archivo con hash debía bajarse una sola vez en tres cargas');
 assert.equal(out.hits['/assets/plain.js'], 3, 'el archivo sin hash no debe guardarse (control)');
 assert.equal(out.hits['/'], 3, 'la página principal debe pedirse siempre');
@@ -143,6 +155,10 @@ for (const name of ['beep', 'alarm', 'siren']) {
   assert.equal(out.hits[`/sounds/${name}.mp3`], undefined, `${name} debía estar bloqueado`);
 }
 assert.ok(out.hits['/sounds/ding.mp3'] >= 1, 'un sonido no silenciado debe descargarse');
+assert.equal(out.hits['fonts.googleapis.com/css2'], undefined, 'el CSS de Google Fonts no debía pedirse');
+assert.equal(out.hits['fonts.gstatic.com/x.woff2'], undefined, 'no debía pedirse nada a gstatic');
+assert.ok(out.fontsLoaded.some((f) => f.startsWith('Geist:')), 'Geist no cargó desde la extensión');
+assert.ok(out.fontsLoaded.some((f) => f.startsWith('Geist Mono:')), 'Geist Mono no cargó desde la extensión');
 assert.match(out.contentScriptAttrs, /data-gavriel-mute/, 'los content scripts no arrancaron');
 console.log('OK: caché, bloqueo de sonidos y content scripts verificados');
 process.exit(0);

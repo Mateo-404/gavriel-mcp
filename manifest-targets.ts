@@ -6,6 +6,8 @@ export const FIREFOX_ID = 'gavriel-tools@gavriel-extension.local';
 /** Firefox soporta `world: "MAIN"` en content scripts desde la 128. */
 export const FIREFOX_MIN_VERSION = '128.0';
 const SITE = 'https://app.gavriel.com.ar/*';
+/** Para redirigir el CSS de Google Fonts a las tipografías de la extensión. */
+const FONTS_HOST = 'https://fonts.googleapis.com/*';
 
 /** Versión mínima de Chrome: el código sale en JS moderno (sin transpilar a versiones viejas). */
 export const CHROME_MIN_VERSION = '120';
@@ -17,7 +19,7 @@ export function forChrome(base: Manifest, version: string): Manifest {
     minimum_chrome_version: CHROME_MIN_VERSION,
     background: { service_worker: 'background.js' },
     // Cambiar cabeceras de respuesta (caché) exige permiso sobre el sitio
-    host_permissions: [SITE],
+    host_permissions: [SITE, FONTS_HOST],
   };
 }
 
@@ -36,6 +38,6 @@ export function forFirefox(base: Manifest, version: string): Manifest {
       },
     },
     // En Firefox los permisos de sitio de un MV3 se piden aparte de los content scripts
-    host_permissions: [SITE],
+    host_permissions: [SITE, FONTS_HOST],
   };
 }

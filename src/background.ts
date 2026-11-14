@@ -4,16 +4,17 @@
  * al abrir el navegador y cada vez que cambian los ajustes de sonido.
  */
 import { readSettings, touches } from './shared/storage';
-import { CACHE_RULESET, syncSoundRules } from './shared/sound-rules';
+import { CACHE_RULESET, FONTS_RULESET, syncSoundRules } from './shared/sound-rules';
 
 async function sync(): Promise<void> {
   try {
-    const { mutedSounds, muteEnabled, cacheAssets } = await readSettings();
+    const { mutedSounds, muteEnabled, cacheAssets, localFonts } = await readSettings();
     await syncSoundRules(chrome.declarativeNetRequest, mutedSounds, muteEnabled);
     // Caché de los archivos con hash: un conjunto de reglas estáticas que se enciende o apaga
-    await chrome.declarativeNetRequest.updateEnabledRulesets(
-      cacheAssets ? { enableRulesetIds: [CACHE_RULESET] } : { disableRulesetIds: [CACHE_RULESET] },
-    );
+    await chrome.declarativeNetRequest.updateEnabledRulesets({
+      enableRulesetIds: [cacheAssets && CACHE_RULESET, localFonts && FONTS_RULESET].filter((id): id is string => !!id),
+      disableRulesetIds: [!cacheAssets && CACHE_RULESET, !localFonts && FONTS_RULESET].filter((id): id is string => !!id),
+    });
   } catch (error) {
     console.warn('[Gavriel Tools] no se pudo actualizar el bloqueo de sonidos:', error);
   }
@@ -22,6 +23,6 @@ async function sync(): Promise<void> {
 chrome.runtime.onInstalled.addListener(() => void sync());
 chrome.runtime.onStartup.addListener(() => void sync());
 chrome.storage.onChanged.addListener((changes, area) => {
-  if (touches(changes, area, 'mutedSounds', 'muteEnabled', 'cacheAssets')) void sync();
+  if (touches(changes, area, 'mutedSounds', 'muteEnabled', 'cacheAssets', 'localFonts')) void sync();
 });
 void sync(); // también al despertar el service worker

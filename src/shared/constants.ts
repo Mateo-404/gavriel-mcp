@@ -20,6 +20,8 @@ export type Settings = {
   liteMode: boolean;
   /** Guarda en el navegador los archivos con hash de Gavriel (el servidor pide no guardarlos nunca). */
   cacheAssets: boolean;
+  /** Sirve las tipografías Geist desde la extensión en lugar de pedirlas a Google Fonts. */
+  localFonts: boolean;
   /** Nombres (sin extensión) de los sonidos de /sounds/ que se silencian. */
   mutedSounds: string[];
   /** Sonidos que Gavriel ya reprodujo (lista que muestra el popup). */
@@ -44,6 +46,7 @@ export const DEFAULT_SETTINGS: Settings = {
   hideGridView: true,
   liteMode: true,
   cacheAssets: true,
+  localFonts: true,
   mutedSounds: [...DEFAULT_SOUNDS],
   knownSounds: [...DEFAULT_SOUNDS],
 };
