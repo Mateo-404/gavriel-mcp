@@ -74,6 +74,7 @@ Al cambiar el código: `bun run build` (o `bun run dev` para recompilar al guard
 | `bun test`          | Tests unitarios (lógica pura) y de DOM con happy-dom (diálogos, filtros, tarjeta de llamada, observador, bundles minificados) |
 | `bun run outdated` / `bun run update:latest` | Ver y subir Bun, TypeScript y dependencias a lo último |
 | `bun run check`     | Tipos + tests + build                              |
+| `bun run e2e`       | Prueba de punta a punta en un Chrome aparte (perfil temporal) con la extensión cargada sobre un servidor local que imita a Gavriel: verifica la caché de archivos con hash (1 descarga en 3 cargas), el bloqueo de sonidos (los elegidos no se piden, los demás sí) y el arranque de los content scripts. Necesita Chrome y openssl; no toca el Gavriel real. |
 
 ## Estructura
 

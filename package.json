@@ -10,6 +10,7 @@
     "typecheck": "tsc --noEmit",
     "test": "bun test",
     "check": "bun run typecheck && bun test && bun run build",
+    "e2e": "node e2e/gavriel-cache-sounds.mjs",
     "outdated": "bun outdated",
     "update:latest": "bun update --latest"
   },
