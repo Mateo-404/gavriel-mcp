@@ -2,7 +2,8 @@
   "manifest_version": 3,
   "name": "Gavriel Tools",
   "version": "0.0.0",
-  "description": "Herramientas extra para Gavriel: silenciar los sonidos del panel de monitoreo y atajos de teclado para llamar.",
+  "description": "Gavriel más rápido y sin ruido: atajos de teclado, llamadas con un toque, sonidos silenciados y carga veloz del panel de monitoreo.",
+  "homepage_url": "https://github.com/Mateo-404/gavriel-mcp/tree/gavriel-extension",
   "permissions": ["storage", "declarativeNetRequest", "declarativeNetRequestFeedback"],
   "declarative_net_request": {
     "rule_resources": [
@@ -24,7 +25,7 @@
     "128": "icons/icon128.png"
   },
   "action": {
-    "default_title": "Gavriel Tools",
+    "default_title": "Gavriel Tools: sonidos y atajos",
     "default_popup": "popup/popup.html",
     "default_icon": {
       "16": "icons/icon16.png",

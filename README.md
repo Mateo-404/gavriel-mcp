@@ -102,6 +102,7 @@ static/            manifest.json, popup/ y options/ (html y css), shortcuts.css,
 test/              bun test
 build.ts           script de build (Bun.build, un IIFE por content script; genera dist/ y dist-firefox/)
 manifest-targets.ts  manifest de cada navegador a partir de static/manifest.json
+scripts/make-icons.mjs  genera los íconos de 16, 32 y 48 px desde icon128.png (PNG válidos; un bloque dañado en icon48.png hacía que Chrome mostrara una «G» gris)
 ```
 
 ## Cómo funciona Gavriel (verificado en su código)
