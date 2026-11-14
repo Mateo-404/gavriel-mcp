@@ -13,11 +13,15 @@ import {
   type Settings,
 } from '../shared/constants';
 import { readSettings, readSetting, touches, writeSettings } from '../shared/storage';
+import { setLocalFonts } from './fonts';
 
 const root = document.documentElement;
 
 /** Interruptores visuales: el CSS (shortcuts.css) actúa según estos atributos de <html>. */
-function applyLook(settings: Pick<Settings, 'hideSoundBanner' | 'plainEvents' | 'hideGridView' | 'liteMode'>): void {
+function applyLook(
+  settings: Pick<Settings, 'hideSoundBanner' | 'plainEvents' | 'hideGridView' | 'liteMode' | 'localFonts'>,
+): void {
+  setLocalFonts(settings.localFonts);
   root.toggleAttribute('data-gv-nobanner', settings.hideSoundBanner);
   root.toggleAttribute('data-gv-plain', settings.plainEvents);
   root.toggleAttribute('data-gv-nogrid', settings.hideGridView);
@@ -40,7 +44,7 @@ apply(DEFAULT_SETTINGS); // valores por defecto hasta leer lo guardado
 void load();
 
 chrome.storage.onChanged.addListener((changes, area) => {
-  if (touches(changes, area, 'muteEnabled', 'mutedSounds', 'hideSoundBanner', 'plainEvents', 'hideGridView', 'liteMode')) void load();
+  if (touches(changes, area, 'muteEnabled', 'mutedSounds', 'hideSoundBanner', 'plainEvents', 'hideGridView', 'liteMode', 'localFonts')) void load();
 });
 
 // Sonido nuevo detectado: se agrega a la lista del popup (sin silenciarlo)

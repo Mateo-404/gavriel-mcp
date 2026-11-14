@@ -16,6 +16,10 @@ describe('humo: los content scripts minificados arrancan sin errores', () => {
     expect(document.documentElement.getAttribute('data-gavriel-mute')).toBe('1');
     expect(document.documentElement.hasAttribute('data-gv-nobanner')).toBe(true);
     expect(document.documentElement.hasAttribute('data-gv-plain')).toBe(true);
+    // las tipografías locales se inyectan al instante, con URLs de la extensión y sin pedir nada afuera
+    const fonts = document.getElementById('gv-fonts')?.textContent ?? '';
+    expect(fonts).toContain('url("chrome-extension://test-extension/fonts/geist-latin.woff2")');
+    expect(fonts).not.toContain('https://');
     expect(JSON.parse(document.documentElement.getAttribute('data-gavriel-muted-sounds') ?? '[]')).toContain('alarm');
   });
 

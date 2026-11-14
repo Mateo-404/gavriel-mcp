@@ -17,7 +17,7 @@ export const chromeStub = {
 
 Object.assign(globalThis, {
   chrome: {
-    runtime: { id: 'test-extension' },
+    runtime: { id: 'test-extension', getURL: (path: string) => `chrome-extension://test-extension/${path}` },
     storage: {
       local: {
         get: async (defaults: Record<string, unknown>) => {

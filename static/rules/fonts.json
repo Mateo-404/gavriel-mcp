@@ -2,7 +2,7 @@
   {
     "id": 1,
     "priority": 1,
-    "action": { "type": "redirect", "redirect": { "extensionPath": "/fonts/gavriel-fonts.css" } },
+    "action": { "type": "block" },
     "condition": {
       "urlFilter": "||fonts.googleapis.com/css2?family=Geist",
       "initiatorDomains": ["app.gavriel.com.ar"],

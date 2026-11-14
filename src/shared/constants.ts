@@ -20,7 +20,7 @@ export type Settings = {
   liteMode: boolean;
   /** Guarda en el navegador los archivos con hash de Gavriel (el servidor pide no guardarlos nunca). */
   cacheAssets: boolean;
-  /** Sirve las tipografías Geist desde la extensión en lugar de pedirlas a Google Fonts. */
+  /** Usa las tipografías Geist de la extensión y bloquea el CSS de Google Fonts (cero pedidos externos). */
   localFonts: boolean;
   /** Nombres (sin extensión) de los sonidos de /sounds/ que se silencian. */
   mutedSounds: string[];
