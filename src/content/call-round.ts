@@ -47,6 +47,8 @@ export interface CallRound {
   peek: (contacts: RoundContact[]) => { position: number; round: RoundNumber } | { message: string };
   /** La llamada a `position` arrancó: cuenta una llamada y la pinta «llamando». */
   commit: (position: number, round: RoundNumber) => void;
+  /** La intervención terminó: la ronda de la cuenta vuelve a cero (sin cuenta abierta, todas). */
+  forget: (all?: boolean) => void;
 }
 
 export function createCallRound({ isCalling, accountId, repaint }: CallRoundDeps): CallRound {
@@ -191,6 +193,14 @@ export function createCallRound({ isCalling, accountId, repaint }: CallRoundDeps
       if (!id) return;
       calling = { index: position - 1, at: Date.now(), seen: false };
       update(id, (s) => markCalled(s, position - 1, round));
+    },
+
+    forget(all = false) {
+      const id = accountId();
+      if (all || !id) store.clear();
+      else store.clear(id);
+      calling = null;
+      repaint();
     },
   };
 }

@@ -420,7 +420,7 @@ console.log(JSON.stringify(out, null, 2));
 // --- verificaciones
 assert.equal(out.error, undefined, out.error);
 assert.ok(out.loadUnpacked?.id, 'la extensión no cargó');
-assert.deepEqual([...out.enabledRulesets].sort(), ['cache', 'fonts'], 'los conjuntos de reglas de caché y tipografías deben estar activos');
+assert.deepEqual([...out.enabledRulesets].sort(), ['cache', 'fonts', 'push'], 'los conjuntos de reglas de caché y tipografías deben estar activos');
 assert.equal(out.hits['/assets/index-ABCD1234.js'], 1, 'el archivo con hash debía bajarse una sola vez en tres cargas');
 assert.equal(out.hits['/assets/plain.js'], 3, 'el archivo sin hash no debe guardarse (control)');
 assert.equal(out.hits['/'], 3, 'la página principal debe pedirse siempre');
@@ -488,7 +488,7 @@ assert.equal(out.sipClicks.hangup, 1, 'Ctrl+Enter debía llamar una vez a hangup
 assert.equal(out.sipClicks.panel, 0, 'no debía abrir el panel del softphone');
 assert.equal(out.sipToast, 'Llamada cortada');
 const net = JSON.parse(out.netStatus ?? '{}');
-assert.deepEqual([...(net.rulesets ?? [])].sort(), ['cache', 'fonts'], 'el fondo debe publicar las reglas activas');
+assert.deepEqual([...(net.rulesets ?? [])].sort(), ['cache', 'fonts', 'push'], 'el fondo debe publicar las reglas activas');
 assert.equal(net.dynamic, 3, 'el fondo debe publicar los sonidos bloqueados');
 assert.equal(net.error, null);
 assert.match(out.contentScriptAttrs, /data-gavriel-mute/, 'los content scripts no arrancaron');

@@ -48,6 +48,8 @@ Avisos por tipo: notificaciones del sistema para BUR (robo), POW (corte de energ
 
 Música: si hay Spotify Web (`open.spotify.com`) o YouTube Music (`music.youtube.com`) abiertos en otra pestaña, aparece un reproductor en la barra, junto a «Tiempo real» (en el resto de las pantallas, solo en la barra de arriba) (anterior, pausa, siguiente, volumen, silencio, progreso, cambiar de reproductor). Lee `navigator.mediaSession` y el elemento de audio. No controla la app de escritorio de Spotify. Los selectores de los botones pueden romperse si los sitios cambian.
 
+Fin de la ronda: al confirmar «Cerrar intervención» o «Dejar en observación» (con el mouse o con Ctrl+Enter) la ronda de esa cuenta vuelve a cero; en el cierre masivo se reinician todas las cuentas.
+
 Música abierta antes que Gavriel: al abrir Gavriel (o al instalar/recargar la extensión) el fondo busca las pestañas de Spotify Web y YouTube Music por su dirección, les pide que informen su estado y, si alguna estaba abierta antes de la extensión y no tiene el script, se lo inyecta (permiso `scripting`). Una pestaña abierta se muestra aunque esté en pausa hace horas; una cerrada desaparece.
 
 Animaciones: vienen apagadas por defecto (interruptor en Ajustes, `data-gv-noanim`): sin transiciones ni animaciones, sin desenfoques (`backdrop-filter`) ni `will-change`; solo quedan los indicadores de carga. Incluye al reproductor.

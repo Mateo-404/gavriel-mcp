@@ -54,7 +54,7 @@ import { plainDigit, typeDigit } from './dial-input';
 import { createClientCopy } from './client-copy';
 import { createAlertSender } from './alerts';
 import { createDataStore } from './data-store';
-import { createDialogConfirm } from './dialog-confirm';
+import { createDialogConfirm, watchInterventionEnd } from './dialog-confirm';
 import { createMediaBar } from './media-bar';
 import { createLastContact } from './last-contact';
 import { createPanelActions } from './panel-actions';
@@ -338,6 +338,8 @@ function main(): void {
   const callMute = createCallMute({ sip, toast });
   let roundOn: boolean = DEFAULT_SETTINGS.callRound;
   const round = createCallRound({ isCalling, accountId: currentAccountId, repaint: () => schedule() });
+  // Al cerrar la intervención (o dejarla en observación) la ronda de esa cuenta vuelve a cero
+  watchInterventionEnd((bulk) => round.forget(bulk));
 
   // Reproductor de Spotify Web / YouTube Music en la barra de arriba (ver media-bar.ts)
   const mediaBar = createMediaBar({

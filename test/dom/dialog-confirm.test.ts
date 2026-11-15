@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, test } from 'bun:test';
-import { createDialogConfirm } from '../../src/content/dialog-confirm';
+import { createDialogConfirm, watchInterventionEnd } from '../../src/content/dialog-confirm';
 
 const toasts: string[] = [];
 const dc = createDialogConfirm({
@@ -123,5 +123,49 @@ describe('dialog-confirm (DOM)', () => {
       expect(clicks).toEqual([]);
       expect(toasts).toEqual(['Completá los campos para confirmar']);
     });
+  });
+});
+
+describe('watchInterventionEnd', () => {
+  const ends: boolean[] = [];
+  const stop = watchInterventionEnd((bulk) => ends.push(bulk));
+  const mount = (title: string, disabled = false): void => {
+    document.body.innerHTML = `<div role="dialog" data-slot="dialog-content"><h2>${title}</h2><div data-slot="dialog-footer"><button class="bg-transparent">Cancelar</button><button class="bg-destructive" ${disabled ? 'disabled' : ''}>Confirmar</button></div></div>`;
+  };
+  const click = (i: number): void => document.querySelectorAll('button')[i]!.click();
+
+  test('al confirmar «Cerrar intervención» o «Dejar en observación» avisa (con mouse o con Ctrl+Enter)', () => {
+    ends.length = 0;
+    mount('Cerrar intervención');
+    click(1);
+    mount('Dejar en observación');
+    click(1);
+    expect(ends).toEqual([false, false]);
+  });
+
+  test('el cierre masivo avisa como masivo', () => {
+    ends.length = 0;
+    mount('Cerrar Intervenciones Masivamente');
+    click(1);
+    expect(ends).toEqual([true]);
+  });
+
+  test('Cancelar, un botón deshabilitado u otros diálogos no avisan', () => {
+    ends.length = 0;
+    mount('Cerrar intervención');
+    click(0);
+    mount('Cerrar intervención', true);
+    click(1);
+    mount('Eliminar contacto');
+    click(1);
+    expect(ends).toEqual([]);
+  });
+
+  test('al detenerlo no avisa más', () => {
+    stop();
+    ends.length = 0;
+    mount('Cerrar intervención');
+    click(1);
+    expect(ends).toEqual([]);
   });
 });

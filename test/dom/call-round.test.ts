@@ -101,6 +101,40 @@ describe('ronda de llamadas (DOM)', () => {
     expect(label()).toBe('Ronda 1 de 2 · 0/2 llamados');
   });
 
+  test('al terminar la intervención la ronda de la cuenta vuelve a cero, y las otras cuentas no se tocan', () => {
+    const { contacts, heading } = mount(['A', 'B']);
+    round.paint(contacts, heading);
+    round.commit(1, 1);
+    round.paint(contacts, heading);
+    expect(label()).toBe('Ronda 1 de 2 · 1/2 llamados');
+    const mine = account;
+    account = 'otra-cuenta';
+    round.commit(1, 1);
+    round.forget();
+    round.paint(contacts, heading);
+    expect(label()).toBe('Ronda 1 de 2 · 0/2 llamados');
+    account = mine;
+    round.paint(contacts, heading);
+    expect(label()).toBe('Ronda 1 de 2 · 1/2 llamados');
+    round.forget();
+    round.paint(contacts, heading);
+    expect(label()).toBe('Ronda 1 de 2 · 0/2 llamados');
+    expect(states(contacts)).toEqual(['', '']);
+  });
+
+  test('en un cierre masivo se olvidan todas las cuentas', () => {
+    const { contacts, heading } = mount(['A']);
+    round.paint(contacts, heading);
+    round.commit(1, 1);
+    const mine = account;
+    account = 'x1';
+    round.commit(1, 1);
+    round.forget(true);
+    account = mine;
+    round.paint(contacts, heading);
+    expect(label()).toBe('Ronda 1 de 2 · 0/1 llamados');
+  });
+
   test('el estado es por cuenta: otra cuenta empieza de cero y al volver se conserva', () => {
     const { contacts, heading } = mount(['A', 'B']);
     round.paint(contacts, heading);

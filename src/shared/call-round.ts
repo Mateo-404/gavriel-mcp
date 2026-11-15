@@ -118,6 +118,8 @@ export function progressLabel(p: RoundProgress): string {
 export function createRoundStore(limit = 8): {
   get: (accountId: string) => RoundState;
   set: (accountId: string, state: RoundState) => void;
+  /** Olvida la ronda de una cuenta (o de todas, sin argumento). */
+  clear: (accountId?: string) => void;
 } {
   const map = new Map<string, RoundState>();
   return {
@@ -126,6 +128,10 @@ export function createRoundStore(limit = 8): {
       map.delete(accountId);
       map.set(accountId, state);
       if (map.size > limit) map.delete(map.keys().next().value as string);
+    },
+    clear(accountId) {
+      if (accountId === undefined) map.clear();
+      else map.delete(accountId);
     },
   };
 }

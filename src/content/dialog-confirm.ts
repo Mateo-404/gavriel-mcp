@@ -24,6 +24,29 @@ interface Deps {
   toast: (message: string) => void;
 }
 
+/** Diálogos que terminan una intervención (cerrarla, dejarla en observación, cierre masivo). */
+const ENDS_INTERVENTION = /cerrar intervenci|dejar en observaci[oó]n/i;
+
+/**
+ * Avisa cuando se aprieta el botón principal de un diálogo que termina una intervención, sea con Ctrl+Enter o
+ * con el mouse. Se escucha en captura (antes que Gavriel). `bulk` indica el cierre de varias cuentas a la vez.
+ */
+export function watchInterventionEnd(onEnd: (bulk: boolean) => void, doc: Document = document): () => void {
+  const listener = (event: Event): void => {
+    const button = (event.target as Element | null)?.closest?.('button');
+    const dialog = button?.closest('[data-slot="dialog-content"], [role="alertdialog"]');
+    if (!button || !dialog || button.disabled) return;
+    const title = dialog.querySelector('h1, h2, h3, [data-slot="dialog-title"]')?.textContent ?? '';
+    if (!ENDS_INTERVENTION.test(title)) return;
+    const footer = dialog.querySelector(FOOTER) ?? dialog;
+    const buttons = [...footer.querySelectorAll<HTMLButtonElement>('button')];
+    const main = buttons[pickPrimary(buttons.map((b) => ({ className: b.className, label: b.textContent?.trim() ?? '' })))];
+    if (main === button) onEnd(/masivamente/i.test(title));
+  };
+  doc.addEventListener('click', listener, true);
+  return () => doc.removeEventListener('click', listener, true);
+}
+
 export interface DialogConfirm {
   /** Botón principal del diálogo que está arriba de todo, o null. */
   primary: () => HTMLButtonElement | null;
