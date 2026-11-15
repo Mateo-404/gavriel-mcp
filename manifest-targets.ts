@@ -18,6 +18,8 @@ export function forChrome(base: Manifest, version: string): Manifest {
     version,
     minimum_chrome_version: CHROME_MIN_VERSION,
     background: { service_worker: 'background.js' },
+    // Deja el botón en gris fuera de Gavriel y las pestañas de música
+    permissions: [...((base.permissions as string[] | undefined) ?? []), 'declarativeContent'],
     // Cambiar cabeceras de respuesta (caché) exige permiso sobre el sitio
     host_permissions: [SITE, ...MUSIC_SITES],
   };

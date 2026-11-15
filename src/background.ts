@@ -6,6 +6,7 @@
 import { readSettings, touches } from './shared/storage';
 import { installMediaRouter } from './media-router';
 import { installNotifications } from './notifications';
+import { installActionGate } from './action-gate';
 import { CACHE_RULESET, FONTS_RULESET, syncSoundRules } from './shared/sound-rules';
 
 const FONTS_URL = 'https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500;700&display=swap';
@@ -79,6 +80,7 @@ chrome.declarativeNetRequest.onRuleMatchedDebug?.addListener((info) => {
 });
 
 installNotifications();
+installActionGate();
 installMediaRouter();
 
 chrome.runtime.onInstalled.addListener(() => void sync());
