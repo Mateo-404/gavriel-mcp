@@ -50,6 +50,8 @@ Música: si hay Spotify Web (`open.spotify.com`) o YouTube Music (`music.youtube
 
 Fin de la ronda: al confirmar «Cerrar intervención» o «Dejar en observación» (con el mouse o con Ctrl+Enter) la ronda de esa cuenta vuelve a cero; en el cierre masivo se reinician todas las cuentas.
 
+Después de confirmar (con el mouse o con Ctrl+Enter, con «.» automático o con el motivo que escribas): en **«Cerrar Intervenciones Masivamente»**, cuando el diálogo termina de procesar y se cierra, aprieta «Limpiar filtros»; en **«Cerrar Intervención»** de un evento, cuando se cierra el diálogo, aprieta «Volver a panel». Si el diálogo no se cierra (error, motivo faltante) no hace nada. «Dejar en observación» no vuelve al panel.
+
 Música abierta antes que Gavriel: al abrir Gavriel (o al instalar/recargar la extensión) el fondo busca las pestañas de Spotify Web y YouTube Music por su dirección, les pide que informen su estado y, si alguna estaba abierta antes de la extensión y no tiene el script, se lo inyecta (permiso `scripting`). Una pestaña abierta se muestra aunque esté en pausa hace horas; una cerrada desaparece.
 
 Animaciones: vienen apagadas por defecto (interruptor en Ajustes, `data-gv-noanim`): sin transiciones ni animaciones, sin desenfoques (`backdrop-filter`) ni `will-change`; solo quedan los indicadores de carga. Incluye al reproductor.

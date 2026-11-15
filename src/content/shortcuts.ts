@@ -54,7 +54,7 @@ import { plainDigit, typeDigit } from './dial-input';
 import { createClientCopy } from './client-copy';
 import { createAlertSender } from './alerts';
 import { createDataStore } from './data-store';
-import { createDialogConfirm, watchInterventionEnd } from './dialog-confirm';
+import { createDialogConfirm, retryFor, watchInterventionEnd, whenDialogGone } from './dialog-confirm';
 import { createMediaBar } from './media-bar';
 import { createLastContact } from './last-contact';
 import { createPanelActions } from './panel-actions';
@@ -257,6 +257,12 @@ function main(): void {
     return b && !b.disabled && visible(b) ? b : null;
   };
 
+  const goBack = (): boolean => {
+    const button = backButton();
+    button?.click();
+    return button !== null;
+  };
+
   /** Esc vuelve al panel desde una cuenta, salvo que esté escribiendo, haya un menú o diálogo, o pantalla completa. */
   const canGoBack = (target: EventTarget | null): boolean =>
     !!accountIdFromLocation(location.pathname, location.search) &&
@@ -339,7 +345,12 @@ function main(): void {
   let roundOn: boolean = DEFAULT_SETTINGS.callRound;
   const round = createCallRound({ isCalling, accountId: currentAccountId, repaint: () => schedule() });
   // Al cerrar la intervención (o dejarla en observación) la ronda de esa cuenta vuelve a cero
-  watchInterventionEnd((bulk) => round.forget(bulk));
+  // Y se vuelve a lo que sigue: cierre masivo → «Limpiar filtros»; cierre de un evento → «Volver a panel»
+  watchInterventionEnd((bulk, kind, dialog) => {
+    round.forget(bulk);
+    if (kind === 'bulk') whenDialogGone(dialog, () => retryFor(() => panel.clearFilters()));
+    else if (kind === 'close') whenDialogGone(dialog, () => retryFor(goBack));
+  });
 
   // Reproductor de Spotify Web / YouTube Music en la barra de arriba (ver media-bar.ts)
   const mediaBar = createMediaBar({

@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, test } from 'bun:test';
-import { createDialogConfirm, watchInterventionEnd } from '../../src/content/dialog-confirm';
+import { createDialogConfirm, retryFor, watchInterventionEnd, whenDialogGone } from '../../src/content/dialog-confirm';
 
 const toasts: string[] = [];
 const dc = createDialogConfirm({
@@ -167,5 +167,59 @@ describe('watchInterventionEnd', () => {
     mount('Cerrar intervención');
     click(1);
     expect(ends).toEqual([]);
+  });
+
+  test('informa qué diálogo fue: masivo, cierre de un evento u observación', () => {
+    const kinds: string[] = [];
+    const off = watchInterventionEnd((_b, kind) => kinds.push(kind));
+    for (const title of ['Cerrar Intervenciones Masivamente', 'Cerrar Intervención', 'Dejar en observación']) {
+      mount(title);
+      click(1);
+    }
+    off();
+    expect(kinds).toEqual(['bulk', 'close', 'observation']);
+  });
+});
+
+describe('qué se hace después de cerrar', () => {
+  const wait = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
+
+  test('whenDialogGone espera a que el diálogo salga del DOM y recién ahí actúa', async () => {
+    document.body.innerHTML = '<div id="d" data-slot="dialog-content"></div>';
+    const el = document.getElementById('d')!;
+    let ran = 0;
+    whenDialogGone(el, () => ran++);
+    await wait(10);
+    expect(ran).toBe(0); // sigue abierto (procesando o con error)
+    el.remove();
+    await wait(10);
+    expect(ran).toBe(1);
+    document.body.append(document.createElement('p')); // más cambios: no vuelve a actuar
+    await wait(10);
+    expect(ran).toBe(1);
+  });
+
+  test('whenDialogGone abandona a los maxMs si el diálogo nunca se cierra', async () => {
+    document.body.innerHTML = '<div id="d"></div>';
+    const el = document.getElementById('d')!;
+    let ran = 0;
+    whenDialogGone(el, () => ran++, 20);
+    await wait(40);
+    el.remove();
+    await wait(10);
+    expect(ran).toBe(0);
+  });
+
+  test('retryFor reintenta hasta que el botón aparece, y no sigue para siempre', async () => {
+    let tries = 0;
+    retryFor(() => ++tries >= 3, 1000, 5);
+    await wait(40);
+    expect(tries).toBe(3);
+    let never = 0;
+    retryFor(() => (never++, false), 30, 5);
+    await wait(80);
+    const stopped = never;
+    await wait(40);
+    expect(never).toBe(stopped);
   });
 });

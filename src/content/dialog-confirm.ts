@@ -31,7 +31,39 @@ const ENDS_INTERVENTION = /cerrar intervenci|dejar en observaci[oó]n/i;
  * Avisa cuando se aprieta el botón principal de un diálogo que termina una intervención, sea con Ctrl+Enter o
  * con el mouse. Se escucha en captura (antes que Gavriel). `bulk` indica el cierre de varias cuentas a la vez.
  */
-export function watchInterventionEnd(onEnd: (bulk: boolean) => void, doc: Document = document): () => void {
+export type EndKind = 'bulk' | 'close' | 'observation';
+
+/** Prueba `step` hasta que devuelva true o pasen `maxMs` (sin quedarse corriendo si no hay nada que hacer). */
+export function retryFor(step: () => boolean, maxMs = 1500, every = 50): void {
+  const started = Date.now();
+  const tick = (): void => {
+    if (step() || Date.now() - started >= maxMs) return;
+    setTimeout(tick, every);
+  };
+  tick();
+}
+
+/**
+ * Ejecuta `run` cuando el diálogo ya se cerró (terminó de procesar). Se mira solo cuando el DOM cambia y se
+ * abandona a los `maxMs`: si el diálogo sigue abierto (error, motivo faltante) no se hace nada.
+ */
+export function whenDialogGone(dialog: Element, run: () => void, maxMs = 30000, doc: Document = document): void {
+  const gone = (): boolean => !dialog.isConnected;
+  if (gone()) return run();
+  const observer = new MutationObserver(() => {
+    if (!gone()) return;
+    observer.disconnect();
+    clearTimeout(timer);
+    run();
+  });
+  const timer = setTimeout(() => observer.disconnect(), maxMs);
+  observer.observe(doc.body, { childList: true, subtree: true });
+}
+
+export function watchInterventionEnd(
+  onEnd: (bulk: boolean, kind: EndKind, dialog: Element) => void,
+  doc: Document = document,
+): () => void {
   const listener = (event: Event): void => {
     const button = (event.target as Element | null)?.closest?.('button');
     const dialog = button?.closest('[data-slot="dialog-content"], [role="alertdialog"]');
@@ -41,7 +73,9 @@ export function watchInterventionEnd(onEnd: (bulk: boolean) => void, doc: Docume
     const footer = dialog.querySelector(FOOTER) ?? dialog;
     const buttons = [...footer.querySelectorAll<HTMLButtonElement>('button')];
     const main = buttons[pickPrimary(buttons.map((b) => ({ className: b.className, label: b.textContent?.trim() ?? '' })))];
-    if (main === button) onEnd(/masivamente/i.test(title));
+    if (main !== button) return;
+    const kind: EndKind = /masivamente/i.test(title) ? 'bulk' : /observaci[oó]n/i.test(title) ? 'observation' : 'close';
+    onEnd(kind === 'bulk', kind, dialog);
   };
   doc.addEventListener('click', listener, true);
   return () => doc.removeEventListener('click', listener, true);
