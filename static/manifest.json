@@ -4,7 +4,7 @@
   "version": "0.0.0",
   "description": "Gavriel más rápido y sin ruido: atajos de teclado, llamadas con un toque, sonidos silenciados y carga veloz del panel de monitoreo.",
   "homepage_url": "https://github.com/Mateo-404/gavriel-mcp/tree/gavriel-extension",
-  "permissions": ["storage", "declarativeNetRequest", "declarativeNetRequestFeedback", "notifications"],
+  "permissions": ["storage", "scripting", "declarativeNetRequest", "declarativeNetRequestFeedback", "notifications"],
   "declarative_net_request": {
     "rule_resources": [
       { "id": "cache", "enabled": true, "path": "rules/cache.json" },

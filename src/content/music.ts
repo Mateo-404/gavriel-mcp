@@ -223,6 +223,10 @@ function main(): void {
 
   chrome.runtime.onMessage.addListener((message: unknown) => {
     const m = message as { type?: string; action?: MediaAction; value?: number } | null;
+    if (m?.type === 'media-poll') {
+      push(true); // una pestaña de Gavriel recién abierta quiere saber qué hay
+      return false;
+    }
     if (m?.type === 'media-command' && m.action) {
       runCommand(source, m.action, m.value);
       setTimeout(() => push(true), 150);

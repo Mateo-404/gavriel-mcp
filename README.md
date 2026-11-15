@@ -48,6 +48,8 @@ Avisos por tipo: notificaciones del sistema para BUR (robo), POW (corte de energ
 
 Música: si hay Spotify Web (`open.spotify.com`) o YouTube Music (`music.youtube.com`) abiertos en otra pestaña, aparece un reproductor en la barra, junto a «Tiempo real» (en el resto de las pantallas, solo en la barra de arriba) (anterior, pausa, siguiente, volumen, silencio, progreso, cambiar de reproductor). Lee `navigator.mediaSession` y el elemento de audio. No controla la app de escritorio de Spotify. Los selectores de los botones pueden romperse si los sitios cambian.
 
+Música abierta antes que Gavriel: al abrir Gavriel (o al instalar/recargar la extensión) el fondo busca las pestañas de Spotify Web y YouTube Music por su dirección, les pide que informen su estado y, si alguna estaba abierta antes de la extensión y no tiene el script, se lo inyecta (permiso `scripting`). Una pestaña abierta se muestra aunque esté en pausa hace horas; una cerrada desaparece.
+
 Animaciones: vienen apagadas por defecto (interruptor en Ajustes, `data-gv-noanim`): sin transiciones ni animaciones, sin desenfoques (`backdrop-filter`) ni `will-change`; solo quedan los indicadores de carga. Incluye al reproductor.
 
 Rendimiento: el build sale minificado (de 66 KB en cuatro scripts a 32 KB en tres), con un único content script para cuenta y atajos; todos comparten un solo observador del DOM (que ignora lo que dibuja la extensión y se pausa con la pestaña oculta), una sola lectura de ajustes y, en Chrome, la Navigation API en lugar de sondear la URL. El JS sale moderno (ES más nuevo, Chrome 120 o más) y TypeScript compila con `target: ESNext`.

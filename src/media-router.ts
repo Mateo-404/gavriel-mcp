@@ -31,9 +31,41 @@ function load(): Promise<Record<string, TabMedia>> {
 
 const save = (tabs: Record<string, TabMedia>): Promise<void> => chrome.storage.session.set({ [KEY]: tabs }).catch(() => {});
 
-function prune(tabs: Record<string, TabMedia>, now = Date.now()): TabMedia[] {
-  for (const [id, tab] of Object.entries(tabs)) if (now - tab.at > STALE_MS) delete tabs[id];
+/**
+ * Lista vigente. Sin `alive`, se descartan las pestañas que hace mucho que no informan. Con `alive` (ids de las
+ * pestañas de música que de verdad siguen abiertas) manda eso: una pestaña abierta se conserva aunque esté en
+ * pausa y no informe nada hace rato, y una que ya no existe se descarta.
+ */
+export function prune(tabs: Record<string, TabMedia>, now = Date.now(), alive?: ReadonlySet<number>): TabMedia[] {
+  for (const [id, tab] of Object.entries(tabs)) {
+    const gone = alive ? !alive.has(Number(id)) : now - tab.at > STALE_MS;
+    if (gone) delete tabs[id];
+  }
   return Object.values(tabs);
+}
+
+const MUSIC_URLS = ['https://open.spotify.com/*', 'https://music.youtube.com/*'];
+
+/** Ids de las pestañas de música abiertas ahora (se las reconoce por la dirección, sin leer su contenido). */
+async function openMusicTabs(): Promise<Set<number>> {
+  try {
+    const tabs = await chrome.tabs.query({ url: MUSIC_URLS });
+    return new Set(tabs.flatMap((t) => (t.id === undefined ? [] : [t.id])));
+  } catch {
+    return new Set();
+  }
+}
+
+/**
+ * Le pide a cada pestaña de música que informe su estado ya. Si no responde (estaba abierta antes de instalar o
+ * recargar la extensión y no tiene el script) se lo inyecta; el script informa apenas arranca.
+ */
+async function pollMusicTabs(ids: ReadonlySet<number>): Promise<void> {
+  for (const tabId of ids) {
+    chrome.tabs.sendMessage(tabId, { type: 'media-poll' }).catch(() => {
+      chrome.scripting?.executeScript({ target: { tabId }, files: ['content/music.js'] }).catch(() => {});
+    });
+  }
 }
 
 /** Avisa a todas las pestañas de Gavriel qué hay sonando. */
@@ -74,7 +106,13 @@ export function installMediaRouter(): void {
     }
 
     if (m?.type === 'media-get') {
-      void load().then((tabs) => sendResponse({ tabs: prune(tabs) }));
+      // Una pestaña de Gavriel recién abierta: se responde con lo que hay (solo pestañas que siguen abiertas)
+      // y se le pide a las de música que informen, por si estaban abiertas desde antes
+      void (async () => {
+        const [tabs, alive] = await Promise.all([load(), openMusicTabs()]);
+        sendResponse({ tabs: prune(tabs, Date.now(), alive) });
+        void pollMusicTabs(alive);
+      })();
       return true; // respuesta asíncrona
     }
 
@@ -85,6 +123,9 @@ export function installMediaRouter(): void {
     }
     return false;
   });
+
+  // Al instalar o recargar la extensión, las pestañas de música que ya estaban abiertas se ponen al día
+  chrome.runtime.onInstalled.addListener(() => void openMusicTabs().then(pollMusicTabs));
 
   // Una pestaña de música cerrada deja de mostrarse
   chrome.tabs.onRemoved.addListener((tabId) => {
