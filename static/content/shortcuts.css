@@ -293,3 +293,19 @@ html[data-gv-noanim] .gv-media-pop { transition: none !important; }
 .gv-round-reset:hover { background: var(--muted, rgba(255, 255, 255, 0.08)); }
 .gv-round-reset:focus-visible { outline: 2px solid var(--ring, #a9e6bd); outline-offset: 1px; }
 @media (prefers-reduced-motion: reduce) { [data-gv-round] { transition: none; } }
+
+/* Botón de silencio del micrófono durante una llamada (a la izquierda del teléfono flotante) */
+.gv-mutebtn {
+  position: fixed; z-index: 2147483000; display: inline-flex; align-items: center; justify-content: center;
+  width: 48px; height: 48px; padding: 0; border: 1px solid rgba(255, 255, 255, 0.18); border-radius: 9999px;
+  background: #1d2a23; color: #f4faf6; cursor: pointer; box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+  transition: background 0.15s, transform 0.12s;
+  animation: gv-callcard-in 0.16s ease-out;
+}
+.gv-mutebtn:hover { background: #26382e; }
+.gv-mutebtn:active { transform: scale(0.94); }
+.gv-mutebtn:focus-visible { outline: 2px solid #a9e6bd; outline-offset: 2px; }
+.gv-mutebtn.gv-muted { background: #ef4444; border-color: #ef4444; color: #fff; }
+.gv-mutebtn.gv-muted:hover { background: #dc2626; }
+@media (prefers-reduced-motion: reduce) { .gv-mutebtn { animation: none; transition: none; } }
+html[data-gv-noanim] .gv-mutebtn { animation: none !important; transition: none !important; }

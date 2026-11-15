@@ -15,6 +15,7 @@
 import { DEFAULT_SOUNDS, MUTE_ATTR, MUTED_SOUNDS_ATTR, SOUND_SEEN_EVENT } from '../shared/constants';
 import { isDebugNoise } from '../shared/console-filter';
 import { installNetTap } from './net-tap';
+import { installMicTracker } from './mic';
 import { installSipBridge } from './sip-bridge';
 import { soundNameFromUrl } from '../shared/sounds';
 
@@ -40,6 +41,8 @@ function main(): void {
   installNetTap();
   // Colgar / atender / rechazar llamando a las funciones del softphone (ver sip-bridge.ts)
   installSipBridge();
+  // Recuerda el micrófono de la llamada para poder silenciarlo (ver mic.ts)
+  installMicTracker();
 
   // Modo ahorro: se descartan los mensajes de depuración con emoji de Gavriel (ver console-filter.ts)
   for (const method of ['log', 'info', 'debug'] as const) {

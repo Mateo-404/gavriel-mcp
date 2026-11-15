@@ -84,7 +84,7 @@ describe('runSipAction', () => {
   test('«state» informa sin ejecutar nada', () => {
     const sip = fakeSip({ calling: true, incoming: 'x' });
     mountProvider(sip);
-    expect(runSipAction('state')).toEqual({ ok: true, calling: true, incoming: true });
+    expect(runSipAction('state')).toEqual({ ok: true, calling: true, incoming: true, muted: false });
     expect(sip.calls).toEqual([]);
   });
 
@@ -126,5 +126,17 @@ describe('puente por eventos (aislado -> página)', () => {
       document.dispatchEvent(new CustomEvent('gavriel:sip-request', { detail }));
     }
     expect(sip.calls).toEqual([]);
+  });
+});
+
+describe('silencio del micrófono por el puente', () => {
+  test('sin llamada en curso no silencia; reactivar siempre se permite', () => {
+    mountProvider(fakeSip({ calling: false, incoming: null }));
+    expect(runSipAction('mute')).toMatchObject({ ok: false, reason: 'nothing-to-do', muted: false });
+  });
+  test('con llamada pero sin micrófono en uso responde error', () => {
+    mountProvider(fakeSip({ calling: true, incoming: null }));
+    expect(runSipAction('mute')).toMatchObject({ ok: false, reason: 'error' });
+    expect(runSipAction('unmute')).toMatchObject({ ok: false, reason: 'error' });
   });
 });

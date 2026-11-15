@@ -17,8 +17,9 @@
  * llamador usa el camino de siempre (clics en la interfaz).
  */
 import { SIP_REQUEST_EVENT, SIP_RESULT_EVENT } from '../shared/constants';
+import { isMicMuted, setMicMuted, toggleMic } from './mic';
 
-type SipAction = 'hangup' | 'answer' | 'reject' | 'state';
+type SipAction = 'hangup' | 'answer' | 'reject' | 'state' | 'mute' | 'unmute';
 
 interface SipContext {
   calling: boolean;
@@ -69,13 +70,21 @@ export interface SipResult {
   reason?: 'no-sip' | 'nothing-to-do' | 'error';
   calling?: boolean;
   incoming?: boolean;
+  /** Micrófono silenciado (solo en las acciones de silencio). */
+  muted?: boolean;
 }
 
 export function runSipAction(action: SipAction, root: ParentNode = document): Omit<SipResult, 'id'> {
   const sip = findSipContext(root);
   if (!sip) return { ok: false, reason: 'no-sip' };
   const state = { calling: !!sip.calling, incoming: !!sip.incoming };
-  if (action === 'state') return { ok: true, ...state };
+  if (action === 'state') return { ok: true, ...state, muted: isMicMuted() };
+  if (action === 'mute' || action === 'unmute') {
+    // El silencio solo tiene sentido con una llamada en curso; reactivar siempre se permite
+    if (action === 'mute' && !state.calling) return { ok: false, reason: 'nothing-to-do', ...state, muted: false };
+    const result = action === 'mute' ? toggleMic() : setMicMuted(false);
+    return result === null ? { ok: false, reason: 'error', ...state, muted: false } : { ok: true, ...state, muted: result };
+  }
   // Solo se actúa si hay algo que cortar o contestar: nunca se cuelga «por las dudas»
   if (action === 'hangup' && !state.calling) return { ok: false, reason: 'nothing-to-do', ...state };
   if ((action === 'answer' || action === 'reject') && !state.incoming) return { ok: false, reason: 'nothing-to-do', ...state };
@@ -106,7 +115,7 @@ export function installSipBridge(): void {
     } catch {
       return;
     }
-    const actions: readonly string[] = ['hangup', 'answer', 'reject', 'state'];
+    const actions: readonly string[] = ['hangup', 'answer', 'reject', 'state', 'mute', 'unmute'];
     if (typeof request.id !== 'number' || typeof request.action !== 'string' || !actions.includes(request.action)) return;
     const result = runSipAction(request.action as SipAction);
     document.dispatchEvent(new CustomEvent(SIP_RESULT_EVENT, { detail: JSON.stringify({ id: request.id, ...result }) }));

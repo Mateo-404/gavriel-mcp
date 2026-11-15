@@ -159,7 +159,7 @@ await new Promise((r) => server.listen(8443, '127.0.0.1', r));
 
 const profile = mkdtempSync(join(tmpdir(), 'gv-e2e-'));
 const chrome = spawn(CHROME, [
-  `--user-data-dir=${profile}`, '--remote-debugging-pipe', '--remote-debugging-port=9333', '--enable-unsafe-extension-debugging',
+  `--user-data-dir=${profile}`, '--remote-debugging-pipe', '--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream', '--remote-debugging-port=9333', '--enable-unsafe-extension-debugging',
   // REAL_FONTS=1: Google Fonts real por internet (solo Gavriel se imita). HEADFUL=1: con ventana.
   process.env.REAL_FONTS
     ? `--host-resolver-rules=MAP ${HOST} 127.0.0.1:8443, MAP open.spotify.com 127.0.0.1:8443, MAP music.youtube.com 127.0.0.1:8443`
@@ -376,9 +376,23 @@ try {
   // --- Colgar: Ctrl+Enter llama a hangup() del contexto de React, sin abrir el panel ni cambiar de pestaña
   await evalJs('window.__mountSip()');
   await sleep(500);
+  // --- Silencio del micrófono: Alt+M y el botón, con el micrófono falso de Chrome
+  await evalJs("navigator.mediaDevices.getUserMedia({ audio: true }).then((st) => { window.__mic = st.getAudioTracks()[0]; return 'ok'; })");
+  await sleep(1200);
+  const micView = () => evalJs("JSON.stringify({ enabled: window.__mic.enabled, button: !!document.querySelector('.gv-mutebtn'), pressed: document.querySelector('.gv-mutebtn')?.getAttribute('aria-pressed') ?? null })").then(JSON.parse);
+  const altM = async () => { await key('keyDown', 'Alt', 'AltLeft', 18, 1); await key('keyDown', 'm', 'KeyM', 77, 1); await key('keyUp', 'm', 'KeyM', 77, 1); await key('keyUp', 'Alt', 'AltLeft', 18, 0); await sleep(700); };
+  out.mic = { inicial: await micView() };
+  await altM();
+  out.mic.conAltM = await micView();
+  await evalJs("document.querySelector('.gv-mutebtn').click()");
+  await sleep(700);
+  out.mic.conClic = await micView();
+  await altM(); // silenciado otra vez: debe quedar así al colgar y reactivarse solo
+  out.mic.silenciado = await micView();
   await key('keyDown', 'Control', 'ControlLeft', 17, 2); await key('keyDown', 'Enter', 'Enter', 13, 2);
   await key('keyUp', 'Enter', 'Enter', 13, 2); await key('keyUp', 'Control', 'ControlLeft', 17, 0);
   await sleep(500);
+  out.mic.trasColgar = await micView();
   out.sipClicks = await evalJs('window.__sipClicks');
   out.sipToast = await toast();
   out.netStatus = await evalJs(`document.documentElement.getAttribute('data-gv-net')`);
@@ -448,6 +462,13 @@ assert.match(out.round.fin.toast, /Ronda terminada/, 'tras la segunda ronda avis
 assert.equal(out.round.fin.view.calls.length, 4, 'no se llama de más');
 assert.deepEqual(out.round.reiniciada.checks, [true, true, true], '«Reiniciar ronda» vuelve a tildar todo');
 assert.equal(out.round.reiniciada.text, 'Ronda 1 de 2 · 0/3 llamados');
+assert.deepEqual(out.mic.inicial, { enabled: true, button: true, pressed: 'false' }, 'durante la llamada debe aparecer el botón de micrófono');
+assert.equal(out.mic.conAltM.enabled, false, 'Alt+M debía silenciar la pista de audio');
+assert.equal(out.mic.conAltM.pressed, 'true');
+assert.equal(out.mic.conClic.enabled, true, 'el clic en el botón debía reactivarlo');
+assert.equal(out.mic.silenciado.enabled, false);
+assert.equal(out.mic.trasColgar.enabled, true, 'al colgar el micrófono debe volver a quedar activo');
+assert.equal(out.mic.trasColgar.button, false, 'sin llamada no hay botón');
 assert.equal(out.sipClicks.hangup, 1, 'Ctrl+Enter debía llamar una vez a hangup() del softphone');
 assert.equal(out.sipClicks.panel, 0, 'no debía abrir el panel del softphone');
 assert.equal(out.sipToast, 'Llamada cortada');

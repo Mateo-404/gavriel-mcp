@@ -59,6 +59,12 @@ export const SHORTCUTS: readonly Shortcut[] = [
     description: 'Llama al contacto N de la lista, desde cualquier pestaña de la cuenta. Nunca llama a Jurisdicción ni al 911.',
   },
   {
+    scope: 'llamadas',
+    keys: ['Alt', 'M'],
+    chord: true,
+    description: 'Durante una llamada, silencia o reactiva tu micrófono (también con el botón del micrófono junto al teléfono flotante).',
+  },
+  {
     scope: 'cuenta',
     keys: ['Alt', 'Enter'],
     chord: true,

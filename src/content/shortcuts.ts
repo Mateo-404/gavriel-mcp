@@ -15,6 +15,7 @@
  *                  (ver last-contact.ts); sin tocar nada, deja los filtros como estaban.
  *   Alt + Enter    en una cuenta: siguiente contacto de la ronda de llamadas (corta la llamada en curso);
  *                  ver call-round.ts. Alt+N sigue llamando a mano sin mover la ronda.
+ *   Alt + M        durante una llamada: silencia o reactiva el micrófono (botón en call-mute.ts)
  *   Ctrl + Enter   acción principal según contexto, en este orden:
  *                    1. llamada en curso      -> cortar
  *                    2. llamada entrante      -> atender
@@ -47,6 +48,7 @@ import { readSetting, readSettings, touches } from '../shared/storage';
 import { accountIdFromLocation } from '../shared/routes';
 import { createEventsNav, FOCUS_ATTR } from './events-nav';
 import { createCallCard } from './call-card';
+import { createCallMute } from './call-mute';
 import { createCallRound } from './call-round';
 import { createClientCopy } from './client-copy';
 import { createAlertSender } from './alerts';
@@ -332,6 +334,7 @@ function main(): void {
   const panel = createPanelActions({ visible, ownText });
   const dialogConfirm = createDialogConfirm({ visible, ownText, toast });
   const sip = createSipClient();
+  const callMute = createCallMute({ sip, toast });
   let roundOn: boolean = DEFAULT_SETTINGS.callRound;
   const round = createCallRound({ isCalling, accountId: currentAccountId, repaint: () => schedule() });
 
@@ -535,6 +538,7 @@ function main(): void {
     }
     events.refresh();
     callCard.update();
+    callMute.update(isCalling());
     paintRound();
   });
 
@@ -870,6 +874,13 @@ function main(): void {
         consume(event);
         void copyClientMessage();
       }
+      return;
+    }
+
+    // Alt + M durante una llamada: silenciar o reactivar el micrófono (fuera de una llamada no se intercepta)
+    if (event.altKey && !event.ctrlKey && !event.getModifierState('AltGraph') && event.code === 'KeyM' && isCalling()) {
+      consume(event);
+      void callMute.toggle();
       return;
     }
 
