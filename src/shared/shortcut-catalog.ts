@@ -44,7 +44,7 @@ export const SHORTCUTS: readonly Shortcut[] = [
     scope: 'panel',
     keys: ['Ctrl', 'Enter'],
     chord: true,
-    description: 'Con un filtro activo, aprieta «Procesar masivo» y deja el cursor en el motivo del cierre. Confirmar sigue siendo manual.',
+    description: 'Con un filtro activo, aprieta «Procesar masivo». Ya en el diálogo de cierre masivo, Ctrl+Enter sin motivo escrito pone «.» y cierra los eventos.',
   },
   {
     scope: 'panel',

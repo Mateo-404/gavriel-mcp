@@ -65,4 +65,54 @@ describe('dialog-confirm (DOM)', () => {
       '<div data-slot="dialog-content"><div data-slot="dialog-footer"><button class="bg-primary">Arriba</button></div></div>';
     expect(dc.primary()?.textContent).toBe('Arriba');
   });
+
+  describe('cierre masivo sin motivo', () => {
+    // simula a React: el botón se habilita cuando el motivo deja de estar vacío
+    const bulk = (reason = ''): HTMLTextAreaElement => {
+      document.body.innerHTML = `<div role="dialog" data-slot="dialog-content"><h2>Cerrar Intervenciones Masivamente</h2>
+        <textarea>${reason}</textarea>
+        <div data-slot="dialog-footer"><button class="bg-transparent">Cancelar</button><button class="bg-primary" ${reason ? '' : 'disabled'}>Confirmar</button></div></div>`;
+      const area = document.querySelector('textarea')!;
+      const ok = document.querySelectorAll('button')[1]!;
+      area.addEventListener('input', () => { ok.disabled = area.value.trim() === ''; });
+      track();
+      return area;
+    };
+    const fresh = () => createDialogConfirm({ visible: () => true, ownText: (el) => el.textContent?.trim() ?? '', toast: (m) => toasts.push(m) });
+    const settle = (): Promise<void> => new Promise((r) => setTimeout(r, 60));
+
+    test('motivo vacío: escribe «.» y confirma una sola vez', async () => {
+      const area = bulk();
+      expect(fresh().confirm()).toBe(true);
+      await settle();
+      expect(area.value).toBe('.');
+      expect(clicks).toEqual(['Confirmar']);
+      expect(toasts).toEqual([]);
+    });
+
+    test('con motivo escrito se respeta y confirma normal', () => {
+      const area = bulk('Falla de línea');
+      fresh().confirm();
+      expect(area.value).toBe('Falla de línea');
+      expect(clicks).toEqual(['Confirmar']);
+    });
+
+    test('doble Ctrl+Enter no confirma dos veces', async () => {
+      bulk();
+      const d = fresh();
+      d.confirm();
+      d.confirm();
+      await settle();
+      expect(clicks).toEqual(['Confirmar']);
+    });
+
+    test('otros diálogos con motivo vacío no se tocan (solo se avisa)', () => {
+      document.body.innerHTML = '<div role="dialog" data-slot="dialog-content"><h2>Cerrar intervención</h2><textarea></textarea><div data-slot="dialog-footer"><button>Cancelar</button><button class="bg-destructive" disabled>Cerrar Intervención</button></div></div>';
+      track();
+      fresh().confirm();
+      expect(document.querySelector('textarea')!.value).toBe('');
+      expect(clicks).toEqual([]);
+      expect(toasts).toEqual(['Completá los campos para confirmar']);
+    });
+  });
 });
