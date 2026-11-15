@@ -346,7 +346,7 @@ function main(): void {
   const round = createCallRound({ isCalling, accountId: currentAccountId, repaint: () => schedule() });
   // Al cerrar la intervención (o dejarla en observación) la ronda de esa cuenta vuelve a cero
   // Y se vuelve a lo que sigue: cierre masivo → «Limpiar filtros»; cierre de un evento → «Volver a panel»
-  watchInterventionEnd((bulk, kind, dialog) => {
+  watchInterventionEnd((_bulk, kind, dialog) => {
     // La ronda se conserva hasta que la intervención de verdad se cierra (el diálogo se cierra al aplicar
     // resolución y categoría); «Dejar en observación» no la toca
     const id = currentAccountId();
