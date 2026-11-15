@@ -13,8 +13,8 @@ import { type FooterButton, pickDismiss, pickPrimary } from '../shared/dialog';
 const DIALOG = '[data-slot="dialog-content"], [role="alertdialog"]';
 const FOOTER = '[data-slot="dialog-footer"]';
 const LOCK_MS = 1500;
-/** Título del cierre masivo: ahí, sin motivo escrito, Ctrl+Enter pone «.» y cierra (el motivo es obligatorio pero no importa). */
-const BULK_CLOSE = /cerrar intervenciones masivamente/i;
+/** Diálogos con motivo obligatorio que no importa (cierre masivo, dejar en observación): sin texto escrito, Ctrl+Enter pone «.» y confirma. */
+const BULK_CLOSE = /cerrar intervenciones masivamente|dejar en observaci[oó]n/i;
 const DEFAULT_REASON = '.';
 const ENABLE_WAIT_MS = 400;
 

@@ -90,6 +90,15 @@ describe('dialog-confirm (DOM)', () => {
       expect(toasts).toEqual([]);
     });
 
+    test('«Dejar en observación» sin comentario: también pone «.» y confirma', async () => {
+      const area = bulk();
+      document.querySelector('h2')!.textContent = 'Dejar en observación';
+      fresh().confirm();
+      await settle();
+      expect(area.value).toBe('.');
+      expect(clicks).toEqual(['Confirmar']);
+    });
+
     test('con motivo escrito se respeta y confirma normal', () => {
       const area = bulk('Falla de línea');
       fresh().confirm();
