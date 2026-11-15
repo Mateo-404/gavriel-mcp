@@ -50,6 +50,7 @@ import { createEventsNav, FOCUS_ATTR } from './events-nav';
 import { createCallCard } from './call-card';
 import { createCallMute } from './call-mute';
 import { createCallRound } from './call-round';
+import { plainDigit, typeDigit } from './dial-input';
 import { createClientCopy } from './client-copy';
 import { createAlertSender } from './alerts';
 import { createDataStore } from './data-store';
@@ -820,6 +821,17 @@ function main(): void {
     if (event.key !== 'Alt') cancelPeekTimer();
     if (!enabled || event.isComposing || event.repeat) return;
     if (event.metaKey) return;
+
+    // Softphone abierto: los números van al campo «Número…» aunque no esté enfocado (solo dígitos)
+    const digit = plainDigit(event);
+    if (digit) {
+      const input = dialInput();
+      if (input && visible(input) && !isEditable(event.target) && !modalOpen() && document.activeElement !== input) {
+        consume(event);
+        typeDigit(input, digit);
+      }
+      return;
+    }
 
     // Alt + Shift apretados juntos (sin otra tecla), en una cuenta: copia el nombre de la última
     // persona a la que se llamó. No se consume la tecla: el sistema puede usar Alt+Shift para

@@ -237,7 +237,7 @@ try {
   await send('Browser.grantPermissions', { permissions: ['clipboardReadWrite', 'clipboardSanitizedWrite'], origin: `https://${HOST}` }).catch(() => {});
   await send('Page.navigate', { url: `https://${HOST}/monitoring-panel/account-analysis?accountId=acc1` });
   await sleep(2500);
-  const key = (type, k, code, vk, modifiers) => send('Input.dispatchKeyEvent', { type, key: k, code, windowsVirtualKeyCode: vk, modifiers });
+  const key = (type, k, code, vk, modifiers, text) => send('Input.dispatchKeyEvent', { type, key: k, code, windowsVirtualKeyCode: vk, modifiers, ...(text ? { text } : {}) });
   const toast = () => evalJs(`document.querySelector('.gv-toast')?.textContent ?? ''`);
   await key('keyDown', 'Alt', 'AltLeft', 18, 1); await key('keyDown', 'Shift', 'ShiftLeft', 16, 9);
   await key('keyUp', 'Shift', 'ShiftLeft', 16, 1); await key('keyUp', 'Alt', 'AltLeft', 18, 0);
@@ -373,6 +373,18 @@ try {
   await evalJs(`document.getElementById('rs').remove(); document.getElementById('fab').remove(); document.getElementById('softphone').remove()`);
   await sleep(400);
 
+  // --- Marcador: los números se escriben solos en «Número…» (solo dígitos)
+  await evalJs("document.body.insertAdjacentHTML('beforeend', '<div id=\"dial\"><input placeholder=\"Número…\"><textarea id=\"other\"></textarea></div>')");
+  await sleep(300);
+  const typeKey = async (k, code, vk) => { await key('keyDown', k, code, vk, 0, k.length === 1 ? k : undefined); await key('keyUp', k, code, vk, 0); };
+  await typeKey('3', 'Digit3', 51); await typeKey('4', 'Digit4', 52); await typeKey('a', 'KeyA', 65); await typeKey('7', 'Digit7', 55);
+  out.dial = { escrito: await evalJs("document.querySelector('input[placeholder=\"Número…\"]').value") };
+  // con el foco en otro campo, los números van a ese campo y no al marcador
+  await evalJs("document.getElementById('other').focus()");
+  await typeKey('9', 'Digit9', 57);
+  out.dial.otro = await evalJs("document.getElementById('other').value");
+  out.dial.marcadorTrasOtro = await evalJs("document.querySelector('input[placeholder=\"Número…\"]').value");
+  await evalJs("document.getElementById('dial').remove()");
   // --- Colgar: Ctrl+Enter llama a hangup() del contexto de React, sin abrir el panel ni cambiar de pestaña
   await evalJs('window.__mountSip()');
   await sleep(500);
@@ -469,6 +481,9 @@ assert.equal(out.mic.conClic.enabled, true, 'el clic en el botón debía reactiv
 assert.equal(out.mic.silenciado.enabled, false);
 assert.equal(out.mic.trasColgar.enabled, true, 'al colgar el micrófono debe volver a quedar activo');
 assert.equal(out.mic.trasColgar.button, false, 'sin llamada no hay botón');
+assert.equal(out.dial.escrito, '347', 'los dígitos debían escribirse solos en el marcador (y la letra no)');
+assert.equal(out.dial.otro, '9', 'con otro campo enfocado, el número va a ese campo');
+assert.equal(out.dial.marcadorTrasOtro, '347');
 assert.equal(out.sipClicks.hangup, 1, 'Ctrl+Enter debía llamar una vez a hangup() del softphone');
 assert.equal(out.sipClicks.panel, 0, 'no debía abrir el panel del softphone');
 assert.equal(out.sipToast, 'Llamada cortada');
