@@ -193,15 +193,17 @@ function main(): void {
   if (!source) return;
   let last = '';
   let lastSentAt = 0;
+  /** Mientras suena se repite el estado cada tanto (la barra de Gavriel interpola la posición entre avisos). */
+  const HEARTBEAT_MS = 15_000;
 
   const push = (force = false): void => {
     try {
       const state = readState(source);
       if (!state) return;
-      // Sin cambios de fondo (la posición avanza sola) se informa como mucho cada 2 s
+      // Sin cambios de fondo (la posición avanza sola) solo se repite cada HEARTBEAT_MS, y nunca en pausa
       const key = `${state.title}|${state.artist}|${state.playing}|${state.volume.toFixed(2)}|${state.muted}|${Math.round(state.duration)}`;
       const now = Date.now();
-      if (!force && key === last && now - lastSentAt < 2000) return;
+      if (!force && key === last && (!state.playing || now - lastSentAt < HEARTBEAT_MS)) return;
       last = key;
       lastSentAt = now;
       void chrome.runtime.sendMessage({ type: 'media-state', state }).catch(() => {});
@@ -211,11 +213,11 @@ function main(): void {
   };
 
   // Los eventos multimedia no burbujean: se escuchan en captura sobre el documento (sirve para cualquier <audio>/<video>)
-  for (const type of ['play', 'pause', 'ended', 'volumechange', 'loadedmetadata', 'emptied']) {
+  // (sin 'timeupdate': dispara varias veces por segundo y la posición no hace falta con tanta frecuencia)
+  for (const type of ['play', 'pause', 'ended', 'volumechange', 'loadedmetadata', 'emptied', 'seeked']) {
     document.addEventListener(type, () => push(true), true);
   }
-  document.addEventListener('timeupdate', () => push(), true);
-  // Red de seguridad: cambios de tema sin evento (metadatos que se actualizan solos)
+  // Cambios sin evento (Spotify como control remoto, cambio de tema): una lectura barata cada 3 s
   setInterval(() => push(), 3000);
   push(true);
 

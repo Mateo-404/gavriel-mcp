@@ -78,3 +78,27 @@ describe('nextTab / formatTime / isMediaAction', () => {
     expect(isMediaAction('delete')).toBe(false);
   });
 });
+
+import { sameMedia, type MediaState } from '../src/shared/media';
+
+describe('sameMedia (qué no hace falta volver a avisar)', () => {
+  const base: MediaState = { source: 'spotify', title: 'T', artist: 'A', playing: true, volume: 0.5, muted: false, position: 10, duration: 200, at: 1_000_000 };
+  test('solo avanzó la posición como corresponde: igual', () => {
+    expect(sameMedia(base, { ...base, position: 15, at: base.at + 5000 })).toBe(true);
+  });
+  test('un salto de posición (se movió la barra) sí se avisa', () => {
+    expect(sameMedia(base, { ...base, position: 90, at: base.at + 5000 })).toBe(false);
+  });
+  test('en pausa la posición no debería avanzar', () => {
+    const paused = { ...base, playing: false };
+    expect(sameMedia(paused, { ...paused, position: 10, at: base.at + 9000 })).toBe(true);
+    expect(sameMedia(paused, { ...paused, position: 30, at: base.at + 9000 })).toBe(false);
+  });
+  test('cambio de tema, pausa, volumen o silencio se avisan; sin estado previo también', () => {
+    expect(sameMedia(base, { ...base, title: 'Otro' })).toBe(false);
+    expect(sameMedia(base, { ...base, playing: false })).toBe(false);
+    expect(sameMedia(base, { ...base, volume: 0.6 })).toBe(false);
+    expect(sameMedia(base, { ...base, muted: true })).toBe(false);
+    expect(sameMedia(undefined, base)).toBe(false);
+  });
+});

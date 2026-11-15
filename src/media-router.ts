@@ -8,18 +8,25 @@
  *
  * El estado se guarda en chrome.storage.session para sobrevivir a que el service worker se duerma.
  */
-import { type TabMedia, isMediaAction, sanitizeState } from './shared/media';
+import { type TabMedia, isMediaAction, sameMedia, sanitizeState } from './shared/media';
 
 const KEY = 'mediaTabs';
 const STALE_MS = 15 * 60_000;
+const RENEW_MS = 5 * 60_000;
 
-async function load(): Promise<Record<string, TabMedia>> {
-  try {
-    const stored = (await chrome.storage.session.get(KEY)) as Record<string, Record<string, TabMedia> | undefined>;
-    return stored[KEY] ?? {};
-  } catch {
-    return {};
-  }
+/** Copia en memoria: el almacenamiento solo se lee al despertar el service worker y se escribe si algo cambió. */
+let memory: Promise<Record<string, TabMedia>> | undefined;
+
+function load(): Promise<Record<string, TabMedia>> {
+  memory ??= (async () => {
+    try {
+      const stored = (await chrome.storage.session.get(KEY)) as Record<string, Record<string, TabMedia> | undefined>;
+      return stored[KEY] ?? {};
+    } catch {
+      return {};
+    }
+  })();
+  return memory;
 }
 
 const save = (tabs: Record<string, TabMedia>): Promise<void> => chrome.storage.session.set({ [KEY]: tabs }).catch(() => {});
@@ -47,6 +54,16 @@ export function installMediaRouter(): void {
       if (state) {
         void (async () => {
           const tabs = await load();
+          const before = tabs[String(tabId)];
+          if (before && sameMedia(before, state)) {
+            // Solo avanzó la posición: no se avisa a las pestañas. De vez en cuando se renueva lo guardado
+            // para que una pestaña que sigue sonando no se descarte como vieja.
+            if (state.at - before.at > RENEW_MS) {
+              tabs[String(tabId)] = { ...state, tabId };
+              await save(tabs);
+            }
+            return;
+          }
           tabs[String(tabId)] = { ...state, tabId };
           const list = prune(tabs);
           await save(tabs);

@@ -85,6 +85,19 @@ export function formatTime(seconds: number): string {
   return h > 0 ? `${h}:${String(m).padStart(2, '0')}:${s}` : `${m}:${s}`;
 }
 
+/**
+ * ¿Es lo mismo que ya se informó (salvo el avance natural de la posición)? Si sí, no hace falta guardar
+ * ni avisar a las pestañas de Gavriel: la barra ya interpola la posición sola.
+ */
+export function sameMedia(a: MediaState | undefined, b: MediaState, driftSeconds = 4): boolean {
+  if (!a) return false;
+  if (a.source !== b.source || a.title !== b.title || a.artist !== b.artist) return false;
+  if (a.playing !== b.playing || a.muted !== b.muted || a.duration !== b.duration) return false;
+  if (Math.abs(a.volume - b.volume) > 0.005) return false;
+  const expected = a.playing ? a.position + (b.at - a.at) / 1000 : a.position;
+  return Math.abs(b.position - expected) <= driftSeconds;
+}
+
 /** Lista de pestañas que llega del fondo, ya validada (cada una con su tabId). */
 export function sanitizeTabs(value: unknown, now = Date.now()): TabMedia[] {
   if (!Array.isArray(value)) return [];

@@ -237,14 +237,25 @@ export function createMediaBar({ send }: MediaBarDeps): MediaBar {
       requestAnimationFrame(() => root.classList.toggle('gv-marquee', title.scrollWidth > text.clientWidth + 2));
     }
     paintProgress();
+    syncClock();
   };
 
   root.addEventListener('pointerenter', paintProgress);
   root.addEventListener('focusin', paintProgress);
-  // La barra de progreso avanza una vez por segundo, solo mientras suena y la pestaña se ve
-  setInterval(() => {
-    if (current?.playing && !document.hidden && !root.hidden) paintProgress();
-  }, 1000);
+  // La barra de progreso avanza una vez por segundo; el reloj existe solo mientras suena (y se detiene con la pestaña oculta)
+  let clock: ReturnType<typeof setInterval> | undefined;
+  const syncClock = (): void => {
+    const want = !!current?.playing && !root.hidden && !document.hidden;
+    if (want && clock === undefined) clock = setInterval(paintProgress, 1000);
+    else if (!want && clock !== undefined) {
+      clearInterval(clock);
+      clock = undefined;
+    }
+  };
+  document.addEventListener('visibilitychange', () => {
+    syncClock();
+    if (!document.hidden) paintProgress();
+  });
 
   /** Dónde va: 1) junto a «Tiempo real»; 2) la barra de acciones vacía; 3) el grupo derecho del encabezado, al comienzo. */
   const anchor = (): { container: HTMLElement; before: Element | null } | null => {
