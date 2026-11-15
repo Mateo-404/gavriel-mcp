@@ -122,6 +122,21 @@ describe('ronda de llamadas (DOM)', () => {
     expect(states(contacts)).toEqual(['', '']);
   });
 
+  test('olvida la cuenta que se le indica aunque ya se haya salido de ella, y sin cuenta no borra nada', () => {
+    const { contacts, heading } = mount(['A', 'B']);
+    round.paint(contacts, heading);
+    round.commit(1, 1);
+    const mine = account;
+    account = null; // ya volvió al panel
+    round.forget();
+    account = mine;
+    round.paint(contacts, heading);
+    expect(label()).toBe('Ronda 1 de 2 · 1/2 llamados');
+    round.forget(false, mine);
+    round.paint(contacts, heading);
+    expect(label()).toBe('Ronda 1 de 2 · 0/2 llamados');
+  });
+
   test('en un cierre masivo se olvidan todas las cuentas', () => {
     const { contacts, heading } = mount(['A']);
     round.paint(contacts, heading);

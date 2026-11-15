@@ -347,9 +347,20 @@ function main(): void {
   // Al cerrar la intervención (o dejarla en observación) la ronda de esa cuenta vuelve a cero
   // Y se vuelve a lo que sigue: cierre masivo → «Limpiar filtros»; cierre de un evento → «Volver a panel»
   watchInterventionEnd((bulk, kind, dialog) => {
-    round.forget(bulk);
-    if (kind === 'bulk') whenDialogGone(dialog, () => retryFor(() => panel.clearFilters()));
-    else if (kind === 'close') whenDialogGone(dialog, () => retryFor(goBack));
+    // La ronda se conserva hasta que la intervención de verdad se cierra (el diálogo se cierra al aplicar
+    // resolución y categoría); «Dejar en observación» no la toca
+    const id = currentAccountId();
+    if (kind === 'bulk') {
+      whenDialogGone(dialog, () => {
+        round.forget(true);
+        retryFor(() => panel.clearFilters());
+      });
+    } else if (kind === 'close') {
+      whenDialogGone(dialog, () => {
+        round.forget(false, id);
+        retryFor(goBack);
+      });
+    }
   });
 
   // Reproductor de Spotify Web / YouTube Music en la barra de arriba (ver media-bar.ts)

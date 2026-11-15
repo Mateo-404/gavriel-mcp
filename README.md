@@ -48,7 +48,7 @@ Avisos por tipo: notificaciones del sistema para BUR (robo), POW (corte de energ
 
 Música: si hay Spotify Web (`open.spotify.com`) o YouTube Music (`music.youtube.com`) abiertos en otra pestaña, aparece un reproductor en la barra, junto a «Tiempo real» (en el resto de las pantallas, solo en la barra de arriba) (anterior, pausa, siguiente, volumen, silencio, progreso, cambiar de reproductor). Lee `navigator.mediaSession` y el elemento de audio. No controla la app de escritorio de Spotify. Los selectores de los botones pueden romperse si los sitios cambian.
 
-Fin de la ronda: al confirmar «Cerrar intervención» o «Dejar en observación» (con el mouse o con Ctrl+Enter) la ronda de esa cuenta vuelve a cero; en el cierre masivo se reinician todas las cuentas.
+Fin de la ronda: la ronda se conserva hasta que la intervención se cierra de verdad (aplicada la resolución y la categoría y cerrado el diálogo de «Cerrar intervención»); recién ahí vuelve a cero para esa cuenta. «Dejar en observación» no la reinicia. En el cierre masivo se reinician todas las cuentas cuando termina.
 
 Después de confirmar (con el mouse o con Ctrl+Enter, con «.» automático o con el motivo que escribas): en **«Cerrar Intervenciones Masivamente»**, cuando el diálogo termina de procesar y se cierra, aprieta «Limpiar filtros»; en **«Cerrar Intervención»** de un evento, cuando se cierra el diálogo, aprieta «Volver a panel». Si el diálogo no se cierra (error, motivo faltante) no hace nada. «Dejar en observación» no vuelve al panel.
 
