@@ -48,7 +48,7 @@ Avisos por tipo: notificaciones del sistema para BUR (robo), POW (corte de energ
 
 Música: si hay Spotify Web (`open.spotify.com`) o YouTube Music (`music.youtube.com`) abiertos en otra pestaña, aparece un reproductor en la barra, junto a «Tiempo real» (en el resto de las pantallas, solo en la barra de arriba) (anterior, pausa, siguiente, volumen, silencio, progreso, cambiar de reproductor). Lee `navigator.mediaSession` y el elemento de audio. No controla la app de escritorio de Spotify. Los selectores de los botones pueden romperse si los sitios cambian.
 
-Animaciones: un interruptor en Ajustes las apaga todas (`data-gv-noanim`), incluidas las del reproductor.
+Animaciones: vienen apagadas por defecto (interruptor en Ajustes, `data-gv-noanim`): sin transiciones ni animaciones, sin desenfoques (`backdrop-filter`) ni `will-change`; solo quedan los indicadores de carga. Incluye al reproductor.
 
 Rendimiento: el build sale minificado (de 66 KB en cuatro scripts a 32 KB en tres), con un único content script para cuenta y atajos; todos comparten un solo observador del DOM (que ignora lo que dibuja la extensión y se pausa con la pestaña oculta), una sola lectura de ajustes y, en Chrome, la Navigation API en lugar de sondear la URL. El JS sale moderno (ES más nuevo, Chrome 120 o más) y TypeScript compila con `target: ESNext`.
 

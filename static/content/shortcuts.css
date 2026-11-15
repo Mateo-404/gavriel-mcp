@@ -171,6 +171,14 @@ html[data-gv-noanim] *::after {
   transition-delay: 0s !important;
   scroll-behavior: auto !important;
 }
+/* Máximo rendimiento: tampoco desenfoques ni sombras animadas que la GPU rehace en cada cuadro */
+html[data-gv-noanim] *,
+html[data-gv-noanim] *::before,
+html[data-gv-noanim] *::after {
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+  will-change: auto !important;
+}
 html[data-gv-noanim] .animate-spin,
 html[data-gv-noanim] .pi-spin,
 html[data-gv-noanim] [class*="spinner"] {

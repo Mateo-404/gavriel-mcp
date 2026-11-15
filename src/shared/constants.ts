@@ -60,7 +60,7 @@ export const DEFAULT_SETTINGS: Settings = {
   cacheAssets: true,
   localFonts: true,
   dedupeAccount: true,
-  disableAnimations: false,
+  disableAnimations: true,
   notifyEnabled: true,
   notifyTypes: ['BUR', 'POW', 'PAN', 'MED', 'INC'],
   mediaPlayer: true,
