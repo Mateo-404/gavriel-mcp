@@ -1,0 +1,11 @@
+[
+  {
+    "id": 1,
+    "priority": 1,
+    "action": { "type": "block" },
+    "condition": {
+      "requestDomains": ["fcm.googleapis.com", "fcmregistrations.googleapis.com", "firebaseinstallations.googleapis.com"],
+      "initiatorDomains": ["app.gavriel.com.ar"]
+    }
+  }
+]

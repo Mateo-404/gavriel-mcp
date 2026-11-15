@@ -41,6 +41,8 @@ export function buildRules(mutedSounds: readonly string[], enabled: boolean): Bl
 export const CACHE_RULESET = 'cache';
 /** Conjunto de reglas estáticas que bloquea el CSS de Google Fonts (static/rules/fonts.json). */
 export const FONTS_RULESET = 'fonts';
+/** Conjunto de reglas estáticas que bloquea Firebase Cloud Messaging, el push de Gavriel (static/rules/push.json). */
+export const PUSH_RULESET = 'push';
 
 /** Lo mínimo de chrome.declarativeNetRequest que se usa (permite probarlo sin navegador). */
 export interface RulesApi {

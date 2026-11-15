@@ -22,6 +22,8 @@ export type Settings = {
   cacheAssets: boolean;
   /** Usa las tipografías Geist de la extensión y bloquea el CSS de Google Fonts (cero pedidos externos). */
   localFonts: boolean;
+  /** Bloquea las notificaciones push de Gavriel (Firebase): ni se suscribe ni se piden al servidor. */
+  blockPush: boolean;
   /** Responde desde memoria el segundo pedido idéntico de la cuenta (abrir una cuenta es ~1 s más rápido). */
   dedupeAccount: boolean;
   /** Apaga todas las animaciones y transiciones CSS de Gavriel (quedan los indicadores de carga). */
@@ -59,6 +61,7 @@ export const DEFAULT_SETTINGS: Settings = {
   liteMode: true,
   cacheAssets: true,
   localFonts: true,
+  blockPush: true,
   dedupeAccount: true,
   disableAnimations: true,
   notifyEnabled: true,

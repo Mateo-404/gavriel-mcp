@@ -57,6 +57,8 @@ Compatibilidad con otras herramientas: los indicadores (`Ctrl+Enter`, `Esc`, `Al
 Protecciones: ignora teclas repetidas, `AltGr`, `Shift`/`Meta`; bloquea llamadas dobles durante 1,5 s; no llama si ya
 hay una llamada en curso ni con un menú o diálogo modal abierto.
 
+Sin push de Gavriel: Gavriel se suscribe a notificaciones push (Firebase Cloud Messaging). Con el interruptor de Ajustes (activado por defecto) la suscripción se rechaza como un permiso negado, la que ya existía se da de baja y los pedidos a `fcm.googleapis.com`, `fcmregistrations.googleapis.com` y `firebaseinstallations.googleapis.com` se bloquean (regla estática `push`). Las notificaciones de la extensión (por tipo de evento) no dependen de esto.
+
 Solo donde hace falta: la extensión únicamente actúa en Gavriel, Spotify Web y YouTube Music (scripts, reglas de red y permisos acotados a esos sitios). En cualquier otro sitio el ícono de la barra aparece en gris y sin ventana; en Chrome lo decide el propio navegador con reglas declarativas (permiso declarativeContent), sin leer tus pestañas. En Firefox el botón queda siempre activo. Los ajustes siguen disponibles con clic derecho en el ícono → Opciones.
 
 Robustez: cada manejador está aislado (una falla se avisa una vez por consola y no rompe la página), los observadores ignoran lo que dibuja la propia extensión, no gastan nada con la pestaña oculta y se apagan solos si la extensión se recarga mientras Gavriel sigue abierto (basta F5). Si el almacenamiento falla, se usan los valores por defecto.

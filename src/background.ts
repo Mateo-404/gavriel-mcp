@@ -7,7 +7,7 @@ import { readSettings, touches } from './shared/storage';
 import { installMediaRouter } from './media-router';
 import { installNotifications } from './notifications';
 import { installActionGate } from './action-gate';
-import { CACHE_RULESET, FONTS_RULESET, syncSoundRules } from './shared/sound-rules';
+import { CACHE_RULESET, FONTS_RULESET, PUSH_RULESET, syncSoundRules } from './shared/sound-rules';
 
 const FONTS_URL = 'https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500;700&display=swap';
 
@@ -54,12 +54,12 @@ async function publishStatus(error?: unknown): Promise<void> {
 
 async function sync(): Promise<void> {
   try {
-    const { mutedSounds, muteEnabled, cacheAssets, localFonts } = await readSettings();
+    const { mutedSounds, muteEnabled, cacheAssets, localFonts, blockPush } = await readSettings();
     await syncSoundRules(chrome.declarativeNetRequest, mutedSounds, muteEnabled);
     // Caché de los archivos con hash: un conjunto de reglas estáticas que se enciende o apaga
     await chrome.declarativeNetRequest.updateEnabledRulesets({
-      enableRulesetIds: [cacheAssets && CACHE_RULESET, localFonts && FONTS_RULESET].filter((id): id is string => !!id),
-      disableRulesetIds: [!cacheAssets && CACHE_RULESET, !localFonts && FONTS_RULESET].filter((id): id is string => !!id),
+      enableRulesetIds: [cacheAssets && CACHE_RULESET, localFonts && FONTS_RULESET, blockPush && PUSH_RULESET].filter((id): id is string => !!id),
+      disableRulesetIds: [!cacheAssets && CACHE_RULESET, !localFonts && FONTS_RULESET, !blockPush && PUSH_RULESET].filter((id): id is string => !!id),
     });
     await publishStatus();
   } catch (error) {
@@ -86,6 +86,6 @@ installMediaRouter();
 chrome.runtime.onInstalled.addListener(() => void sync());
 chrome.runtime.onStartup.addListener(() => void sync());
 chrome.storage.onChanged.addListener((changes, area) => {
-  if (touches(changes, area, 'mutedSounds', 'muteEnabled', 'cacheAssets', 'localFonts')) void sync();
+  if (touches(changes, area, 'mutedSounds', 'muteEnabled', 'cacheAssets', 'localFonts', 'blockPush')) void sync();
 });
 void sync(); // también al despertar el service worker

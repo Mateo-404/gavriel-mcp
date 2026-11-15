@@ -8,7 +8,7 @@ import { SCOPE_TITLES, shortcutsFor, type Shortcut, type ShortcutScope } from '.
 import { ALERT_LABELS, ALERT_TYPES } from '../shared/event-alerts';
 import { readSettings, touches, writeSettings } from '../shared/storage';
 
-type SwitchKey = 'shortcutsEnabled' | 'openContactsTab' | 'revealSecrets' | 'showCallCard' | 'hideSoundBanner' | 'plainEvents' | 'hideGridView' | 'liteMode' | 'cacheAssets' | 'localFonts' | 'dedupeAccount' | 'disableAnimations' | 'notifyEnabled' | 'mediaPlayer' | 'callRound';
+type SwitchKey = 'shortcutsEnabled' | 'openContactsTab' | 'revealSecrets' | 'showCallCard' | 'hideSoundBanner' | 'plainEvents' | 'hideGridView' | 'liteMode' | 'cacheAssets' | 'localFonts' | 'blockPush' | 'dedupeAccount' | 'disableAnimations' | 'notifyEnabled' | 'mediaPlayer' | 'callRound';
 
 const SWITCHES: readonly { key: SwitchKey; id: string }[] = [
   { key: 'shortcutsEnabled', id: 'keys' },
@@ -21,6 +21,7 @@ const SWITCHES: readonly { key: SwitchKey; id: string }[] = [
   { key: 'liteMode', id: 'opt-lite' },
   { key: 'cacheAssets', id: 'opt-cache' },
   { key: 'localFonts', id: 'opt-fonts' },
+  { key: 'blockPush', id: 'opt-nopush' },
   { key: 'dedupeAccount', id: 'opt-dedupe' },
   { key: 'disableAnimations', id: 'opt-noanim' },
   { key: 'notifyEnabled', id: 'opt-notify' },
@@ -173,6 +174,7 @@ $('reset-yes').addEventListener('click', () => {
     liteMode: DEFAULT_SETTINGS.liteMode,
     cacheAssets: DEFAULT_SETTINGS.cacheAssets,
     localFonts: DEFAULT_SETTINGS.localFonts,
+    blockPush: DEFAULT_SETTINGS.blockPush,
     dedupeAccount: DEFAULT_SETTINGS.dedupeAccount,
     disableAnimations: DEFAULT_SETTINGS.disableAnimations,
     notifyEnabled: DEFAULT_SETTINGS.notifyEnabled,
@@ -211,7 +213,7 @@ void showNetStatus();
 
 // Si algo cambia desde otro lado (el popup, otra pestaña), esta página se actualiza sola
 chrome.storage.onChanged.addListener((changes, area) => {
-  if (touches(changes, area, 'shortcutsEnabled', 'openContactsTab', 'revealSecrets', 'showCallCard', 'hideSoundBanner', 'plainEvents', 'hideGridView', 'liteMode', 'cacheAssets', 'localFonts', 'dedupeAccount', 'disableAnimations', 'notifyEnabled', 'notifyTypes', 'mediaPlayer', 'callRound', 'muteEnabled', 'mutedSounds')) {
+  if (touches(changes, area, 'shortcutsEnabled', 'openContactsTab', 'revealSecrets', 'showCallCard', 'hideSoundBanner', 'plainEvents', 'hideGridView', 'liteMode', 'cacheAssets', 'localFonts', 'blockPush', 'dedupeAccount', 'disableAnimations', 'notifyEnabled', 'notifyTypes', 'mediaPlayer', 'callRound', 'muteEnabled', 'mutedSounds')) {
     void readSettings().then(render);
     setTimeout(() => void showNetStatus(), 500); // el fondo actualiza las reglas un instante después
   }

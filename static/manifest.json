@@ -8,7 +8,8 @@
   "declarative_net_request": {
     "rule_resources": [
       { "id": "cache", "enabled": true, "path": "rules/cache.json" },
-      { "id": "fonts", "enabled": true, "path": "rules/fonts.json" }
+      { "id": "fonts", "enabled": true, "path": "rules/fonts.json" },
+      { "id": "push", "enabled": true, "path": "rules/push.json" }
     ]
   },
   "web_accessible_resources": [

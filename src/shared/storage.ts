@@ -24,6 +24,7 @@ export function sanitizeSettings(raw: Record<string, unknown>): Settings {
     liteMode: typeof raw.liteMode === 'boolean' ? raw.liteMode : DEFAULT_SETTINGS.liteMode,
     cacheAssets: typeof raw.cacheAssets === 'boolean' ? raw.cacheAssets : DEFAULT_SETTINGS.cacheAssets,
     localFonts: typeof raw.localFonts === 'boolean' ? raw.localFonts : DEFAULT_SETTINGS.localFonts,
+    blockPush: typeof raw.blockPush === 'boolean' ? raw.blockPush : DEFAULT_SETTINGS.blockPush,
     dedupeAccount: typeof raw.dedupeAccount === 'boolean' ? raw.dedupeAccount : DEFAULT_SETTINGS.dedupeAccount,
     disableAnimations:
       typeof raw.disableAnimations === 'boolean' ? raw.disableAnimations : DEFAULT_SETTINGS.disableAnimations,
