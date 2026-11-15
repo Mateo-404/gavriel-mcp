@@ -20,6 +20,8 @@ import { type MediaAction, type TabMedia, SOURCE_LABELS, formatTime, nextTab, pi
 const BAR = '#topbar-actions .monitoring-panel';
 /** En el resto de las pantallas (Tickets, Cuentas…) la barra existe pero está vacía: se usa ese contenedor. */
 const ANY_SCREEN = '#topbar-actions';
+/** En una cuenta no hay #topbar-actions: el grupo de la derecha del encabezado (mapa, avisos, usuario) sí existe. */
+const TOPBAR_RIGHT = '.layout-topbar > * > :last-child';
 const BUTTONSET = '.monitoring-panel-view-buttonset';
 
 const ICONS = {
@@ -244,15 +246,26 @@ export function createMediaBar({ send }: MediaBarDeps): MediaBar {
     if (current?.playing && !document.hidden && !root.hidden) paintProgress();
   }, 1000);
 
+  /** Dónde va: 1) junto a «Tiempo real»; 2) la barra de acciones vacía; 3) el grupo derecho del encabezado, al comienzo. */
+  const anchor = (): { container: HTMLElement; before: Element | null } | null => {
+    const bar = document.querySelector<HTMLElement>(BAR);
+    if (bar) return { container: bar, before: bar.querySelector(BUTTONSET) };
+    const actions = document.querySelector<HTMLElement>(ANY_SCREEN);
+    if (actions) return { container: actions, before: null };
+    const right = document.querySelector<HTMLElement>(TOPBAR_RIGHT);
+    return right ? { container: right, before: right.firstElementChild === root ? root.nextElementSibling : right.firstElementChild } : null;
+  };
+
   const mount = (): void => {
-    const container = document.querySelector<HTMLElement>(BAR) ?? document.querySelector<HTMLElement>(ANY_SCREEN);
-    if (!container || !enabled || !current) {
-      if (root.isConnected && (!container || !enabled || !current)) root.remove();
+    const target = enabled && current ? anchor() : null;
+    if (!target) {
+      if (root.isConnected) root.remove();
       return;
     }
-    const set = container.querySelector(BUTTONSET);
-    if (root.parentElement === container && (!set || root.nextElementSibling === set)) return;
-    if (set) container.insertBefore(root, set);
+    const { container, before } = target;
+    const placed = root.parentElement === container && (before ? root.nextElementSibling === before : container.lastElementChild === root || container.firstElementChild === root);
+    if (placed) return;
+    if (before) container.insertBefore(root, before);
     else container.append(root);
   };
 

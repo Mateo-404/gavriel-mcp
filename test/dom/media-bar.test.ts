@@ -158,3 +158,14 @@ test('en pantallas sin «Tiempo real» (barra vacía) se monta igual en la barra
   bar.ensureMounted();
   expect(container.contains(bar.root)).toBe(true);
 });
+
+test('en una cuenta (sin barra de acciones) va al comienzo del grupo derecho del encabezado', () => {
+  document.body.innerHTML = '<div class="layout-topbar"><div class="gv-scope"><div>izq</div><div>centro</div><div class="right"><button aria-label="Mapa">m</button><button aria-label="Avisos">a</button></div></div></div>';
+  bar.update([tab(1)]);
+  const right = document.querySelector('.right')!;
+  expect(right.firstElementChild).toBe(bar.root);
+  bar.ensureMounted();
+  bar.ensureMounted();
+  expect([...right.children].filter((c) => c === bar.root)).toHaveLength(1);
+  expect(right.children.length).toBe(3);
+});

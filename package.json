@@ -1,6 +1,6 @@
 {
   "name": "gavriel-tools",
-  "version": "0.14.1",
+  "version": "0.14.2",
   "private": true,
   "description": "Extensión de navegador con herramientas extra para Gavriel (silenciar sonidos del panel, atajos de teclado).",
   "type": "module",
