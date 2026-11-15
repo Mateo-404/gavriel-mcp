@@ -324,3 +324,9 @@ html[data-gv-noanim] .gv-mutebtn { animation: none !important; transition: none 
   box-shadow: none !important;
   background-color: transparent !important;
 }
+
+/* Sin la raya de «cargando» que pulsa sobre el buscador de eventos (y cualquier barra fina igual de Gavriel) */
+.gv-scope > .animate-pulse.h-1.rounded-full,
+.animate-pulse.h-1.w-full.rounded-full {
+  display: none !important;
+}
