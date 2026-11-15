@@ -330,3 +330,21 @@ html[data-gv-noanim] .gv-mutebtn { animation: none !important; transition: none 
 .animate-pulse.h-1.w-full.rounded-full {
   display: none !important;
 }
+
+/* Sin el naranja de «sonando» en el panel: el recuadro del filtro del tipo, el bloque del evento y los parlantes */
+.monitoring-panel-filter-btn.ring-warning,
+.monitoring-panel-filter-btn[class*="bg-warning"],
+.monitoring-panel-event-block[class*="bg-warning"] {
+  --tw-ring-shadow: 0 0 #0000 !important;
+  box-shadow: none !important;
+  background-color: transparent !important;
+}
+.monitoring-panel-filter-btn.ring-warning,
+.monitoring-panel-filter-btn[class*="border-warning"] {
+  border-color: inherit !important;
+}
+[class*="monitoring-panel"] .pi-volume-up.text-warning,
+[class*="monitoring-panel"] .text-warning.pi-volume-up {
+  color: var(--muted-foreground, #8a8a8a) !important;
+  animation: none !important;
+}

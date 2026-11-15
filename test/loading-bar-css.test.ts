@@ -9,4 +9,8 @@ describe('sin barras de carga de Gavriel', () => {
   test('el resaltado naranja del bloque de evento se anula', () => {
     expect(css).toMatch(/\.monitoring-panel-event-block\.ring-warning[^{]*\{[^}]*box-shadow:\s*none\s*!important/);
   });
+  test('el recuadro naranja del filtro y los parlantes naranjas del panel se apagan', () => {
+    expect(css).toMatch(/monitoring-panel-filter-btn\.ring-warning[^{]*\{[^}]*box-shadow:\s*none\s*!important/);
+    expect(css).toMatch(/pi-volume-up\.text-warning[^{]*\{[^}]*color:/);
+  });
 });
