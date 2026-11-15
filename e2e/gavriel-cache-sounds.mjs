@@ -350,6 +350,7 @@ try {
     await key('keyUp', 'Alt', 'AltLeft', 18, 0);
     await sleep(2200);
   };
+  const altEnterCut = async () => { await altEnter(); await sleep(5200); }; // con llamada en curso: corta y espera 5 s
   const roundView = () => evalJs(`JSON.stringify({ calls: window.__rcalls, colors: [...document.querySelectorAll('#rs .card')].map((c) => c.getAttribute('data-gv-round') ?? 'sin'), text: document.querySelector('.gv-round-text')?.textContent, checks: [...document.querySelectorAll('.gv-round-check')].map((c) => c.checked) })`).then(JSON.parse);
   out.round = { inicial: await roundView() };
   // se destilda a Guillermo con un clic real del tilde
@@ -357,12 +358,14 @@ try {
   await sleep(400);
   await altEnter();
   out.round.llamada1 = await roundView();
-  await altEnter(); // con la llamada en curso: corta y llama a la siguiente
+  const antes = Date.now();
+  await altEnterCut(); // con la llamada en curso: corta, espera 5 s y llama a la siguiente
+  out.round.espera = Date.now() - antes;
   out.round.llamada2 = await roundView();
-  await altEnter();
-  await altEnter();
+  await altEnterCut();
+  await altEnterCut();
   out.round.llamada4 = await roundView();
-  await altEnter();
+  await altEnterCut();
   out.round.fin = { toast: await toast(), view: await roundView() };
   await evalJs(`document.querySelector('.gv-round-reset').click()`);
   await sleep(400);
@@ -434,6 +437,7 @@ assert.ok(out.musicBar.cerrada === null || out.musicBar.cerrada.hidden === true,
 assert.deepEqual(out.round.inicial.checks, [true, true, true], 'todos los contactos nacen tildados');
 assert.equal(out.round.inicial.text, 'Ronda 1 de 2 · 0/3 llamados');
 assert.deepEqual(out.round.llamada1.calls, ['Paula'], 'Alt+Enter debía llamar al primero');
+assert.ok(out.round.espera >= 5000, 'tras cortar debía esperar 5 s antes de llamar al siguiente');
 assert.equal(out.round.llamada1.colors[0], 'calling', 'el que está llamando va en verde');
 assert.deepEqual(out.round.llamada2.calls, ['Paula', 'Maria'], 'con llamada en curso corta y llama al siguiente tildado (saltea a Guillermo)');
 assert.equal(out.round.llamada2.colors[0], 'once', 'llamado una vez va en amarillo');

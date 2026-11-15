@@ -98,6 +98,8 @@ const FILTER_KEYS = ['Q', 'W', 'R', 'T', 'Y', 'U', 'I', 'O', 'P'];
 /** Atributo de <html> mientras se mantiene Alt: el CSS muestra solo entonces los indicadores Alt+N. */
 const ALT_ATTR = 'data-gv-alt';
 const LOCK_MS = 1500;
+/** Pausa entre cortar una llamada y marcar al siguiente de la ronda. */
+const ROUND_PAUSE_MS = 5000;
 /** Cuánto hay que mantener Alt (sin otra tecla) para que se abra el menú de contactos. */
 const PEEK_DELAY_MS = 350;
 /** Contactos que se leen de la lista (la ronda los usa todos; solo los primeros 9 tienen un Alt+N). */
@@ -663,10 +665,13 @@ function main(): void {
     roundBusy = true;
     try {
       if (isCalling()) {
-        toast('Cortando para llamar al siguiente…');
+        toast('Cortando la llamada…');
         if (!(await sip.run('hangup'))) await hangUp();
         if (!(await waitFor(() => (isCalling() ? null : true), 3000))) return toast('No se pudo cortar la llamada');
-        await sleep(250);
+        for (let left = Math.ceil(ROUND_PAUSE_MS / 1000); left > 0; left--) {
+          toast(`Llamo al siguiente en ${left} s…`);
+          await sleep(1000);
+        }
       }
       const pick = round.peek(findContacts().map((c) => ({ name: c.name, button: c.button, card: c.card })));
       if ('message' in pick) return toast(pick.message);
