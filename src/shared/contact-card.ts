@@ -9,6 +9,7 @@ export interface CalledContact {
   phone: string;
 }
 
+const NUMBERED = /^\d+\.\s+\S/;
 const PHONE_LINE = /^\+?[\d\s().-]{6,}$/;
 
 /** Solo los dígitos de un teléfono. */
@@ -29,7 +30,14 @@ export function samePhone(a: string, b: string): boolean {
  * según la pantalla; por eso se reconocen por su forma y no por su posición.
  */
 export function parseContactLines(lines: readonly string[]): CalledContact | null {
-  const clean = lines.map((l) => l.trim()).filter(Boolean);
+  let clean = lines.map((l) => l.trim()).filter(Boolean);
+  // En la lista el nombre lleva «N. » delante. Si la tarjeta solo tiene un contacto, subir de nivel puede arrastrar
+  // el encabezado («Contactos de emergencia») o el contacto siguiente: se recorta al bloque del contacto numerado.
+  const numbered = clean.findIndex((l) => NUMBERED.test(l));
+  if (numbered >= 0) {
+    const next = clean.findIndex((l, i) => i > numbered && NUMBERED.test(l));
+    clean = clean.slice(numbered, next < 0 ? undefined : next);
+  }
   const first = clean[0];
   if (!first) return null;
   const name = parseContactName(first);

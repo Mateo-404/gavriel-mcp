@@ -52,4 +52,15 @@ describe('samePhone', () => {
     expect(samePhone('', '')).toBe(false);
     expect(samePhone('911', '911')).toBe(false);
   });
+  test('si la tarjeta arrastra el encabezado, toma el contacto numerado y no el título', () => {
+    expect(parseContactLines(['Contactos de emergencia', '0. Ignacio Lopez', 'SMS', '3492580787', 'Dueño Alarma General'])).toEqual({
+      name: 'Ignacio Lopez',
+      description: 'Dueño Alarma General',
+      phone: '3492580787',
+    });
+  });
+
+  test('no mezcla datos del contacto siguiente', () => {
+    expect(parseContactLines(['0. Ana', '3491111111', 'Titular', '1. Beto', '3492222222'])).toEqual({ name: 'Ana', description: 'Titular', phone: '3491111111' });
+  });
 });
