@@ -317,3 +317,10 @@ html[data-gv-noanim] .gv-media-pop { transition: none !important; }
 .gv-mutebtn.gv-muted:hover { background: #dc2626; }
 @media (prefers-reduced-motion: reduce) { .gv-mutebtn { animation: none; transition: none; } }
 html[data-gv-noanim] .gv-mutebtn { animation: none !important; transition: none !important; }
+
+/* Sin el resaltado naranja (anillo + fondo «warning») del bloque de evento del panel de monitoreo */
+.monitoring-panel-event-block.ring-warning {
+  --tw-ring-shadow: 0 0 #0000 !important;
+  box-shadow: none !important;
+  background-color: transparent !important;
+}
