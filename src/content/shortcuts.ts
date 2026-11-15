@@ -13,6 +13,8 @@
  *                  menú "Llamar a…" del botón flotante. Nunca llama a Jurisdicción / 911.
  *   Alt + Shift    en una cuenta: copia el nombre de la última persona a la que se llamó
  *                  (ver last-contact.ts); sin tocar nada, deja los filtros como estaban.
+ *   Alt + Enter    en una cuenta: siguiente contacto de la ronda de llamadas (corta la llamada en curso);
+ *                  ver call-round.ts. Alt+N sigue llamando a mano sin mover la ronda.
  *   Ctrl + Enter   acción principal según contexto, en este orden:
  *                    1. llamada en curso      -> cortar
  *                    2. llamada entrante      -> atender
@@ -45,6 +47,7 @@ import { readSetting, readSettings, touches } from '../shared/storage';
 import { accountIdFromLocation } from '../shared/routes';
 import { createEventsNav, FOCUS_ATTR } from './events-nav';
 import { createCallCard } from './call-card';
+import { createCallRound } from './call-round';
 import { createClientCopy } from './client-copy';
 import { createAlertSender } from './alerts';
 import { createDataStore } from './data-store';
@@ -71,6 +74,10 @@ interface Contact {
   button: HTMLButtonElement;
   /** Elemento junto al cual se muestra el indicador "Alt+N". */
   badgeHost: Element;
+  /** Tarjeta del contacto (en el menú, el propio botón). */
+  card: HTMLElement;
+  /** Título «Contactos de emergencia» (solo en la lista de la pestaña). */
+  heading?: HTMLElement;
 }
 
 interface BadgeSpec {
@@ -93,7 +100,9 @@ const ALT_ATTR = 'data-gv-alt';
 const LOCK_MS = 1500;
 /** Cuánto hay que mantener Alt (sin otra tecla) para que se abra el menú de contactos. */
 const PEEK_DELAY_MS = 350;
-const MAX_SHORTCUT_CONTACTS = 9;
+/** Contactos que se leen de la lista (la ronda los usa todos; solo los primeros 9 tienen un Alt+N). */
+const MAX_CONTACTS = 20;
+const MAX_SHORTCUT_DIGIT = 9;
 const CONTACTS_HEADING = /^contactos de emergencia$/i;
 const ACCOUNT_CONTACTS_HEADING = /^contactos de la cuenta$/i;
 const MENU_TOGGLE = 'button[aria-label="Elegir otro contacto"]';
@@ -159,9 +168,11 @@ function main(): void {
         name: parseContactName(card.innerText) || 'contacto',
         button: callButton,
         badgeHost: callButton,
+        card,
+        heading,
       });
     }
-    return contacts.slice(0, MAX_SHORTCUT_CONTACTS);
+    return contacts.slice(0, MAX_CONTACTS);
   };
 
   /**
@@ -179,12 +190,13 @@ function main(): void {
     if (!section) return [];
     return [...section.querySelectorAll<HTMLButtonElement>('button')]
       .filter(visible)
-      .slice(0, MAX_SHORTCUT_CONTACTS)
+      .slice(0, MAX_CONTACTS)
       .map((button, index) => ({
         position: index + 1,
         name: parseContactName(button.innerText) || 'contacto',
         button,
         badgeHost: button.lastElementChild ?? button, // el teléfono: el indicador va antes
+        card: button,
       }));
   };
 
@@ -318,6 +330,8 @@ function main(): void {
   const panel = createPanelActions({ visible, ownText });
   const dialogConfirm = createDialogConfirm({ visible, ownText, toast });
   const sip = createSipClient();
+  let roundOn: boolean = DEFAULT_SETTINGS.callRound;
+  const round = createCallRound({ isCalling, accountId: currentAccountId, repaint: () => schedule() });
 
   // Reproductor de Spotify Web / YouTube Music en la barra de arriba (ver media-bar.ts)
   const mediaBar = createMediaBar({
@@ -444,6 +458,15 @@ function main(): void {
     }
   };
 
+  /** Tildes, colores y barra de la ronda sobre «Contactos de emergencia» (no en el panel ni con un diálogo abierto). */
+  const paintRound = (): void => {
+    const listed = enabled && roundOn && !events.active() ? findContacts() : [];
+    round.paint(
+      listed.map((c) => ({ name: c.name, button: c.button, card: c.card })),
+      listed[0]?.heading ?? null,
+    );
+  };
+
   const decorate = guard('indicadores', (): void => {
     mediaBar.ensureMounted(); // la barra de arriba se redibuja con la pantalla: se vuelve a ubicar el reproductor
     // Con un diálogo abierto no hay nada que indicar y escribir ahí dispara muchos cambios: no se toca el DOM
@@ -461,6 +484,7 @@ function main(): void {
         });
       } else {
         for (const contact of visibleContacts()) {
+          if (contact.position > MAX_SHORTCUT_DIGIT) continue;
           wanted.set(contact.badgeHost, { text: `Alt+${contact.position}`, place: 'before', altOnly: true });
         }
       }
@@ -509,6 +533,7 @@ function main(): void {
     }
     events.refresh();
     callCard.update();
+    paintRound();
   });
 
   let timer: number | undefined;
@@ -579,22 +604,28 @@ function main(): void {
    * menú "Llamar a…" del botón flotante: lo abre, elige el contacto y, si hizo
    * falta abrirlo, lo deja cerrado.
    */
-  const callContact = async (position: number): Promise<void> => {
-    if (isCalling()) return toast('Ya hay una llamada en curso (Ctrl+Enter para cortar)');
-    if (modalOpen()) return toast('Cerrá el menú o diálogo abierto para llamar');
-    if (callingFromMenu || Date.now() - lastCallAt < LOCK_MS) return; // evita llamadas dobles
+  const callContact = async (position: number): Promise<boolean> => {
+    const refuse = (message: string): boolean => {
+      toast(message);
+      return false;
+    };
+    if (isCalling()) return refuse('Ya hay una llamada en curso (Ctrl+Enter para cortar)');
+    if (modalOpen()) return refuse('Cerrá el menú o diálogo abierto para llamar');
+    if (callingFromMenu || Date.now() - lastCallAt < LOCK_MS) return false; // evita llamadas dobles
 
     const listed = findContacts().find((c) => c.position === position);
     if (listed) {
-      if (listed.button.disabled) return toast(`No se puede llamar a ${listed.name}`);
+      if (listed.button.disabled) return refuse(`No se puede llamar a ${listed.name}`);
       lastCallAt = Date.now();
-      return startCall(listed);
+      startCall(listed);
+      return true;
     }
-    if (findContacts().length > 0) return toast(`No hay contacto ${position} en esta cuenta`);
+    if (findContacts().length > 0) return refuse(`No hay contacto ${position} en esta cuenta`);
 
     const toggle = document.querySelector<HTMLButtonElement>(MENU_TOGGLE);
-    if (!toggle || !visible(toggle)) return toast('Abrí una cuenta para llamar a sus contactos');
+    if (!toggle || !visible(toggle)) return refuse('Abrí una cuenta para llamar a sus contactos');
 
+    let started = false;
     callingFromMenu = true;
     try {
       const wasOpen = toggle.getAttribute('aria-expanded') === 'true';
@@ -609,11 +640,40 @@ function main(): void {
       } else {
         lastCallAt = Date.now();
         startCall(target); // Gavriel inicia la llamada y cierra el menú
+        started = true;
       }
       await sleep(250);
       if (!wasOpen && toggle.getAttribute('aria-expanded') === 'true') toggle.click(); // no lo dejamos abierto
     } finally {
       callingFromMenu = false;
+      schedule();
+    }
+    return started;
+  };
+
+  /**
+   * Alt+Enter: siguiente contacto de la ronda. Con una llamada en curso, la corta primero. Solo cuenta
+   * una llamada si de verdad arrancó (si Gavriel no dejó llamar, el contacto sigue pendiente).
+   */
+  let roundBusy = false;
+  const roundNext = async (): Promise<void> => {
+    if (roundBusy) return;
+    if (!currentAccountId()) return toast('Abrí una cuenta para llamar a sus contactos');
+    if (modalOpen()) return toast('Cerrá el menú o diálogo abierto para llamar');
+    roundBusy = true;
+    try {
+      if (isCalling()) {
+        toast('Cortando para llamar al siguiente…');
+        if (!(await sip.run('hangup'))) await hangUp();
+        if (!(await waitFor(() => (isCalling() ? null : true), 3000))) return toast('No se pudo cortar la llamada');
+        await sleep(250);
+      }
+      const pick = round.peek(findContacts().map((c) => ({ name: c.name, button: c.button, card: c.card })));
+      if ('message' in pick) return toast(pick.message);
+      lastCallAt = 0; // el bloqueo de llamadas dobles no aplica: la ronda ya cortó la anterior
+      if (await callContact(pick.position)) round.commit(pick.position, pick.round);
+    } finally {
+      roundBusy = false;
       schedule();
     }
   };
@@ -808,6 +868,15 @@ function main(): void {
       return;
     }
 
+    // Alt + Enter en una cuenta: siguiente contacto de la ronda de llamadas
+    if (event.altKey && !event.ctrlKey && !event.getModifierState('AltGraph') && event.key === 'Enter') {
+      if (roundOn && currentAccountId()) {
+        consume(event);
+        void roundNext();
+      }
+      return;
+    }
+
     // Alt + dígito (sin Ctrl: en Windows AltGr se reporta como Ctrl+Alt)
     if (event.altKey && !event.ctrlKey && !event.getModifierState('AltGraph')) {
       const position = digitFromKeyCode(event.code);
@@ -882,12 +951,25 @@ function main(): void {
     schedule();
   });
   void readSetting('showCallCard').then((value) => callCard.setEnabled(value));
+  void readSetting('callRound').then((value) => {
+    roundOn = value;
+    round.setEnabled(roundOn && enabled);
+    schedule();
+  });
   chrome.storage.onChanged.addListener((changes, area) => {
     if (touches(changes, area, 'showCallCard')) void readSetting('showCallCard').then((v) => callCard.setEnabled(v));
     if (touches(changes, area, 'mediaPlayer')) void readSetting('mediaPlayer').then((v) => mediaBar.setEnabled(v));
+    if (touches(changes, area, 'callRound')) {
+      void readSetting('callRound').then((v) => {
+        roundOn = v;
+        round.setEnabled(roundOn && enabled);
+        schedule();
+      });
+    }
     if (touches(changes, area, SETTING)) {
       void readSetting(SETTING).then((value) => {
         enabled = value;
+        round.setEnabled(roundOn && enabled);
         if (!enabled) {
           root.removeAttribute(ALT_ATTR);
           events.clear();

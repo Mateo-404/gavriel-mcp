@@ -23,6 +23,7 @@
       <a href="#llamada">Durante una llamada</a>
       <a href="#panel">Panel de monitoreo</a>
       <a href="#avisos">Avisos</a>
+      <a href="#ronda">Ronda de llamadas</a>
       <a href="#musica">Música</a>
       <a href="#sonidos">Sonidos</a>
       <a href="#mantenimiento">Mantenimiento</a>
@@ -203,6 +204,19 @@
           <button type="button" class="btn" id="notify-test">Probar aviso</button>
         </div>
         <p class="note" id="notify-test-state"></p>
+      </section>
+
+      <section id="ronda" class="block" aria-labelledby="h-ronda">
+        <h2 id="h-ronda">Ronda de llamadas</h2>
+        <p class="lead">En una cuenta, <kbd>Alt</kbd>+<kbd>Enter</kbd> llama al siguiente contacto de emergencia (y, si hay una llamada en curso, la corta y llama al siguiente). Cada contacto tiene un tilde para sacarlo de la ronda y su tarjeta cambia de color: verde llamando ahora, amarillo una llamada, rojo dos. Son dos rondas como máximo; con «Reiniciar ronda» se empieza de cero. <kbd>Alt</kbd>+<kbd>N</kbd> sigue llamando a mano al contacto N sin mover la ronda.</p>
+        <label class="row" for="opt-round">
+          <span class="row-text">
+            <strong>Activar la ronda de llamadas</strong>
+            <small>Muestra los tildes, los colores y la barra «Ronda 1 de 2» sobre los contactos de emergencia.</small>
+          </span>
+          <input type="checkbox" id="opt-round" role="switch">
+          <span class="switch" aria-hidden="true"></span>
+        </label>
       </section>
 
       <section id="musica" class="block" aria-labelledby="h-musica">

@@ -60,6 +60,12 @@ export const SHORTCUTS: readonly Shortcut[] = [
   },
   {
     scope: 'cuenta',
+    keys: ['Alt', 'Enter'],
+    chord: true,
+    description: 'Ronda de llamadas: llama al siguiente contacto tildado (si hay una llamada en curso, la corta y llama al siguiente). Dos rondas como máximo; Alt+N reintenta a mano sin mover la ronda.',
+  },
+  {
+    scope: 'cuenta',
     keys: ['Mantener Alt'],
     chord: false,
     description: 'Muestra los atajos y abre el menú de contactos. Al soltar, se cierra.',

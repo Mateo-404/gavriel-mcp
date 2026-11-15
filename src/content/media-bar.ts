@@ -9,6 +9,8 @@
  * En reposo es una píldora chica (ecualizador, tema y banda). Al pasar el mouse (o con el teclado) se
  * abre debajo un panel con los controles: nada de eso pesa mientras no se lo mira (solo CSS).
  *
+ * En las demás pantallas `#topbar-actions` está vacío y el reproductor va ahí solo.
+ *
  * Solo aparece si hay una pestaña de Spotify Web o YouTube Music abierta (ver music.ts y
  * media-router.ts). Las animaciones (ecualizador y título que se desplaza) se apagan con el
  * interruptor de Ajustes y con «reducir movimiento» del sistema.
@@ -16,6 +18,8 @@
 import { type MediaAction, type TabMedia, SOURCE_LABELS, formatTime, nextTab, pickActive } from '../shared/media';
 
 const BAR = '#topbar-actions .monitoring-panel';
+/** En el resto de las pantallas (Tickets, Cuentas…) la barra existe pero está vacía: se usa ese contenedor. */
+const ANY_SCREEN = '#topbar-actions';
 const BUTTONSET = '.monitoring-panel-view-buttonset';
 
 const ICONS = {
@@ -241,7 +245,7 @@ export function createMediaBar({ send }: MediaBarDeps): MediaBar {
   }, 1000);
 
   const mount = (): void => {
-    const container = document.querySelector<HTMLElement>(BAR);
+    const container = document.querySelector<HTMLElement>(BAR) ?? document.querySelector<HTMLElement>(ANY_SCREEN);
     if (!container || !enabled || !current) {
       if (root.isConnected && (!container || !enabled || !current)) root.remove();
       return;

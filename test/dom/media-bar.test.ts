@@ -148,3 +148,13 @@ test('adelantar y retroceder 5 segundos mandan skip', () => {
     { type: 'media-command', tabId: 9, action: 'skip', value: -5 },
   ]);
 });
+
+test('en pantallas sin «Tiempo real» (barra vacía) se monta igual en la barra de acciones', () => {
+  document.body.innerHTML = '<div id="topbar-actions" class="flex items-center"></div>';
+  bar.update([tab(1)]);
+  expect(document.querySelector('#topbar-actions')!.contains(bar.root)).toBe(true);
+  // al pasar a una pantalla con «Tiempo real» se muda a esa barra
+  const container = mountTopbar();
+  bar.ensureMounted();
+  expect(container.contains(bar.root)).toBe(true);
+});

@@ -32,6 +32,8 @@ export type Settings = {
   notifyTypes: string[];
   /** Reproductor de Spotify Web / YouTube Music en la barra de arriba de Gavriel. */
   mediaPlayer: boolean;
+  /** Ronda de llamadas a contactos con Alt+Enter (tildes, colores y contador de ronda). */
+  callRound: boolean;
   /** Nombres (sin extensión) de los sonidos de /sounds/ que se silencian. */
   mutedSounds: string[];
   /** Sonidos que Gavriel ya reprodujo (lista que muestra el popup). */
@@ -62,6 +64,7 @@ export const DEFAULT_SETTINGS: Settings = {
   notifyEnabled: true,
   notifyTypes: ['BUR', 'POW', 'PAN', 'MED', 'INC'],
   mediaPlayer: true,
+  callRound: true,
   mutedSounds: [...DEFAULT_SOUNDS],
   knownSounds: [...DEFAULT_SOUNDS],
 };

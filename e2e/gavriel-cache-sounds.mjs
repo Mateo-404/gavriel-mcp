@@ -325,6 +325,51 @@ try {
   await fetch(`http://127.0.0.1:9333/json/close/${music.id}`);
   await sleep(1500);
   out.musicBar.cerrada = await bar();
+  // --- Ronda de llamadas: Alt+Enter llama al siguiente contacto tildado, cortando la llamada en curso
+  await send('Page.navigate', { url: `https://${HOST}/monitoring-panel/account-analysis?accountId=acc1` });
+  await sleep(2500);
+  await evalJs(`(() => {
+    document.body.insertAdjacentHTML('beforeend', '<section id="rs"><p>Contactos de emergencia</p>' +
+      ['Paula', 'Guillermo', 'Maria'].map((n, i) => '<div class="card"><span>' + i + '. ' + n + '</span><button aria-label="Llamar">c</button></div>').join('') +
+      '</section><button id="fab" aria-label="Abrir softphone">tel</button><div id="softphone" hidden><button aria-label="Colgar">Colgar</button></div>');
+    window.__rcalls = [];
+    const fab = document.getElementById('fab'), phone = document.getElementById('softphone');
+    document.querySelectorAll('#rs button[aria-label="Llamar"]').forEach((b) => b.addEventListener('click', () => {
+      if (fab.className) return;
+      window.__rcalls.push(b.parentElement.querySelector('span').textContent.replace(/^[0-9]+. /, ''));
+      fab.className = 'bg-destructive';
+    }));
+    fab.addEventListener('click', () => { phone.hidden = false; });
+    phone.querySelector('button').addEventListener('click', () => { fab.className = ''; phone.hidden = true; });
+  })()`);
+  await sleep(600);
+  const altEnter = async () => {
+    await key('keyDown', 'Alt', 'AltLeft', 18, 1);
+    await key('keyDown', 'Enter', 'Enter', 13, 1);
+    await key('keyUp', 'Enter', 'Enter', 13, 1);
+    await key('keyUp', 'Alt', 'AltLeft', 18, 0);
+    await sleep(2200);
+  };
+  const roundView = () => evalJs(`JSON.stringify({ calls: window.__rcalls, colors: [...document.querySelectorAll('#rs .card')].map((c) => c.getAttribute('data-gv-round') ?? 'sin'), text: document.querySelector('.gv-round-text')?.textContent, checks: [...document.querySelectorAll('.gv-round-check')].map((c) => c.checked) })`).then(JSON.parse);
+  out.round = { inicial: await roundView() };
+  // se destilda a Guillermo con un clic real del tilde
+  await evalJs(`document.querySelectorAll('.gv-round-check')[1].click()`);
+  await sleep(400);
+  await altEnter();
+  out.round.llamada1 = await roundView();
+  await altEnter(); // con la llamada en curso: corta y llama a la siguiente
+  out.round.llamada2 = await roundView();
+  await altEnter();
+  await altEnter();
+  out.round.llamada4 = await roundView();
+  await altEnter();
+  out.round.fin = { toast: await toast(), view: await roundView() };
+  await evalJs(`document.querySelector('.gv-round-reset').click()`);
+  await sleep(400);
+  out.round.reiniciada = await roundView();
+  await evalJs(`document.getElementById('rs').remove(); document.getElementById('fab').remove(); document.getElementById('softphone').remove()`);
+  await sleep(400);
+
   // --- Colgar: Ctrl+Enter llama a hangup() del contexto de React, sin abrir el panel ni cambiar de pestaña
   await evalJs('window.__mountSip()');
   await sleep(500);
@@ -386,6 +431,19 @@ assert.equal(out.musicBar.silencio.muted, true);
 assert.equal(out.musicBar.pausa.pestaña.paused, true);
 assert.equal(out.musicBar.pausa.barra.play, 'Reproducir');
 assert.ok(out.musicBar.cerrada === null || out.musicBar.cerrada.hidden === true, 'al cerrar la pestaña de música el reproductor debía desaparecer');
+assert.deepEqual(out.round.inicial.checks, [true, true, true], 'todos los contactos nacen tildados');
+assert.equal(out.round.inicial.text, 'Ronda 1 de 2 · 0/3 llamados');
+assert.deepEqual(out.round.llamada1.calls, ['Paula'], 'Alt+Enter debía llamar al primero');
+assert.equal(out.round.llamada1.colors[0], 'calling', 'el que está llamando va en verde');
+assert.deepEqual(out.round.llamada2.calls, ['Paula', 'Maria'], 'con llamada en curso corta y llama al siguiente tildado (saltea a Guillermo)');
+assert.equal(out.round.llamada2.colors[0], 'once', 'llamado una vez va en amarillo');
+assert.equal(out.round.llamada2.colors[1], 'off', 'el destildado queda atenuado');
+assert.deepEqual(out.round.llamada4.calls, ['Paula', 'Maria', 'Paula', 'Maria'], 'la segunda ronda vuelve al primero');
+assert.deepEqual(out.round.llamada4.colors, ['twice', 'off', 'calling'], 'rojo a los llamados dos veces');
+assert.match(out.round.fin.toast, /Ronda terminada/, 'tras la segunda ronda avisa que terminó');
+assert.equal(out.round.fin.view.calls.length, 4, 'no se llama de más');
+assert.deepEqual(out.round.reiniciada.checks, [true, true, true], '«Reiniciar ronda» vuelve a tildar todo');
+assert.equal(out.round.reiniciada.text, 'Ronda 1 de 2 · 0/3 llamados');
 assert.equal(out.sipClicks.hangup, 1, 'Ctrl+Enter debía llamar una vez a hangup() del softphone');
 assert.equal(out.sipClicks.panel, 0, 'no debía abrir el panel del softphone');
 assert.equal(out.sipToast, 'Llamada cortada');

@@ -30,6 +30,7 @@ export function sanitizeSettings(raw: Record<string, unknown>): Settings {
     notifyEnabled: typeof raw.notifyEnabled === 'boolean' ? raw.notifyEnabled : DEFAULT_SETTINGS.notifyEnabled,
     notifyTypes: Array.isArray(raw.notifyTypes) ? [...new Set(raw.notifyTypes.filter(isAlertType))] : [...DEFAULT_SETTINGS.notifyTypes],
     mediaPlayer: typeof raw.mediaPlayer === 'boolean' ? raw.mediaPlayer : DEFAULT_SETTINGS.mediaPlayer,
+    callRound: typeof raw.callRound === 'boolean' ? raw.callRound : DEFAULT_SETTINGS.callRound,
     mutedSounds: isNames(raw.mutedSounds) ? raw.mutedSounds : [...DEFAULT_SETTINGS.mutedSounds],
     knownSounds: isNames(raw.knownSounds) ? raw.knownSounds : [...DEFAULT_SETTINGS.knownSounds],
   };
