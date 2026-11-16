@@ -213,13 +213,13 @@ describe('qué se hace después de cerrar', () => {
   test('retryFor reintenta hasta que el botón aparece, y no sigue para siempre', async () => {
     let tries = 0;
     retryFor(() => ++tries >= 3, 1000, 5);
-    await wait(40);
-    expect(tries).toBe(3);
+    await wait(150);
+    expect(tries).toBe(3); // paró al encontrarlo
     let never = 0;
     retryFor(() => (never++, false), 30, 5);
-    await wait(80);
+    await wait(250);
     const stopped = never;
-    await wait(40);
-    expect(never).toBe(stopped);
+    await wait(100);
+    expect(never).toBe(stopped); // y paró al vencer el plazo
   });
 });

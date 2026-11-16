@@ -19,7 +19,34 @@
 import { SIP_REQUEST_EVENT, SIP_RESULT_EVENT } from '../shared/constants';
 import { isMicMuted, setMicMuted, toggleMic } from './mic';
 
-type SipAction = 'hangup' | 'answer' | 'reject' | 'state' | 'mute' | 'unmute';
+type SipAction = 'hangup' | 'answer' | 'reject' | 'state' | 'mute' | 'unmute' | 'caller';
+
+const PHONE_FIELDS = ['remoteNumber', 'number', 'caller', 'from', 'phone', 'user'] as const;
+
+/**
+ * Número de quien llama, a partir de lo que Gavriel guarda en `incoming` (string, la sesión de JsSIP u objeto
+ * con el número). Busca en los lugares habituales y devuelve solo algo con pinta de teléfono (6+ dígitos).
+ */
+export function callerNumber(incoming: unknown, depth = 0): string | null {
+  if (incoming == null || depth > 4) return null;
+  if (typeof incoming === 'string' || typeof incoming === 'number') {
+    const text = String(incoming);
+    const match = /sips?:([^@;>\s]+)@/i.exec(text);
+    const candidate = match ? match[1]! : text;
+    return candidate.replace(/\D/g, '').length >= 6 ? candidate : null;
+  }
+  if (typeof incoming !== 'object') return null;
+  const obj = incoming as Record<string, unknown>;
+  for (const key of ['remote_identity', 'request', 'session', 'uri', 'from', 'data'] as const) {
+    const nested = key in obj ? callerNumber(obj[key], depth + 1) : null;
+    if (nested) return nested;
+  }
+  for (const key of PHONE_FIELDS) {
+    const found = key in obj ? callerNumber(obj[key], depth + 1) : null;
+    if (found) return found;
+  }
+  return null;
+}
 
 interface SipContext {
   calling: boolean;
@@ -72,6 +99,8 @@ export interface SipResult {
   incoming?: boolean;
   /** Micrófono silenciado (solo en las acciones de silencio). */
   muted?: boolean;
+  /** Número de quien llama (solo en la acción `caller`). */
+  caller?: string;
 }
 
 export function runSipAction(action: SipAction, root: ParentNode = document): Omit<SipResult, 'id'> {
@@ -79,6 +108,10 @@ export function runSipAction(action: SipAction, root: ParentNode = document): Om
   if (!sip) return { ok: false, reason: 'no-sip' };
   const state = { calling: !!sip.calling, incoming: !!sip.incoming };
   if (action === 'state') return { ok: true, ...state, muted: isMicMuted() };
+  if (action === 'caller') {
+    const caller = state.incoming ? callerNumber(sip.incoming) : null;
+    return caller ? { ok: true, ...state, caller } : { ok: false, reason: 'nothing-to-do', ...state };
+  }
   if (action === 'mute' || action === 'unmute') {
     // El silencio solo tiene sentido con una llamada en curso; reactivar siempre se permite
     if (action === 'mute' && !state.calling) return { ok: false, reason: 'nothing-to-do', ...state, muted: false };
@@ -115,7 +148,7 @@ export function installSipBridge(): void {
     } catch {
       return;
     }
-    const actions: readonly string[] = ['hangup', 'answer', 'reject', 'state', 'mute', 'unmute'];
+    const actions: readonly string[] = ['hangup', 'answer', 'reject', 'state', 'mute', 'unmute', 'caller'];
     if (typeof request.id !== 'number' || typeof request.action !== 'string' || !actions.includes(request.action)) return;
     const result = runSipAction(request.action as SipAction);
     document.dispatchEvent(new CustomEvent(SIP_RESULT_EVENT, { detail: JSON.stringify({ id: request.id, ...result }) }));

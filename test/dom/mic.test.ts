@@ -63,6 +63,7 @@ describe('botón de silencio (DOM)', () => {
     const state: { muted: boolean | null } = { muted: false };
     const sip: SipClient = {
       run: async () => true,
+      caller: async () => null,
       toggleMute: async () => {
         calls.push('mute');
         if (state.muted === null) return null;

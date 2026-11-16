@@ -59,6 +59,8 @@ import { createMediaBar } from './media-bar';
 import { createLastContact } from './last-contact';
 import { createPanelActions } from './panel-actions';
 import { createSipClient } from './sip';
+import { chromeIndexStore, createAccountIndex, createApiRequester } from './account-index';
+import { createIncomingBanner, createSearchUi } from './account-search-ui';
 import { guard, watchDom } from './runtime';
 
 declare global {
@@ -342,6 +344,25 @@ function main(): void {
   const dialogConfirm = createDialogConfirm({ visible, ownText, toast });
   const sip = createSipClient();
   const callMute = createCallMute({ sip, toast });
+  // Índice de cuentas y contactos: buscador a fondo en «Cuentas» y cuenta de la llamada entrante
+  const accountIndex = createAccountIndex({ request: createApiRequester(), store: chromeIndexStore() });
+  const searchUi = createSearchUi({ search: accountIndex.search, size: accountIndex.size, progress: accountIndex.progress });
+  const incomingBanner = createIncomingBanner({ caller: () => sip.caller(), byPhone: accountIndex.byPhone });
+  let indexOn: boolean = DEFAULT_SETTINGS.accountIndex;
+  let indexStarted = false;
+  const applyIndex = (on: boolean): void => {
+    indexOn = on;
+    if (on && !indexStarted) {
+      indexStarted = true;
+      // Se espera a que la página cargue y haga sus primeros pedidos (de ahí sale la sesión)
+      setTimeout(() => void accountIndex.start(), 4000);
+    }
+    if (!on) {
+      searchUi.hide();
+      incomingBanner.update(false);
+    }
+    schedule();
+  };
   let roundOn: boolean = DEFAULT_SETTINGS.callRound;
   const round = createCallRound({ isCalling, accountId: currentAccountId, repaint: () => schedule() });
   // Al cerrar la intervención (o dejarla en observación) la ronda de esa cuenta vuelve a cero
@@ -499,6 +520,10 @@ function main(): void {
 
   const decorate = guard('indicadores', (): void => {
     mediaBar.ensureMounted(); // la barra de arriba se redibuja con la pantalla: se vuelve a ubicar el reproductor
+    if (indexOn) {
+      searchUi.attach();
+      incomingBanner.update(findAnswer() !== undefined);
+    }
     // Con un diálogo abierto no hay nada que indicar y escribir ahí dispara muchos cambios: no se toca el DOM
     if (dialogOpen()) {
       syncDialogBadge();
@@ -1003,6 +1028,7 @@ function main(): void {
     schedule();
   });
   void readSetting('showCallCard').then((value) => callCard.setEnabled(value));
+  void readSetting('accountIndex').then(applyIndex);
   void readSetting('callRound').then((value) => {
     roundOn = value;
     round.setEnabled(roundOn && enabled);
@@ -1011,6 +1037,7 @@ function main(): void {
   chrome.storage.onChanged.addListener((changes, area) => {
     if (touches(changes, area, 'showCallCard')) void readSetting('showCallCard').then((v) => callCard.setEnabled(v));
     if (touches(changes, area, 'mediaPlayer')) void readSetting('mediaPlayer').then((v) => mediaBar.setEnabled(v));
+    if (touches(changes, area, 'accountIndex')) void readSetting('accountIndex').then(applyIndex);
     if (touches(changes, area, 'callRound')) {
       void readSetting('callRound').then((v) => {
         roundOn = v;

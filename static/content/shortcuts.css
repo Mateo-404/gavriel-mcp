@@ -348,3 +348,62 @@ html[data-gv-noanim] .gv-mutebtn { animation: none !important; transition: none 
   color: var(--muted-foreground, #8a8a8a) !important;
   animation: none !important;
 }
+
+/* Desplegable del buscador a fondo (lista de cuentas) y aviso de llamada entrante */
+.gv-asearch,
+.gv-incoming {
+  position: fixed;
+  z-index: 2147483000;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px;
+  border-radius: 10px;
+  border: 1px solid var(--border, rgba(255, 255, 255, 0.14));
+  background: var(--card, #1c1c1f);
+  color: var(--foreground, #f2f2f2);
+  font: 500 13px/1.35 system-ui, "Segoe UI", sans-serif;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+.gv-incoming {
+  top: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  min-width: 320px;
+  max-width: min(92vw, 560px);
+}
+.gv-incoming-head,
+.gv-asearch-note {
+  padding: 4px 8px;
+  color: var(--muted-foreground, #9a9a9a);
+  font-size: 12px;
+}
+.gv-incoming-head {
+  color: var(--foreground, #f2f2f2);
+  font-weight: 600;
+}
+.gv-asearch-row {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  width: 100%;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+}
+.gv-asearch-row:hover,
+.gv-asearch-row.gv-selected {
+  background: var(--accent, rgba(255, 255, 255, 0.08));
+}
+.gv-asearch-title {
+  font-weight: 600;
+}
+.gv-asearch-why {
+  color: var(--muted-foreground, #9a9a9a);
+  font-size: 12px;
+}

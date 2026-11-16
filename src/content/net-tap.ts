@@ -2,7 +2,7 @@
  * Escucha pasiva de dos respuestas que Gavriel ya recibe (mundo de la página, world: MAIN):
  * el historial de llamadas (`/api/sip/calls`) y la cuenta (`/api/accounts/<id>`).
  *
- * No hace pedidos propios, no lee ni envía el token de sesión y no cambia lo que recibe la página:
+ * No hace pedidos propios (los de lectura van por gavriel-api.ts), no envía el token a ningún lado y no cambia lo que recibe la página:
  * `fetch` devuelve la misma respuesta (se lee una copia) y en XHR solo se agrega un oyente de fin.
  * Lo que sale hacia el mundo aislado es mínimo y ya filtrado (ver shared/gavriel-data.ts): nombre,
  * dirección, contactos y llamadas; nunca cabeceras, tokens ni las URLs firmadas de las grabaciones.
@@ -23,6 +23,13 @@ declare global {
     __gvAuth?: string;
   }
 }
+
+/**
+ * Última cabecera de sesión que la propia página mandó. Vive solo en esta variable (mundo de la página):
+ * no se guarda, no se escribe en el DOM ni sale al mundo aislado. Solo la usa gavriel-api.ts para lecturas.
+ */
+let lastAuth: string | undefined;
+export const getAuthHeader = (): string | undefined => lastAuth;
 
 /** Interruptor de Ajustes (bridge.ts lo refleja en <html>). */
 const dedupeOn = (): boolean => document.documentElement.hasAttribute('data-gv-dedupe');
@@ -79,7 +86,10 @@ export function installNetTap(): void {
 
   const setHeader = XMLHttpRequest.prototype.setRequestHeader;
   XMLHttpRequest.prototype.setRequestHeader = function (this: XMLHttpRequest, name: string, value: string) {
-    if (name.toLowerCase() === 'authorization') this.__gvAuth = value;
+    if (name.toLowerCase() === 'authorization') {
+      this.__gvAuth = value;
+      lastAuth = value; // solo en memoria de la página: ver gavriel-api.ts
+    }
     return setHeader.call(this, name, value);
   };
 

@@ -8,7 +8,7 @@ import { SCOPE_TITLES, shortcutsFor, type Shortcut, type ShortcutScope } from '.
 import { ALERT_LABELS, ALERT_TYPES } from '../shared/event-alerts';
 import { readSettings, touches, writeSettings } from '../shared/storage';
 
-type SwitchKey = 'shortcutsEnabled' | 'openContactsTab' | 'revealSecrets' | 'showCallCard' | 'hideSoundBanner' | 'plainEvents' | 'hideGridView' | 'liteMode' | 'cacheAssets' | 'localFonts' | 'blockPush' | 'dedupeAccount' | 'disableAnimations' | 'notifyEnabled' | 'mediaPlayer' | 'callRound';
+type SwitchKey = 'shortcutsEnabled' | 'openContactsTab' | 'revealSecrets' | 'showCallCard' | 'hideSoundBanner' | 'plainEvents' | 'hideGridView' | 'liteMode' | 'cacheAssets' | 'localFonts' | 'blockPush' | 'dedupeAccount' | 'disableAnimations' | 'notifyEnabled' | 'mediaPlayer' | 'callRound' | 'accountIndex';
 
 const SWITCHES: readonly { key: SwitchKey; id: string }[] = [
   { key: 'shortcutsEnabled', id: 'keys' },
@@ -27,6 +27,7 @@ const SWITCHES: readonly { key: SwitchKey; id: string }[] = [
   { key: 'notifyEnabled', id: 'opt-notify' },
   { key: 'mediaPlayer', id: 'opt-media' },
   { key: 'callRound', id: 'opt-round' },
+  { key: 'accountIndex', id: 'opt-index' },
 ];
 
 const SCOPES: readonly ShortcutScope[] = ['panel', 'cuenta', 'llamadas'];
@@ -181,6 +182,7 @@ $('reset-yes').addEventListener('click', () => {
     notifyTypes: [...DEFAULT_SETTINGS.notifyTypes],
     mediaPlayer: DEFAULT_SETTINGS.mediaPlayer,
     callRound: DEFAULT_SETTINGS.callRound,
+    accountIndex: DEFAULT_SETTINGS.accountIndex,
   }).then(async () => {
     render(await readSettings());
     showResetConfirm(false);
@@ -213,7 +215,7 @@ void showNetStatus();
 
 // Si algo cambia desde otro lado (el popup, otra pestaña), esta página se actualiza sola
 chrome.storage.onChanged.addListener((changes, area) => {
-  if (touches(changes, area, 'shortcutsEnabled', 'openContactsTab', 'revealSecrets', 'showCallCard', 'hideSoundBanner', 'plainEvents', 'hideGridView', 'liteMode', 'cacheAssets', 'localFonts', 'blockPush', 'dedupeAccount', 'disableAnimations', 'notifyEnabled', 'notifyTypes', 'mediaPlayer', 'callRound', 'muteEnabled', 'mutedSounds')) {
+  if (touches(changes, area, 'shortcutsEnabled', 'openContactsTab', 'revealSecrets', 'showCallCard', 'hideSoundBanner', 'plainEvents', 'hideGridView', 'liteMode', 'cacheAssets', 'localFonts', 'blockPush', 'dedupeAccount', 'disableAnimations', 'notifyEnabled', 'notifyTypes', 'mediaPlayer', 'callRound', 'accountIndex', 'muteEnabled', 'mutedSounds')) {
     void readSettings().then(render);
     setTimeout(() => void showNetStatus(), 500); // el fondo actualiza las reglas un instante después
   }

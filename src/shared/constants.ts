@@ -36,6 +36,8 @@ export type Settings = {
   mediaPlayer: boolean;
   /** Ronda de llamadas a contactos con Alt+Enter (tildes, colores y contador de ronda). */
   callRound: boolean;
+  /** Índice de cuentas y contactos: búsqueda a fondo y cuenta de la llamada entrante (ver account-index.ts). */
+  accountIndex: boolean;
   /** Nombres (sin extensión) de los sonidos de /sounds/ que se silencian. */
   mutedSounds: string[];
   /** Sonidos que Gavriel ya reprodujo (lista que muestra el popup). */
@@ -68,6 +70,7 @@ export const DEFAULT_SETTINGS: Settings = {
   notifyTypes: ['BUR', 'POW', 'PAN', 'MED', 'INC'],
   mediaPlayer: true,
   callRound: true,
+  accountIndex: true,
   mutedSounds: [...DEFAULT_SOUNDS],
   knownSounds: [...DEFAULT_SOUNDS],
 };
@@ -84,6 +87,8 @@ export const TAP_EVENT = 'gavriel:tap';
 export const TAP_REPLAY_EVENT = 'gavriel:tap-replay';
 
 /** Pedido (aislado -> página) y respuesta (página -> aislado) para colgar/atender/rechazar (sip-bridge.ts). */
+export const GAPI_REQUEST_EVENT = 'gavriel:api-request';
+export const GAPI_RESULT_EVENT = 'gavriel:api-result';
 export const SIP_REQUEST_EVENT = 'gavriel:sip-request';
 export const SIP_RESULT_EVENT = 'gavriel:sip-result';
 

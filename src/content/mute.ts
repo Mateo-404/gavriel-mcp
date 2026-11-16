@@ -14,7 +14,8 @@
  */
 import { DEFAULT_SOUNDS, MUTE_ATTR, MUTED_SOUNDS_ATTR, SOUND_SEEN_EVENT } from '../shared/constants';
 import { isDebugNoise } from '../shared/console-filter';
-import { installNetTap } from './net-tap';
+import { installGavrielApi } from './gavriel-api';
+import { getAuthHeader, installNetTap } from './net-tap';
 import { installMicTracker } from './mic';
 import { installPushGuard } from './push-guard';
 import { installRtcFix } from './rtc-fix';
@@ -48,6 +49,8 @@ function main(): void {
   installPushGuard(root);
   // Audio de las llamadas entrantes con la central: limpia la oferta SDP (ver rtc-fix.ts)
   installRtcFix();
+  // Lecturas propias para el índice de cuentas, con la sesión de la página (ver gavriel-api.ts)
+  installGavrielApi(getAuthHeader);
 
   // Modo ahorro: se descartan los mensajes de depuración con emoji de Gavriel (ver console-filter.ts)
   for (const method of ['log', 'info', 'debug'] as const) {

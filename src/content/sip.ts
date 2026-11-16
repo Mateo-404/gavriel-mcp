@@ -14,12 +14,15 @@ export interface SipClient {
   toggleMute: () => Promise<boolean | null>;
   /** Reactiva el micrófono (al terminar una llamada). */
   unmute: () => Promise<boolean | null>;
+  /** Número de quien llama mientras suena una llamada entrante, o null si no se pudo leer. */
+  caller: () => Promise<string | null>;
 }
 
 interface Result {
   id?: number;
   ok?: boolean;
   muted?: boolean;
+  caller?: string;
 }
 
 const TIMEOUT_MS = 400;
@@ -54,5 +57,9 @@ export function createSipClient(): SipClient {
     run: async (action) => (await request(action))?.ok === true,
     toggleMute: () => muted('mute'),
     unmute: () => muted('unmute'),
+    caller: async () => {
+      const result = await request('caller');
+      return result?.ok === true && typeof result.caller === 'string' ? result.caller : null;
+    },
   };
 }

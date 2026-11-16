@@ -228,6 +228,19 @@
         </label>
       </section>
 
+      <section id="indice" class="block" aria-labelledby="h-indice">
+        <h2 id="h-indice">Búsqueda a fondo y llamadas entrantes</h2>
+        <p class="lead">Arma un índice local de cuentas y contactos con lecturas a Gavriel, usando la misma sesión que la página (el token queda solo en la memoria de la página: no se guarda ni sale de Gavriel). Son unos 1.700 pedidos de lectura la primera vez y se refresca cada 24 horas, de a poco para no cargar el servidor. Con el índice, el buscador de Cuentas muestra resultados por abonado, teléfono, contacto y nombre, y una llamada entrante muestra a qué cuenta pertenece.</p>
+        <label class="row" for="opt-index">
+          <span class="row-text">
+            <strong>Activar el índice de cuentas</strong>
+            <small>Desactivarlo deja de pedir datos a Gavriel y oculta el desplegable y el aviso de llamada entrante.</small>
+          </span>
+          <input type="checkbox" id="opt-index" role="switch">
+          <span class="switch" aria-hidden="true"></span>
+        </label>
+      </section>
+
       <section id="musica" class="block" aria-labelledby="h-musica">
         <h2 id="h-musica">Música en la barra de Gavriel</h2>
         <p class="lead">Un reproductor junto a «Tiempo real» que controla Spotify Web o YouTube Music abiertos en otra pestaña del navegador: reproducir y pausar, anterior y siguiente, volumen, silenciar y posición. Si hay dos abiertos, elige el que suena. La app de escritorio de Spotify no se puede controlar desde una extensión.</p>
