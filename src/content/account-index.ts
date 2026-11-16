@@ -34,6 +34,8 @@ export interface IndexDeps {
   store: IndexStore;
   sleep?: (ms: number) => Promise<void>;
   now?: () => number;
+  /** Estado en palabras (se deja en <html data-gv-index> para diagnosticar). */
+  onStatus?: (status: string) => void;
 }
 
 export interface AccountIndex {
@@ -81,7 +83,7 @@ export function createApiRequester(timeoutMs = 20000): (path: string) => Promise
     });
 }
 
-export function createAccountIndex({ request, store, sleep = defaultSleep, now = Date.now }: IndexDeps): AccountIndex {
+export function createAccountIndex({ request, store, sleep = defaultSleep, now = Date.now, onStatus = () => {} }: IndexDeps): AccountIndex {
   let rows: IndexRow[] = [];
   let accounts: IndexedAccount[] = [];
   let building = false;
@@ -104,19 +106,23 @@ export function createAccountIndex({ request, store, sleep = defaultSleep, now =
   };
 
   async function build(): Promise<void> {
-    if (building || !(await store.lock())) return;
+    if (building) return;
+    if (!(await store.lock())) return onStatus('otra pestaña lo está armando');
     building = true;
     try {
+      onStatus('pidiendo la lista de cuentas');
       const first = await get(`/api/accounts?page=1&limit=${PAGE_SIZE}`);
-      if (first === undefined) return;
+      if (first === undefined) return onStatus('falló la lista de cuentas (sin sesión o error)');
       const firstPage = parseAccountsPage(first);
       const list = [...firstPage.accounts];
       for (let page = 2; page <= firstPage.pages; page++) {
+        onStatus(`lista de cuentas ${page}/${firstPage.pages}`);
         await sleep(GAP_MS);
         const body = await get(`/api/accounts?page=${page}&limit=${PAGE_SIZE}`);
-        if (body === undefined) return; // incompleto: se reintenta la próxima vez
+        if (body === undefined) return onStatus(`falló la página ${page} de la lista`); // incompleto: se reintenta la próxima vez
         list.push(...parseAccountsPage(body).accounts);
       }
+      onStatus(`lista lista: ${list.length} cuentas`);
       // Cuentas ya conocidas conservan sus contactos mientras se refrescan
       const known = new Map(accounts.map((a) => [a.id, a]));
       for (const account of list) account.contacts = known.get(account.id)?.contacts ?? [];
@@ -136,6 +142,7 @@ export function createAccountIndex({ request, store, sleep = defaultSleep, now =
           }
           account.contacts = parseContacts(body);
           progress = { done: Math.min(list.length, (progress?.done ?? 0) + 1), total: list.length };
+          onStatus(`contactos ${progress.done}/${progress.total}`);
           if (++sinceSave >= SAVE_EVERY) {
             sinceSave = 0;
             setAccounts(list);
@@ -148,6 +155,7 @@ export function createAccountIndex({ request, store, sleep = defaultSleep, now =
       await Promise.all(Array.from({ length: WORKERS }, worker));
       setAccounts(list);
       await store.save({ updatedAt: failed ? 0 : now(), complete: !failed, accounts: list });
+      onStatus(failed ? 'incompleto: falló un pedido de contactos' : `completo: ${list.length} cuentas`);
     } finally {
       building = false;
       progress = null;
@@ -159,6 +167,7 @@ export function createAccountIndex({ request, store, sleep = defaultSleep, now =
       const saved = await store.load();
       if (saved) setAccounts(saved.accounts);
       if (!saved || !saved.complete || now() - saved.updatedAt > STALE_MS) void build();
+      else onStatus(`guardado: ${saved.accounts.length} cuentas`);
     },
     search: (query) => search(rows, query),
     byPhone: (number) => accountsByPhone(rows, number),

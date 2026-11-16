@@ -345,7 +345,11 @@ function main(): void {
   const sip = createSipClient();
   const callMute = createCallMute({ sip, toast });
   // Índice de cuentas y contactos: buscador a fondo en «Cuentas» y cuenta de la llamada entrante
-  const accountIndex = createAccountIndex({ request: createApiRequester(), store: chromeIndexStore() });
+  const accountIndex = createAccountIndex({
+    request: createApiRequester(),
+    store: chromeIndexStore(),
+    onStatus: (status) => document.documentElement.setAttribute('data-gv-index', status), // para diagnosticar
+  });
   const searchUi = createSearchUi({ search: accountIndex.search, size: accountIndex.size, progress: accountIndex.progress });
   const incomingBanner = createIncomingBanner({ caller: () => sip.caller(), byPhone: accountIndex.byPhone });
   let indexOn: boolean = DEFAULT_SETTINGS.accountIndex;
@@ -355,6 +359,7 @@ function main(): void {
     if (on && !indexStarted) {
       indexStarted = true;
       // Se espera a que la página cargue y haga sus primeros pedidos (de ahí sale la sesión)
+      document.documentElement.setAttribute('data-gv-index', 'esperando 4 s para arrancar');
       setTimeout(() => void accountIndex.start(), 4000);
     }
     if (!on) {
