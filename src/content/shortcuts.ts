@@ -1043,6 +1043,8 @@ function main(): void {
     if (touches(changes, area, 'showCallCard')) void readSetting('showCallCard').then((v) => callCard.setEnabled(v));
     if (touches(changes, area, 'mediaPlayer')) void readSetting('mediaPlayer').then((v) => mediaBar.setEnabled(v));
     if (touches(changes, area, 'accountIndex')) void readSetting('accountIndex').then(applyIndex);
+    // Otra pestaña armó o avanzó el índice guardado: se lee de nuevo
+    if (area === 'local' && changes.accountIndex && indexOn) void accountIndex.reload();
     if (touches(changes, area, 'callRound')) {
       void readSetting('callRound').then((v) => {
         roundOn = v;

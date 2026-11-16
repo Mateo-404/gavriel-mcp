@@ -43,6 +43,8 @@ export interface AccountIndex {
   start: () => Promise<void>;
   search: (query: string) => SearchResult[];
   byPhone: (number: string) => SearchResult[];
+  /** Vuelve a leer lo guardado (otra pestaña lo armó o lo avanzó); no hace nada si esta pestaña lo está armando. */
+  reload: () => Promise<void>;
   /** Cuentas ya indexadas (0 si todavía no hay nada). */
   size: () => number;
   /** Avance del armado, o null si no está armando. */
@@ -87,6 +89,9 @@ export function createAccountIndex({ request, store, sleep = defaultSleep, now =
   let rows: IndexRow[] = [];
   let accounts: IndexedAccount[] = [];
   let building = false;
+  let retry: ReturnType<typeof setTimeout> | undefined;
+  /** Lo último que se leyó de lo guardado estaba completo y al día. */
+  let savedComplete = false;
   let progress: { done: number; total: number } | null = null;
 
   const setAccounts = (list: IndexedAccount[]): void => {
@@ -107,7 +112,17 @@ export function createAccountIndex({ request, store, sleep = defaultSleep, now =
 
   async function build(): Promise<void> {
     if (building) return;
-    if (!(await store.lock())) return onStatus('otra pestaña lo está armando');
+    if (!(await store.lock())) {
+      onStatus('otra pestaña lo está armando');
+      // Si esa pestaña se cierra sin terminar, el candado vence y esta toma la posta
+      if (retry === undefined) {
+        retry = setTimeout(() => {
+          retry = undefined;
+          if (!savedComplete) void build();
+        }, 130_000);
+      }
+      return;
+    }
     building = true;
     try {
       onStatus('pidiendo la lista de cuentas');
@@ -166,8 +181,18 @@ export function createAccountIndex({ request, store, sleep = defaultSleep, now =
     async start() {
       const saved = await store.load();
       if (saved) setAccounts(saved.accounts);
+      savedComplete = !!saved && saved.complete && now() - saved.updatedAt <= STALE_MS;
       if (!saved || !saved.complete || now() - saved.updatedAt > STALE_MS) void build();
       else onStatus(`guardado: ${saved.accounts.length} cuentas`);
+    },
+    async reload() {
+      if (building) return;
+      const saved = await store.load();
+      if (saved && saved.accounts.length >= accounts.length) {
+        setAccounts(saved.accounts);
+        savedComplete = saved.complete && now() - saved.updatedAt <= STALE_MS;
+        onStatus(`${saved.complete ? 'completo' : 'parcial'} (armado por otra pestaña): ${saved.accounts.length} cuentas`);
+      }
     },
     search: (query) => search(rows, query),
     byPhone: (number) => accountsByPhone(rows, number),
