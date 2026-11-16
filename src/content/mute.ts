@@ -17,6 +17,7 @@ import { isDebugNoise } from '../shared/console-filter';
 import { installNetTap } from './net-tap';
 import { installMicTracker } from './mic';
 import { installPushGuard } from './push-guard';
+import { installRtcFix } from './rtc-fix';
 import { installSipBridge } from './sip-bridge';
 import { soundNameFromUrl } from '../shared/sounds';
 
@@ -45,6 +46,8 @@ function main(): void {
   // Recuerda el micrófono de la llamada para poder silenciarlo (ver mic.ts)
   installMicTracker();
   installPushGuard(root);
+  // Audio de las llamadas entrantes con la central: limpia la oferta SDP (ver rtc-fix.ts)
+  installRtcFix();
 
   // Modo ahorro: se descartan los mensajes de depuración con emoji de Gavriel (ver console-filter.ts)
   for (const method of ['log', 'info', 'debug'] as const) {
