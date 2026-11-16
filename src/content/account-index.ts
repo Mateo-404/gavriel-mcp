@@ -55,7 +55,7 @@ export const STALE_MS = 24 * 60 * 60 * 1000;
 const PAGE_SIZE = 100;
 const WORKERS = 3;
 const GAP_MS = 120;
-const SAVE_EVERY = 300;
+const SAVE_EVERY = 150;
 const MAX_ATTEMPTS = 4;
 
 const defaultSleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
@@ -124,6 +124,8 @@ export function createAccountIndex({ request, store, sleep = defaultSleep, now =
       return;
     }
     building = true;
+    // El candado se renueva mientras se arma (vence a los 2 minutos): si no, otra pestaña lo toma a mitad de camino
+    const keepLock = setInterval(() => void store.lock(), 30_000);
     try {
       onStatus('pidiendo la lista de cuentas');
       const first = await get(`/api/accounts?page=1&limit=${PAGE_SIZE}`);
@@ -142,6 +144,8 @@ export function createAccountIndex({ request, store, sleep = defaultSleep, now =
       const known = new Map(accounts.map((a) => [a.id, a]));
       for (const account of list) account.contacts = known.get(account.id)?.contacts ?? [];
       setAccounts(list);
+      // Con solo la lista ya se puede buscar por abonado y nombre: se guarda enseguida para las otras pestañas
+      await store.save({ updatedAt: now(), complete: false, accounts: list });
       progress = { done: 0, total: list.length };
 
       let cursor = 0;
@@ -172,6 +176,7 @@ export function createAccountIndex({ request, store, sleep = defaultSleep, now =
       await store.save({ updatedAt: failed ? 0 : now(), complete: !failed, accounts: list });
       onStatus(failed ? 'incompleto: falló un pedido de contactos' : `completo: ${list.length} cuentas`);
     } finally {
+      clearInterval(keepLock);
       building = false;
       progress = null;
     }
