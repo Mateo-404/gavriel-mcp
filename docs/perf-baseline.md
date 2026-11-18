@@ -37,7 +37,13 @@ Tests: 331 pass en 46 archivos, ~3,2 s (con arranque).
   del orquestador. La meta de 55 KB no se alcanzó; el camino es partir lo que solo se usa en «Cuentas» (desplegable e índice) a un script aparte.
 - Tests: 331 → 282 (−15 %) y de 46 a 39 archivos. La meta de ~150 no se alcanzó: lo que queda es lógica pura y los puentes de seguridad.
 
-## Pendiente de medir en el navegador (hace falta recargar la extensión)
+## Medido en el navegador (v0.24.0, Chrome del usuario, 18/11/2026)
+- Panel de monitoreo en reposo (~30 s): **9 pasadas, 36 ms en total (≈4 ms cada una), la más lenta 21 ms**.
+- Lista de cuentas escribiendo en el buscador: 10 pasadas, 10 ms en total, la más lenta 5 ms.
+- Índice: leyó lo guardado (1.844 cuentas) sin pedir nada; el desplegable responde al instante.
+- No hay medición «antes» en el navegador (la v0.20 no tenía el contador), así que estos números son la referencia de aquí en adelante.
+
+## Pendiente de medir en el navegador
 - Pasadas del observador por minuto y ms por pasada (`data-gv-perfon` / `data-gv-perf`): antes/después de la foto única de botones.
 - Tamaño de `chrome.storage.local` del índice (formato compacto) y de los avisos `onChanged` entre pestañas.
 - La mejora de 4.2 (filtrar mutaciones propias del panel) no se hizo: sin esa medición no hay forma de saber si ayuda o rompe repintados.
