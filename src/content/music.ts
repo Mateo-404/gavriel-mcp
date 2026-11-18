@@ -13,7 +13,7 @@
  * Los selectores de los botones son del sitio y pueden cambiar cuando lo actualicen; sin ellos solo
  * funciona reproducir/pausar, volumen, silencio y posición.
  */
-import { type MediaAction, type MediaSource, type MediaState, sourceOfHost } from '../shared/media';
+import { type MediaAction, type MediaSource, type MediaState, pickArtwork, safeArtUrl, sourceOfHost } from '../shared/media';
 
 interface Adapter {
   toggle: string[];
@@ -128,10 +128,12 @@ export function readState(source: MediaSource, now = Date.now()): MediaState | n
     const ui = readSpotifyUi();
     if (ui) {
       const text = (sel: string): string => document.querySelector(sel)?.textContent?.trim() ?? '';
-      return { source, title: meta?.title || text(SPOTIFY_UI.title), artist: meta?.artist || text(SPOTIFY_UI.artist), ...ui, at: now };
+      const art = pickArtwork(meta?.artwork) || safeArtUrl(document.querySelector<HTMLImageElement>('[data-testid="cover-art-image"]')?.src);
+      return { source, title: meta?.title || text(SPOTIFY_UI.title), artist: meta?.artist || text(SPOTIFY_UI.artist), ...ui, at: now, ...(art ? { art } : {}) };
     }
   }
   if (!meta && !media) return null;
+  const art = pickArtwork(meta?.artwork);
   const playing = navigator.mediaSession?.playbackState === 'playing' || (!!media && !media.paused && !media.ended);
   return {
     source,
@@ -143,6 +145,7 @@ export function readState(source: MediaSource, now = Date.now()): MediaState | n
     position: media?.currentTime ?? 0,
     duration: Number.isFinite(media?.duration) ? (media?.duration ?? 0) : 0,
     at: now,
+    ...(art ? { art } : {}),
   };
 }
 
@@ -203,7 +206,7 @@ function main(): void {
       if (!state) return;
       playing = state.playing;
       // Sin cambios de fondo (la posición avanza sola) solo se repite cada HEARTBEAT_MS, y nunca en pausa
-      const key = `${state.title}|${state.artist}|${state.playing}|${state.volume.toFixed(2)}|${state.muted}|${Math.round(state.duration)}`;
+      const key = `${state.title}|${state.artist}|${state.art ?? ''}|${state.playing}|${state.volume.toFixed(2)}|${state.muted}|${Math.round(state.duration)}`;
       const now = Date.now();
       if (!force && key === last && (!state.playing || now - lastSentAt < HEARTBEAT_MS)) return;
       last = key;

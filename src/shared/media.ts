@@ -19,6 +19,39 @@ export interface MediaState {
   duration: number;
   /** Cuándo lo informó la pestaña (ms desde 1970). */
   at: number;
+  /** Carátula (URL https de los servidores de imágenes de Spotify / YouTube); ausente si no hay. */
+  art?: string;
+}
+
+/** Servidores de imágenes de las carátulas: solo estos se dibujan (el dato llega de otra pestaña). */
+const ART_HOSTS = /^(i\.scdn\.co|[a-z0-9-]+\.spotifycdn\.com|[a-z0-9-]+\.googleusercontent\.com|i\.ytimg\.com|[a-z0-9-]+\.ggpht\.com)$/i;
+
+/** URL de carátula válida (https y de un servidor conocido) o ''. */
+export function safeArtUrl(value: unknown): string {
+  if (typeof value !== 'string' || value.length > 500) return '';
+  try {
+    const url = new URL(value);
+    return url.protocol === 'https:' && ART_HOSTS.test(url.hostname) ? url.href : '';
+  } catch {
+    return '';
+  }
+}
+
+/** De la lista `artwork` de mediaSession elige la imagen más cercana a ~96 px (suficiente para 28 px con pantallas densas). */
+export function pickArtwork(list: readonly { src?: string; sizes?: string }[] | undefined): string {
+  let best = '';
+  let bestGap = Infinity;
+  for (const item of list ?? []) {
+    const src = safeArtUrl(item?.src);
+    if (!src) continue;
+    const side = Number(/^(\d+)x\d+/.exec(item.sizes ?? '')?.[1]) || 96;
+    const gap = Math.abs(side - 96);
+    if (gap < bestGap) {
+      best = src;
+      bestGap = gap;
+    }
+  }
+  return best;
 }
 
 export interface TabMedia extends MediaState {
@@ -42,8 +75,10 @@ export function sanitizeState(value: unknown, now = Date.now()): MediaState | nu
   if (v.source !== 'spotify' && v.source !== 'ytmusic') return null;
   const str = (s: unknown, max: number): string => (typeof s === 'string' ? s.slice(0, max) : '');
   const num = (n: unknown): number => (typeof n === 'number' && Number.isFinite(n) ? n : 0);
+  const art = safeArtUrl(v.art);
   return {
     source: v.source,
+    ...(art ? { art } : {}),
     title: str(v.title, 200),
     artist: str(v.artist, 200),
     playing: v.playing === true,
@@ -91,7 +126,7 @@ export function formatTime(seconds: number): string {
  */
 export function sameMedia(a: MediaState | undefined, b: MediaState, driftSeconds = 4): boolean {
   if (!a) return false;
-  if (a.source !== b.source || a.title !== b.title || a.artist !== b.artist) return false;
+  if (a.source !== b.source || a.title !== b.title || a.artist !== b.artist || a.art !== b.art) return false;
   if (a.playing !== b.playing || a.muted !== b.muted || a.duration !== b.duration) return false;
   if (Math.abs(a.volume - b.volume) > 0.005) return false;
   const expected = a.playing ? a.position + (b.at - a.at) / 1000 : a.position;

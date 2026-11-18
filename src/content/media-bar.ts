@@ -101,6 +101,17 @@ export function createMediaBar({ send }: MediaBarDeps): MediaBar {
   eq.setAttribute('aria-hidden', 'true');
   eq.innerHTML = '<i></i><i></i><i></i>';
 
+  const cover = document.createElement('img');
+  cover.className = 'gv-media-art';
+  cover.alt = '';
+  cover.decoding = 'async';
+  cover.referrerPolicy = 'no-referrer'; // no se le cuenta a Spotify/YouTube desde qué página se ve
+  cover.hidden = true;
+  cover.addEventListener('error', () => {
+    cover.hidden = true;
+    cover.removeAttribute('src');
+  });
+
   const text = document.createElement('div');
   text.className = 'gv-media-text';
   const title = document.createElement('span');
@@ -112,7 +123,7 @@ export function createMediaBar({ send }: MediaBarDeps): MediaBar {
   const line = document.createElement('i');
   line.className = 'gv-media-line';
   line.setAttribute('aria-hidden', 'true');
-  face.append(eq, text, line);
+  face.append(eq, cover, text, line);
 
   const back = button('Retroceder 5 segundos', 'back');
   const fwd = button('Adelantar 5 segundos', 'fwd');
@@ -221,9 +232,16 @@ export function createMediaBar({ send }: MediaBarDeps): MediaBar {
       return;
     }
     root.hidden = false;
-    const key = `${current.tabId}|${current.title}|${current.artist}|${current.playing}|${Math.round(current.volume * 100)}|${current.muted}|${tabs.length}`;
+    const key = `${current.tabId}|${current.title}|${current.artist}|${current.art ?? ''}|${current.playing}|${Math.round(current.volume * 100)}|${current.muted}|${tabs.length}`;
     if (key !== renderedKey) {
       renderedKey = key;
+      if (current.art) {
+        if (cover.getAttribute('src') !== current.art) cover.src = current.art;
+        cover.hidden = false;
+      } else {
+        cover.hidden = true;
+        cover.removeAttribute('src');
+      }
       title.textContent = current.title || 'Sin título';
       sub.textContent = [current.artist, SOURCE_LABELS[current.source]].filter(Boolean).join(' · ');
       root.title = `${current.title} — ${current.artist} (${SOURCE_LABELS[current.source]})`;

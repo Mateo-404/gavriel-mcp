@@ -23,6 +23,24 @@ describe('sourceOfHost', () => {
   });
 });
 
+import { pickArtwork, safeArtUrl } from '../src/shared/media';
+describe('carátula', () => {
+  test('solo https de servidores de imágenes conocidos; elige la más cercana a 96 px', () => {
+    expect(safeArtUrl('https://i.scdn.co/image/abc')).toBe('https://i.scdn.co/image/abc');
+    expect(safeArtUrl('https://lh3.googleusercontent.com/x=w60-h60')).not.toBe('');
+    for (const bad of ['http://i.scdn.co/x', 'https://evil.com/i.scdn.co', 'https://i.scdn.co.evil.com/x', 'javascript:alert(1)', '', 5]) expect(safeArtUrl(bad)).toBe('');
+    const list = [
+      { src: 'https://i.scdn.co/a64', sizes: '64x64' },
+      { src: 'https://i.scdn.co/a300', sizes: '300x300' },
+      { src: 'https://evil.com/a96', sizes: '96x96' },
+    ];
+    expect(pickArtwork(list)).toBe('https://i.scdn.co/a64');
+    expect(pickArtwork(undefined)).toBe('');
+    expect(sanitizeState({ source: 'spotify', art: 'https://evil.com/x' })!.art).toBeUndefined();
+    expect(sanitizeState({ source: 'spotify', art: 'https://i.scdn.co/x' })!.art).toBe('https://i.scdn.co/x');
+  });
+});
+
 describe('sanitizeState', () => {
   test('acota el volumen, recorta textos y descarta lo que no es un estado', () => {
     const s = sanitizeState({ source: 'ytmusic', title: 'x'.repeat(500), artist: 7, playing: true, volume: 3, muted: 'si', position: -4, duration: Infinity }, 5)!;
