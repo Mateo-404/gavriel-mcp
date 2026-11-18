@@ -37,6 +37,33 @@ export function safeArtUrl(value: unknown): string {
   }
 }
 
+/**
+ * Color dominante de una carátula (píxeles RGBA de una miniatura): promedio ponderado por saturación, llevado a
+ * un tono vivo y claro que se lea sobre fondo oscuro. null si la imagen es casi gris o vacía.
+ */
+export function tintOf(rgba: ArrayLike<number>): string | null {
+  let r = 0, g = 0, b = 0, weight = 0;
+  for (let i = 0; i + 3 < rgba.length; i += 4) {
+    if ((rgba[i + 3] ?? 0) < 200) continue;
+    const pr = rgba[i]!, pg = rgba[i + 1]!, pb = rgba[i + 2]!;
+    const max = Math.max(pr, pg, pb), min = Math.min(pr, pg, pb);
+    if (max < 40) continue; // negros
+    const w = (max - min) / 255 + 0.02; // los pixeles grises casi no cuentan
+    r += pr * w; g += pg * w; b += pb * w; weight += w;
+  }
+  if (weight <= 0) return null;
+  r /= weight; g /= weight; b /= weight;
+  const max = Math.max(r, g, b) / 255, min = Math.min(r, g, b) / 255;
+  const d = max - min;
+  if (d < 0.08) return null; // sin color: se queda con el verde de Gavriel
+  let h = 0;
+  if (max === r / 255) h = ((g - b) / 255 / d) % 6;
+  else if (max === g / 255) h = (b - r) / 255 / d + 2;
+  else h = (r - g) / 255 / d + 4;
+  h = Math.round(((h * 60) + 360) % 360);
+  return `hsl(${h} 72% 62%)`;
+}
+
 /** De la lista `artwork` de mediaSession elige la imagen más cercana a ~96 px (suficiente para 28 px con pantallas densas). */
 export function pickArtwork(list: readonly { src?: string; sizes?: string }[] | undefined): string {
   let best = '';

@@ -15,7 +15,7 @@
  * media-router.ts). Las animaciones (ecualizador y título que se desplaza) se apagan con el
  * interruptor de Ajustes y con «reducir movimiento» del sistema.
  */
-import { type MediaAction, type TabMedia, SOURCE_LABELS, formatTime, nextTab, pickActive } from '../shared/media';
+import { type MediaAction, type TabMedia, SOURCE_LABELS, formatTime, nextTab, pickActive, tintOf } from '../shared/media';
 
 const BAR = '#topbar-actions .monitoring-panel';
 /** En el resto de las pantallas (Tickets, Cuentas…) la barra existe pero está vacía: se usa ese contenedor. */
@@ -117,7 +117,38 @@ export function createMediaBar({ send }: MediaBarDeps): MediaBar {
   const ambient = artImg('gv-pop-ambient');
   const lead = document.createElement('span');
   lead.className = 'gv-media-lead';
+  /** Color de la canción (--gv-tint) sacado de la carátula; si el sitio no deja leer los píxeles, queda el verde de Gavriel. */
+  const tints = new Map<string, string | null>();
+  const applyTint = (src: string): void => {
+    const set = (color: string | null | undefined): void => {
+      if (color) root.style.setProperty('--gv-tint', color);
+      else root.style.removeProperty('--gv-tint');
+    };
+    if (!src) return set(null);
+    if (tints.has(src)) return set(tints.get(src));
+    set(null);
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.referrerPolicy = 'no-referrer';
+    img.onload = () => {
+      let color: string | null = null;
+      try {
+        const canvas = document.createElement('canvas');
+        canvas.width = canvas.height = 24;
+        const ctx = canvas.getContext('2d', { willReadFrequently: true });
+        ctx?.drawImage(img, 0, 0, 24, 24);
+        if (ctx) color = tintOf(ctx.getImageData(0, 0, 24, 24).data);
+      } catch {
+        /* imagen sin permiso de lectura */
+      }
+      if (tints.size > 30) tints.clear();
+      tints.set(src, color);
+      if (current?.art === src) set(color);
+    };
+    img.src = src;
+  };
   const setArt = (src: string): void => {
+    applyTint(src);
     for (const img of [cover, popArt, ambient]) {
       if (src) {
         if (img.getAttribute('src') !== src) img.src = src;

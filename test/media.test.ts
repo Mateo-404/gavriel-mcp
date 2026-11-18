@@ -24,6 +24,17 @@ describe('sourceOfHost', () => {
 });
 
 import { pickArtwork, safeArtUrl } from '../src/shared/media';
+import { tintOf } from '../src/shared/media';
+describe('tintOf', () => {
+  const px = (...c: number[][]): number[] => c.flatMap(([r, g, b]) => [r!, g!, b!, 255]);
+  test('toma el color vivo, ignora grises y negros, y devuelve null si no hay color', () => {
+    expect(tintOf(px([200, 20, 20], [210, 30, 25], [0, 0, 0], [128, 128, 128]))).toMatch(/^hsl\((3[0-5]\d|[0-9]|1\d?) 72% 62%\)$/);
+    expect(tintOf(px([20, 20, 220], [30, 25, 210]))).toMatch(/^hsl\(2[34]\d 72% 62%\)$/);
+    expect(tintOf(px([100, 100, 100], [120, 120, 120], [0, 0, 0]))).toBeNull();
+    expect(tintOf([])).toBeNull();
+  });
+});
+
 describe('carátula', () => {
   test('solo https de servidores de imágenes conocidos; elige la más cercana a 96 px', () => {
     expect(safeArtUrl('https://i.scdn.co/image/abc')).toBe('https://i.scdn.co/image/abc');
