@@ -17,6 +17,7 @@
  * llamador usa el camino de siempre (clics en la interfaz).
  */
 import { SIP_REQUEST_EVENT, SIP_RESULT_EVENT } from '../shared/constants';
+import { serveRpc } from '../shared/page-rpc';
 import { isMicMuted, setMicMuted, toggleMic } from './mic';
 
 type SipAction = 'hangup' | 'answer' | 'reject' | 'state' | 'mute' | 'unmute' | 'caller';
@@ -139,18 +140,8 @@ export function installSipBridge(): void {
   // Una sola vez por página: si el script se inyectara dos veces, un pedido de colgar no debe ejecutarse dos veces
   if (window.__gvSipBridge) return;
   window.__gvSipBridge = true;
-  document.addEventListener(SIP_REQUEST_EVENT, (event) => {
-    const detail = (event as CustomEvent<unknown>).detail;
-    if (typeof detail !== 'string') return;
-    let request: { id?: unknown; action?: unknown };
-    try {
-      request = JSON.parse(detail) as { id?: unknown; action?: unknown };
-    } catch {
-      return;
-    }
-    const actions: readonly string[] = ['hangup', 'answer', 'reject', 'state', 'mute', 'unmute', 'caller'];
-    if (typeof request.id !== 'number' || typeof request.action !== 'string' || !actions.includes(request.action)) return;
-    const result = runSipAction(request.action as SipAction);
-    document.dispatchEvent(new CustomEvent(SIP_RESULT_EVENT, { detail: JSON.stringify({ id: request.id, ...result }) }));
-  });
+  const actions: readonly string[] = ['hangup', 'answer', 'reject', 'state', 'mute', 'unmute', 'caller'];
+  serveRpc({ request: SIP_REQUEST_EVENT, result: SIP_RESULT_EVENT }, ({ action }) =>
+    typeof action === 'string' && actions.includes(action) ? { ...runSipAction(action as SipAction) } : undefined,
+  );
 }

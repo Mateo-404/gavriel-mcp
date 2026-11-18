@@ -8,6 +8,7 @@
  * servidor de producción, y queda guardado en `chrome.storage.local`. Una sola pestaña lo arma a la vez (candado).
  */
 import { GAPI_REQUEST_EVENT, GAPI_RESULT_EVENT } from '../shared/constants';
+import { createRpcClient } from '../shared/page-rpc';
 import {
   type IndexRow,
   type IndexedAccount,
@@ -62,27 +63,11 @@ const defaultSleep = (ms: number): Promise<void> => new Promise((resolve) => set
 
 /** Pedido al mundo de la página: se espera la respuesta con el mismo id o se da por perdido. */
 export function createApiRequester(timeoutMs = 20000): (path: string) => Promise<ApiReply | null> {
-  let nextId = 1;
-  return (path) =>
-    new Promise((resolve) => {
-      const id = nextId++;
-      const done = (value: ApiReply | null): void => {
-        clearTimeout(timer);
-        document.removeEventListener(GAPI_RESULT_EVENT, onResult);
-        resolve(value);
-      };
-      const onResult = (event: Event): void => {
-        try {
-          const reply = JSON.parse(String((event as CustomEvent<unknown>).detail)) as { id?: number; status?: number; body?: unknown };
-          if (reply.id === id) done({ status: Number(reply.status ?? 0), body: reply.body });
-        } catch {
-          /* respuesta ajena */
-        }
-      };
-      const timer = setTimeout(() => done(null), timeoutMs);
-      document.addEventListener(GAPI_RESULT_EVENT, onResult);
-      document.dispatchEvent(new CustomEvent(GAPI_REQUEST_EVENT, { detail: JSON.stringify({ id, path }) }));
-    });
+  const call = createRpcClient<{ status?: number; body?: unknown }>({ request: GAPI_REQUEST_EVENT, result: GAPI_RESULT_EVENT }, timeoutMs);
+  return async (path) => {
+    const reply = await call({ path });
+    return reply ? { status: Number(reply.status ?? 0), body: reply.body } : null;
+  };
 }
 
 export function createAccountIndex({ request, store, sleep = defaultSleep, now = Date.now, onStatus = () => {} }: IndexDeps): AccountIndex {

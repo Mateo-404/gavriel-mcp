@@ -4,6 +4,7 @@
  * se encuentra, devuelve false/null y el llamador usa el camino por la interfaz.
  */
 import { SIP_REQUEST_EVENT, SIP_RESULT_EVENT } from '../shared/constants';
+import { createRpcClient } from '../shared/page-rpc';
 
 export type SipAction = 'hangup' | 'answer' | 'reject';
 
@@ -19,7 +20,6 @@ export interface SipClient {
 }
 
 interface Result {
-  id?: number;
   ok?: boolean;
   muted?: boolean;
   caller?: string;
@@ -28,27 +28,8 @@ interface Result {
 const TIMEOUT_MS = 400;
 
 export function createSipClient(): SipClient {
-  let nextId = 1;
-  const request = (action: string): Promise<Result | null> =>
-    new Promise<Result | null>((resolve) => {
-      const id = nextId++;
-      const done = (value: Result | null): void => {
-        clearTimeout(timer);
-        document.removeEventListener(SIP_RESULT_EVENT, onResult);
-        resolve(value);
-      };
-      const onResult = (event: Event): void => {
-        try {
-          const result = JSON.parse(String((event as CustomEvent<unknown>).detail)) as Result;
-          if (result.id === id) done(result);
-        } catch {
-          /* respuesta ajena o rota */
-        }
-      };
-      const timer = setTimeout(() => done(null), TIMEOUT_MS);
-      document.addEventListener(SIP_RESULT_EVENT, onResult);
-      document.dispatchEvent(new CustomEvent(SIP_REQUEST_EVENT, { detail: JSON.stringify({ id, action }) }));
-    });
+  const call = createRpcClient<Result>({ request: SIP_REQUEST_EVENT, result: SIP_RESULT_EVENT }, TIMEOUT_MS);
+  const request = (action: string): Promise<Result | null> => call({ action });
   const muted = async (action: string): Promise<boolean | null> => {
     const result = await request(action);
     return result?.ok === true ? result.muted === true : null;
