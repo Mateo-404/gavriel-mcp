@@ -169,3 +169,14 @@ test('en una cuenta (sin barra de acciones) va al comienzo del grupo derecho del
   expect([...right.children].filter((c) => c === bar.root)).toHaveLength(1);
   expect(right.children.length).toBe(3);
 });
+
+test('Ctrl+Espacio: togglePlayback manda «toggle» a la pestaña de música, la que suena primero, y avisa si no hay', () => {
+  expect(bar.togglePlayback()).toBe(false);
+  expect(sent).toHaveLength(0);
+  bar.update([tab(1, { playing: false }), tab(2, { playing: true })]);
+  sent.length = 0;
+  expect(bar.togglePlayback()).toBe(true);
+  expect(sent).toHaveLength(1);
+  expect(sent[0]).toMatchObject({ type: 'media-command', action: 'toggle' });
+  expect([1, 2]).toContain((sent[0] as { tabId: number }).tabId);
+});

@@ -53,6 +53,12 @@ export const SHORTCUTS: readonly Shortcut[] = [
     description: 'Abre el evento N, contando columna por columna.',
   },
   {
+    scope: 'llamadas',
+    keys: ['Ctrl', 'Espacio'],
+    chord: true,
+    description: 'Pausa o reanuda la canción de Spotify o YouTube Music, desde cualquier pantalla y aunque estés escribiendo.',
+  },
+  {
     scope: 'cuenta',
     keys: ['Alt', '1…9'],
     chord: true,

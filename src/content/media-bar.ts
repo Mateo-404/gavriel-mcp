@@ -72,6 +72,8 @@ export interface MediaBar {
   update: (tabs: TabMedia[]) => void;
   /** Vuelve a ubicar el reproductor si la barra se redibujó. */
   ensureMounted: () => void;
+  /** Pausa o reanuda la canción (Ctrl+Espacio). false si no hay ninguna pestaña de música conocida. */
+  togglePlayback: () => boolean;
   setEnabled: (on: boolean) => void;
   /** Para pruebas. */
   root: HTMLElement;
@@ -288,6 +290,13 @@ export function createMediaBar({ send }: MediaBarDeps): MediaBar {
       mount();
     },
     ensureMounted: mount,
+    togglePlayback() {
+      // Aunque el reproductor de la barra esté oculto, se maneja la pestaña de música que se conoce
+      const target = current ?? tabs.find((t) => t.playing) ?? tabs[0];
+      if (!target) return false;
+      send({ type: 'media-command', tabId: target.tabId, action: 'toggle' });
+      return true;
+    },
     setEnabled(on) {
       enabled = on;
       render();

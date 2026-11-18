@@ -876,6 +876,13 @@ function main(): void {
     if (!enabled || event.isComposing || event.repeat) return;
     if (event.metaKey) return;
 
+    // Ctrl + Espacio: pausa o reanuda la canción de Spotify / YouTube Music, siempre (también escribiendo o con un diálogo abierto)
+    if (event.ctrlKey && !event.altKey && !event.shiftKey && (event.code === 'Space' || event.key === ' ')) {
+      consume(event);
+      if (!mediaBar.togglePlayback()) toast('No hay Spotify ni YouTube Music abiertos');
+      return;
+    }
+
     // Softphone abierto: los números van al campo «Número…» aunque no esté enfocado (solo dígitos)
     const digit = plainDigit(event);
     if (digit) {
