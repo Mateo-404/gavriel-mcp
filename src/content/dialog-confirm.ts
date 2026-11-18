@@ -60,6 +60,36 @@ export function whenDialogGone(dialog: Element, run: () => void, maxMs = 30000, 
   observer.observe(doc.body, { childList: true, subtree: true });
 }
 
+export interface EndActions {
+  /** Cierre masivo terminado: limpia filtros del panel. */
+  clearFilters: () => boolean;
+  /** Vuelve al panel desde la cuenta. */
+  goBack: () => boolean;
+  /** Ronda de llamadas: se reinicia solo con el cierre real (masivo: todas; cierre: la de la cuenta). */
+  forgetRound: (all: boolean) => void;
+}
+
+/**
+ * Qué se hace cuando el diálogo ya se cerró: masivo → «Limpiar filtros»; cierre y «Dejar en observación» →
+ * «Volver a panel». Solo el cierre real (y el masivo) reinicia la ronda; observación no la toca.
+ */
+export function runAfterEnd(kind: EndKind, dialog: Element, actions: EndActions, doc: Document = document): void {
+  whenDialogGone(
+    dialog,
+    () => {
+      if (kind === 'bulk') {
+        actions.forgetRound(true);
+        retryFor(actions.clearFilters);
+        return;
+      }
+      if (kind === 'close') actions.forgetRound(false);
+      retryFor(actions.goBack);
+    },
+    30000,
+    doc,
+  );
+}
+
 export function watchInterventionEnd(
   onEnd: (bulk: boolean, kind: EndKind, dialog: Element) => void,
   doc: Document = document,

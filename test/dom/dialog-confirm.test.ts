@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, test } from 'bun:test';
-import { createDialogConfirm, retryFor, watchInterventionEnd, whenDialogGone } from '../../src/content/dialog-confirm';
+import { createDialogConfirm, retryFor, runAfterEnd, watchInterventionEnd, whenDialogGone } from '../../src/content/dialog-confirm';
 
 const toasts: string[] = [];
 const dc = createDialogConfirm({
@@ -186,6 +186,27 @@ describe('qué se hace después de cerrar', () => {
   const until = async (ok: () => boolean): Promise<void> => {
     for (let i = 0; i < 100 && !ok(); i++) await new Promise((r) => setTimeout(r, 10));
   };
+
+  test('runAfterEnd: cierre y observación vuelven al panel (solo el cierre reinicia la ronda); masivo limpia filtros; nada antes de cerrar', async () => {
+    const run = async (kind: 'bulk' | 'close' | 'observation'): Promise<string[]> => {
+      document.body.innerHTML = '<div id="d" data-slot="dialog-content"></div>';
+      const el = document.getElementById('d')!;
+      const calls: string[] = [];
+      runAfterEnd(kind, el, {
+        clearFilters: () => (calls.push('filtros'), true),
+        goBack: () => (calls.push('volver'), true),
+        forgetRound: (all) => calls.push(all ? 'ronda-todas' : 'ronda'),
+      });
+      await new Promise((r) => setTimeout(r, 20));
+      expect(calls).toEqual([]); // el diálogo sigue abierto (p. ej. falta un campo): no hace nada
+      el.remove();
+      await until(() => calls.length > 1 || (kind === 'observation' && calls.length > 0));
+      return calls;
+    };
+    expect(await run('close')).toEqual(['ronda', 'volver']);
+    expect(await run('observation')).toEqual(['volver']);
+    expect(await run('bulk')).toEqual(['ronda-todas', 'filtros']);
+  });
 
   test('whenDialogGone espera a que el diálogo salga del DOM y recién ahí actúa, una sola vez', async () => {
     document.body.innerHTML = '<div id="d" data-slot="dialog-content"></div>';

@@ -32,7 +32,7 @@ import { plainDigit, typeDigit } from './dial-input';
 import { createClientCopy } from './client-copy';
 import { createAlertSender } from './alerts';
 import { createDataStore } from './data-store';
-import { createDialogConfirm, retryFor, watchInterventionEnd, whenDialogGone } from './dialog-confirm';
+import { createDialogConfirm, runAfterEnd, watchInterventionEnd } from './dialog-confirm';
 import { createIndexFeature } from './index-feature';
 import { createLastContact } from './last-contact';
 import { createMusic } from './music-feature';
@@ -172,21 +172,15 @@ function main(): void {
   const badges = createBadges();
 
   // Al cerrar la intervención la ronda de esa cuenta vuelve a cero, y se vuelve a lo que sigue: cierre masivo → «Limpiar
-  // filtros»; cierre de un evento → «Volver a panel». La ronda se conserva hasta que la intervención de verdad se cierra
-  // (el diálogo se cierra al aplicar resolución y categoría); «Dejar en observación» no la toca
+  // filtros»; cierre de un evento o «Dejar en observación» → «Volver a panel». La ronda se conserva hasta que la
+  // intervención de verdad se cierra (resolución y categoría); «Dejar en observación» no la toca
   watchInterventionEnd((_bulk, kind, dialog) => {
     const id = currentAccountId();
-    if (kind === 'bulk') {
-      whenDialogGone(dialog, () => {
-        round.forget(true);
-        retryFor(() => panel.clearFilters());
-      });
-    } else if (kind === 'close') {
-      whenDialogGone(dialog, () => {
-        round.forget(false, id);
-        retryFor(goBack);
-      });
-    }
+    runAfterEnd(kind, dialog, {
+      clearFilters: () => panel.clearFilters(),
+      goBack,
+      forgetRound: (all) => round.forget(all, all ? undefined : id),
+    });
   });
 
   // ---------- Indicadores dentro de cada componente ----------
