@@ -2,8 +2,17 @@
 
 El usuario es operador de monitoreo de alarmas y escribe en español: responder en español, directo y sin relleno.
 
-## Tarea pendiente para el próximo modelo
-Leer **`docs/GUIA-OPTIMIZACION.md`** completa antes de tocar código y ejecutarla en el orden que indica (Fase 0, luego poda de tests trivial, puente único, features, ajustes declarativos y optimizaciones, un commit por fase y con `bun run check` en verde). Es un refactor sin cambios de comportamiento visibles: cada mejora de rendimiento lleva su medición de antes y después, y si no mejora se revierte.
+## Estado del trabajo de arquitectura y optimización
+Se ejecutó lo que pedía **`docs/GUIA-OPTIMIZACION.md`** (versiones 0.20.1 a 0.24.0): línea de base y `scripts/measure.ts`, verificación del paquete en el build,
+puente único entre mundos (`shared/page-rpc.ts`), `shortcuts.ts` dividido (`page`, `badges`, `music-feature`, `index-feature`, `settings-sync`),
+ajustes declarativos (`SWITCH_DEFAULTS`), índice compacto con Web Lock, CSS minificado, fondo sin depuración y tests consolidados (331 → 282).
+La arquitectura vigente está en el README (sección «Arquitectura») y los números en `docs/perf-baseline.md`.
+
+**Pendiente** (lo que no se pudo cerrar sin el navegador del usuario o no alcanzó la meta):
+1. Medir en vivo, con la extensión recargada, las pasadas del observador (`data-gv-perfon` → `data-gv-perf`) y el tamaño del índice guardado.
+2. 4.2 de la guía (filtrar mutaciones propias del panel en `runtime.ts hasForeignChange`): solo si la medición lo justifica.
+3. `main.js` sigue en ~65 KB (meta 55 KB): partir el desplegable y el índice de «Cuentas» a un script aparte, y poda de tests restante (meta ~150) sin perder los puentes de seguridad.
+4. Probar con una llamada entrante real el cartel de cuenta (el número se lee de forma defensiva de la sesión SIP).
 
 ## Reglas permanentes
 - **Bun primero, si no pnpm.** Nunca npm ni yarn.
