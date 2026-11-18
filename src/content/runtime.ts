@@ -76,9 +76,20 @@ function schedule(subscriber: Subscriber): void {
   subscriber.timer = window.setTimeout(() => {
     subscriber.timer = undefined;
     if (!alive()) return stopAll();
+    const root = document.documentElement;
+    if (!root.hasAttribute('data-gv-perfon')) return subscriber.run();
+    // Medición opcional (se prende poniendo data-gv-perfon en <html>): pasadas, ms totales y la más lenta
+    const started = performance.now();
     subscriber.run();
+    const took = performance.now() - started;
+    perf.passes++;
+    perf.ms += took;
+    perf.max = Math.max(perf.max, took);
+    root.setAttribute('data-gv-perf', `${perf.passes} pasadas · ${perf.ms.toFixed(1)} ms · máx ${perf.max.toFixed(1)} ms`);
   }, subscriber.delayMs);
 }
+
+const perf = { passes: 0, ms: 0, max: 0 };
 
 const scheduleAll = (): void => subscribers.forEach(schedule);
 

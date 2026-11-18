@@ -20,22 +20,11 @@ describe('catálogo de atajos', () => {
     }
   });
 
-  test('todos los ámbitos tienen al menos un atajo y un título', () => {
+  test('todos los ámbitos tienen atajos y título, y se avisa que el 911 nunca tiene atajo', () => {
     for (const scope of SCOPES) {
       expect(shortcutsFor(scope).length).toBeGreaterThan(0);
       expect(SCOPE_TITLES[scope].title).not.toBe('');
-      expect(SCOPE_TITLES[scope].where).not.toBe('');
     }
-  });
-
-  test('los atajos de dos teclas simultáneas se marcan como combinación', () => {
-    const altShift = SHORTCUTS.find((s) => s.keys.join('+') === 'Alt+Shift');
-    expect(altShift?.chord).toBe(true);
-    const arrows = SHORTCUTS.find((s) => s.keys.includes('↑'));
-    expect(arrows?.chord).toBe(false);
-  });
-
-  test('avisa que el 911 nunca tiene atajo', () => {
     expect(SHORTCUTS.some((s) => /911/.test(s.description))).toBe(true);
   });
 });

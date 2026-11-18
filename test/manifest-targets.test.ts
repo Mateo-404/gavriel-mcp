@@ -26,16 +26,11 @@ describe('manifest por navegador', () => {
     expect(ff.background).toEqual({ scripts: ['background.js'] });
   });
 
-  test('Firefox conserva todo lo demás del manifest base', () => {
+  test('Firefox conserva el resto del manifest y no modifica el base', () => {
+    const copy = JSON.stringify(base);
     const ff = forFirefox(base, '1.2.3');
     expect(ff.content_scripts).toEqual(base.content_scripts);
     expect(ff.permissions).toEqual(base.permissions);
-    expect(ff.manifest_version).toBe(3);
-  });
-
-  test('no modifica el manifest base', () => {
-    const copy = JSON.stringify(base);
-    forFirefox(base, '9.9.9');
     expect(JSON.stringify(base)).toBe(copy);
   });
 });

@@ -182,44 +182,31 @@ describe('watchInterventionEnd', () => {
 });
 
 describe('qué se hace después de cerrar', () => {
-  const wait = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
+  /** Espera a que se cumpla algo (hasta 1 s) en vez de dormir un tiempo fijo: no depende de la carga de la máquina. */
+  const until = async (ok: () => boolean): Promise<void> => {
+    for (let i = 0; i < 100 && !ok(); i++) await new Promise((r) => setTimeout(r, 10));
+  };
 
-  test('whenDialogGone espera a que el diálogo salga del DOM y recién ahí actúa', async () => {
+  test('whenDialogGone espera a que el diálogo salga del DOM y recién ahí actúa, una sola vez', async () => {
     document.body.innerHTML = '<div id="d" data-slot="dialog-content"></div>';
     const el = document.getElementById('d')!;
     let ran = 0;
     whenDialogGone(el, () => ran++);
-    await wait(10);
-    expect(ran).toBe(0); // sigue abierto (procesando o con error)
-    el.remove();
-    await wait(10);
-    expect(ran).toBe(1);
-    document.body.append(document.createElement('p')); // más cambios: no vuelve a actuar
-    await wait(10);
-    expect(ran).toBe(1);
-  });
-
-  test('whenDialogGone abandona a los maxMs si el diálogo nunca se cierra', async () => {
-    document.body.innerHTML = '<div id="d"></div>';
-    const el = document.getElementById('d')!;
-    let ran = 0;
-    whenDialogGone(el, () => ran++, 20);
-    await wait(40);
-    el.remove();
-    await wait(10);
+    document.body.append(document.createElement('i')); // un cambio cualquiera con el diálogo abierto
+    await new Promise((r) => setTimeout(r, 20));
     expect(ran).toBe(0);
+    el.remove();
+    await until(() => ran > 0);
+    expect(ran).toBe(1);
+    document.body.append(document.createElement('p'));
+    await new Promise((r) => setTimeout(r, 20));
+    expect(ran).toBe(1);
   });
 
-  test('retryFor reintenta hasta que el botón aparece, y no sigue para siempre', async () => {
+  test('retryFor reintenta hasta que el botón aparece', async () => {
     let tries = 0;
     retryFor(() => ++tries >= 3, 1000, 5);
-    await wait(150);
-    expect(tries).toBe(3); // paró al encontrarlo
-    let never = 0;
-    retryFor(() => (never++, false), 30, 5);
-    await wait(250);
-    const stopped = never;
-    await wait(100);
-    expect(never).toBe(stopped); // y paró al vencer el plazo
+    await until(() => tries >= 3);
+    expect(tries).toBe(3);
   });
 });

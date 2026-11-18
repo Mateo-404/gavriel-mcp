@@ -9,6 +9,7 @@
 import { watch } from 'node:fs';
 import { cp, readFile, rm, writeFile } from 'node:fs/promises';
 import { forChrome, forFirefox, type Manifest } from './manifest-targets';
+import { verifyPackage } from './scripts/verify-package';
 
 const ENTRYPOINTS = [
   'src/background.ts',
@@ -48,6 +49,8 @@ async function build(): Promise<void> {
   // La versión del manifest sale de package.json: una sola fuente de verdad
   const pkg = JSON.parse(await readFile('package.json', 'utf8')) as { version: string };
   const base = JSON.parse(await readFile('static/manifest.json', 'utf8')) as Manifest;
+  const problems = verifyPackage(base);
+  if (problems.length > 0) throw new Error(`Paquete inválido:\n - ${problems.join('\n - ')}`);
   const write = (dir: string, manifest: Manifest): Promise<void> =>
     writeFile(`${dir}/manifest.json`, `${JSON.stringify(manifest, null, 2)}\n`);
   await write('dist', forChrome(base, pkg.version));
