@@ -14,7 +14,7 @@ export type AlertType = (typeof ALERT_TYPES)[number];
 
 export const ALERT_LABELS: Readonly<Record<AlertType, string>> = {
   BUR: 'Robo / intrusión',
-  POW: 'Energía / batería',
+  POW: 'Falla de energía',
   PAN: 'Pánico',
   MED: 'Emergencia médica',
   INC: 'Incendio',
@@ -38,8 +38,8 @@ const CODE_RANGES: readonly { type: AlertType; test: (n: number) => boolean }[] 
   { type: 'INC', test: (n) => n >= 110 && n <= 119 },
   { type: 'PAN', test: (n) => n >= 120 && n <= 129 },
   { type: 'BUR', test: (n) => n >= 130 && n <= 139 },
-  // 301 falla de corriente alterna, 302 batería baja del sistema, 311 batería ausente/agotada
-  { type: 'POW', test: (n) => n === 301 || n === 302 || n === 311 },
+  // 301 falla de corriente alterna y 311 batería ausente/agotada. La 302 (batería baja, «LOW» en Gavriel) NO avisa a propósito.
+  { type: 'POW', test: (n) => n === 301 || n === 311 },
 ];
 
 /** Tipo de aviso de un código como «E130»; null si no corresponde (otro tipo o restauración «R130»). */

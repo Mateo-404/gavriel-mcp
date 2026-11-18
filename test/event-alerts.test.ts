@@ -26,7 +26,8 @@ describe('alertTypeOfCode', () => {
     expect(alertTypeOfCode('E120')).toBe('PAN');
     expect(alertTypeOfCode('E100')).toBe('MED');
     expect(alertTypeOfCode('E301')).toBe('POW');
-    expect(alertTypeOfCode('E302')).toBe('POW');
+    expect(alertTypeOfCode('E311')).toBe('POW');
+    expect(alertTypeOfCode('E302')).toBeNull(); // batería baja (LOW): no avisa
     expect(alertTypeOfCode(' e130 ')).toBe('BUR');
   });
 
