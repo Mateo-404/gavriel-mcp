@@ -16,6 +16,8 @@ const LOCK_MS = 1500;
 /** Diálogos con motivo obligatorio que no importa (cierre masivo, dejar en observación): sin texto escrito, Ctrl+Enter pone «.» y confirma. */
 const BULK_CLOSE = /cerrar intervenciones masivamente|dejar en observaci[oó]n/i;
 const DEFAULT_REASON = '.';
+/** «Cerrar Intervención» de un solo evento (el masivo se llama «…Intervenciones Masivamente»). */
+const CLOSE_ONE = /^\s*cerrar intervenci[oó]n\s*$/i;
 const ENABLE_WAIT_MS = 400;
 
 interface Deps {
@@ -156,6 +158,45 @@ export function createDialogConfirm({ visible, ownText, toast }: Deps): DialogCo
     return true;
   };
 
+  /** «Cerrar Intervención» de un evento (no el masivo) con categoría y resolución sin completar. */
+  const closeDialogEmpty = (): { area: HTMLTextAreaElement; trigger: HTMLElement } | null => {
+    const dialog = topDialog();
+    if (!dialog || !CLOSE_ONE.test(dialog.querySelector('h1, h2, h3, [data-slot="dialog-title"]')?.textContent ?? '')) return null;
+    const area = dialog.querySelector<HTMLTextAreaElement>('textarea');
+    const trigger = dialog.querySelector<HTMLElement>('select, [role="combobox"]');
+    if (!area || !trigger || area.disabled || area.readOnly || area.value.trim() !== '') return null;
+    const unset = trigger instanceof HTMLSelectElement ? trigger.value === '' : trigger.hasAttribute('data-placeholder');
+    if (!unset) return null; // ya hay categoría elegida: se respeta
+    return { area, trigger };
+  };
+
+  /** Elige la categoría «90» (select nativo o desplegable de Radix) y llama a `done` con si lo logró. */
+  const pickCategory = (trigger: HTMLElement, done: (ok: boolean) => void): void => {
+    const is90 = (text: string): boolean => /^\s*90\b/.test(text);
+    if (trigger instanceof HTMLSelectElement) {
+      const option = [...trigger.options].find((o) => is90(o.textContent ?? '') || o.value === '90');
+      if (!option) return done(false);
+      option.selected = true;
+      trigger.dispatchEvent(new Event('change', { bubbles: true }));
+      return done(true);
+    }
+    trigger.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, button: 0, pointerType: 'mouse' }));
+    const started = Date.now();
+    const tick = (): void => {
+      const option = [...document.querySelectorAll<HTMLElement>('[role="option"]')].find((o) => is90(o.textContent ?? ''));
+      if (option) {
+        for (const type of ['pointerdown', 'pointerup', 'mouseup'] as const) {
+          option.dispatchEvent(new MouseEvent(type, { bubbles: true, button: 0 }));
+        }
+        option.click();
+        return done(true);
+      }
+      if (Date.now() - started < 1000) setTimeout(tick, 30);
+      else done(false);
+    };
+    tick();
+  };
+
   /** Espera (sin polling largo) a que React habilite el botón tras rellenar el motivo, y lo aprieta. */
   const clickWhenEnabled = (button: HTMLButtonElement): void => {
     const started = Date.now();
@@ -186,6 +227,15 @@ export function createDialogConfirm({ visible, ownText, toast }: Deps): DialogCo
         if (Date.now() >= lockedUntil && fillDefaultReason()) {
           lockedUntil = Date.now() + LOCK_MS; // un solo intento mientras se espera
           clickWhenEnabled(button);
+          return true;
+        }
+        const empty = Date.now() >= lockedUntil ? closeDialogEmpty() : null;
+        if (empty) {
+          // Diálogo tal cual está: categoría 90 y resolución «.», y se cierra como con un clic
+          lockedUntil = Date.now() + 3000;
+          Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set?.call(empty.area, DEFAULT_REASON);
+          empty.area.dispatchEvent(new Event('input', { bubbles: true }));
+          pickCategory(empty.trigger, (ok) => (ok ? clickWhenEnabled(button) : toast('No encontré la categoría 90')));
           return true;
         }
         toast('Completá los campos para confirmar');

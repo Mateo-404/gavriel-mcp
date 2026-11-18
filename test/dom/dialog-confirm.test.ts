@@ -126,6 +126,41 @@ describe('dialog-confirm (DOM)', () => {
   });
 });
 
+describe('Ctrl+Enter en «Cerrar Intervención» vacío', () => {
+  const mountClose = (): void => {
+    document.body.innerHTML = `<div role="dialog" data-slot="dialog-content"><h2>Cerrar Intervención</h2>
+      <select><option value="">Seleccionar categoría</option><option value="a1">80 - Otra</option><option value="a2">90 - Sin novedad</option></select>
+      <textarea></textarea>
+      <div data-slot="dialog-footer"><button>Cancelar</button><button class="bg-primary" disabled>Cerrar Intervención</button></div></div>`;
+    const select = document.querySelector('select')!;
+    const area = document.querySelector('textarea')!;
+    const ok = document.querySelectorAll('button')[1]!;
+    const sync = (): void => { ok.disabled = !select.value || !area.value.trim(); };
+    select.addEventListener('change', sync);
+    area.addEventListener('input', sync);
+  };
+
+  const fresh = (): typeof dc => createDialogConfirm({ visible: () => true, ownText: (el) => el.textContent?.trim() ?? '', toast: (m) => toasts.push(m) });
+
+  test('pone categoría 90 y «.» y aprieta el botón', async () => {
+    mountClose();
+    track();
+    expect(fresh().confirm()).toBe(true);
+    for (let i = 0; i < 50 && !clicks.includes('Cerrar Intervención'); i++) await new Promise((r) => setTimeout(r, 10));
+    expect(document.querySelector('select')!.value).toBe('a2');
+    expect(document.querySelector('textarea')!.value).toBe('.');
+    expect(clicks).toEqual(['Cerrar Intervención']);
+  });
+
+  test('con la resolución ya escrita no toca nada', () => {
+    mountClose();
+    document.querySelector('textarea')!.value = 'listo';
+    expect(fresh().confirm()).toBe(true);
+    expect(document.querySelector('select')!.value).toBe('');
+    expect(toasts).toEqual(['Completá los campos para confirmar']);
+  });
+});
+
 describe('watchInterventionEnd', () => {
   const ends: boolean[] = [];
   const stop = watchInterventionEnd((bulk) => ends.push(bulk));
