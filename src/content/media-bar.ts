@@ -138,8 +138,8 @@ export function createMediaBar({ send }: MediaBarDeps): MediaBar {
   const line = document.createElement('i');
   line.className = 'gv-media-line';
   line.setAttribute('aria-hidden', 'true');
-  lead.append(cover, eq);
-  face.append(lead, text, line);
+  lead.append(cover);
+  face.append(lead, text, eq, line);
 
   const back = button('Retroceder 5 segundos', 'back');
   const fwd = button('Adelantar 5 segundos', 'fwd');
