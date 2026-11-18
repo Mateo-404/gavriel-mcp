@@ -45,6 +45,13 @@ async function build(): Promise<void> {
   }
 
   await cp('static', 'dist', { recursive: true });
+  // CSS propio minificado (el de producción es lo que se inyecta en cada pantalla de Gavriel); en `dev` queda legible
+  if (!watching) {
+    for (const css of ['content/shortcuts.css', 'options/options.css', 'popup/popup.css']) {
+      const out = await Bun.build({ entrypoints: [`static/${css}`], outdir: `dist/${css.slice(0, css.lastIndexOf('/'))}`, minify: true });
+      if (!out.success) throw new Error(`No se pudo minificar ${css}`);
+    }
+  }
 
   // La versión del manifest sale de package.json: una sola fuente de verdad
   const pkg = JSON.parse(await readFile('package.json', 'utf8')) as { version: string };

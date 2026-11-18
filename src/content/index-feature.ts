@@ -2,7 +2,7 @@
  * Índice de cuentas y contactos (buscador a fondo en «Cuentas» y cuenta de la llamada entrante): junta el índice
  * (account-index.ts), el desplegable y el cartel (account-search-ui.ts) detrás de un interruptor.
  */
-import { chromeIndexStore, createAccountIndex, createApiRequester } from './account-index';
+import { INDEX_META_KEY, chromeIndexStore, createAccountIndex, createApiRequester } from './account-index';
 import { createIncomingBanner, createSearchUi } from './account-search-ui';
 import type { SipClient } from './sip';
 
@@ -18,7 +18,7 @@ export function createIndexFeature({ sip, repaint }: { sip: SipClient; repaint: 
   let started = false;
   // Otra pestaña armó o avanzó el índice guardado: se lee de nuevo
   chrome.storage.onChanged.addListener((changes, area) => {
-    if (area === 'local' && changes.accountIndex && on) void index.reload();
+    if (area === 'local' && INDEX_META_KEY in changes && on) void index.reload();
   });
 
   return {

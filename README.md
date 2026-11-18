@@ -147,3 +147,22 @@ scripts/make-icons.mjs  genera los íconos de 16, 32 y 48 px desde icon128.png (
 `bun test` cubre la lógica pura (nombres de sonido, etiquetas, almacenamiento, manifest). El comportamiento sobre la
 página real se verificó a mano en el navegador con `click()` interceptado para no llamar a nadie. Pendiente: una
 llamada real de punta a punta con la extensión cargada en Chrome.
+
+## Arquitectura
+
+Dos mundos de JavaScript dentro de cada pantalla de Gavriel, más el fondo y las pestañas de música:
+
+| Pieza | Dónde corre | Qué hace |
+|---|---|---|
+| `content/mute.js` (`mute.ts`) | **mundo de la página** (`world: MAIN`), al inicio | silenciador, `net-tap` (lee copias de respuestas y guarda en memoria la cabecera de sesión), `sip-bridge` (colgar, atender, número de quien llama), `gavriel-api` (lecturas del índice), `push-guard`, `rtc-fix` (SDP de llamadas entrantes), `mic` |
+| `content/bridge.js` | mundo aislado, al inicio | pasa los ajustes a atributos `data-gv-*` de `<html>` |
+| `content/main.js` (`account.ts` + `shortcuts.ts`) | mundo aislado | un solo observador del DOM (`runtime.ts`); `shortcuts.ts` orquesta |
+| `background.js` | service worker | reglas de red (cache, fonts, push, sonidos), notificaciones, `media-router`, `action-gate` |
+| `content/music.js` | pestañas de Spotify / YouTube Music | lee y controla el reproductor |
+
+- **Puente entre mundos:** un solo mecanismo, `src/shared/page-rpc.ts` (`createRpcClient` / `serveRpc`, por `CustomEvent`). Lo usan SIP, `gavriel-api` y el índice de cuentas. Lo que cruza es solo `{ id, ...datos }`: nunca cabeceras ni el token.
+- **`shortcuts.ts`** reparte teclas y sostiene las acciones de llamada y cierre; lee la pantalla con `page.ts` (**una sola lectura de los botones por pasada**: `page.snapshot`), dibuja indicadores con `badges.ts` y se apoya en `music-feature.ts`, `index-feature.ts` y `settings-sync.ts`.
+- **Ajustes:** `SWITCH_DEFAULTS` (`shared/constants.ts`) es la única tabla de interruptores. De ahí salen el tipo `Settings`, la lectura segura, «Restablecer» y el refresco de Opciones. Un ajuste nuevo = una línea ahí + su `<label>` en `options.html` + su id en `SWITCH_IDS` (`options.ts`; si falta, no compila).
+- **Índice de cuentas:** se guarda compacto (`accountIndexData`) con su versión aparte (`accountIndexMeta`); las pestañas escuchan solo la meta. Una sola pestaña lo arma por vez gracias a un Web Lock (`navigator.locks`), que el navegador suelta solo.
+- **Verificación del paquete:** `bun run build` falla si el manifest, los íconos, las reglas de red o las tipografías no están como se espera (`scripts/verify-package.ts`).
+- **Medición:** `bun run scripts/measure.ts` (tamaños y tests); en el navegador, poner `data-gv-perfon` en `<html>` y leer `data-gv-perf` (pasadas del observador y ms). Los números están en `docs/perf-baseline.md`. La guía de este trabajo: `docs/GUIA-OPTIMIZACION.md`.

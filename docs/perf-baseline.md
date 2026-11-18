@@ -18,5 +18,26 @@ página) y leer `data-gv-perf` (pasadas del observador del DOM, ms totales y la 
 
 Tests: 331 pass en 46 archivos, ~3,2 s (con arranque).
 
-## Después de cada fase
-(se completa a medida que se avanza)
+## Después (v0.23.1, 282 tests en 39 archivos)
+| archivo | crudo | gzip |
+|---|---:|---:|
+| background.js | 12.582 | 5.157 |
+| content/bridge.js | 11.872 | 3.101 |
+| content/main.js | 64.794 | 23.530 |
+| content/music.js | 6.631 | 2.588 |
+| content/mute.js | 17.123 | 6.810 |
+| content/shortcuts.css (minificado) | 13.005 | 3.307 |
+| options/options.js | 11.070 | 4.614 |
+| popup/popup.js | 5.452 | 2.438 |
+| **TOTAL (js + css)** | **158.407** | **55.430** |
+
+- Total: −8 % crudo (172.018 → 158.407) y −5 % gzip (58.305 → 55.430). Sale del CSS minificado (−28 % el de shortcuts), del fondo sin
+  diagnóstico de depuración (−2 KB) y de los ajustes declarativos (`options.js` −2 KB, `bridge.js` −1,3 KB).
+- `main.js` quedó igual (64,5 → 64,8 KB): el trabajo nuevo (índice, ronda, Ctrl+Espacio, cartel de llamada entrante) compensó lo que se sacó
+  del orquestador. La meta de 55 KB no se alcanzó; el camino es partir lo que solo se usa en «Cuentas» (desplegable e índice) a un script aparte.
+- Tests: 331 → 282 (−15 %) y de 46 a 39 archivos. La meta de ~150 no se alcanzó: lo que queda es lógica pura y los puentes de seguridad.
+
+## Pendiente de medir en el navegador (hace falta recargar la extensión)
+- Pasadas del observador por minuto y ms por pasada (`data-gv-perfon` / `data-gv-perf`): antes/después de la foto única de botones.
+- Tamaño de `chrome.storage.local` del índice (formato compacto) y de los avisos `onChanged` entre pestañas.
+- La mejora de 4.2 (filtrar mutaciones propias del panel) no se hizo: sin esa medición no hay forma de saber si ayuda o rompe repintados.

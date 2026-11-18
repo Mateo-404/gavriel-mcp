@@ -193,6 +193,7 @@ function main(): void {
   if (!source) return;
   let last = '';
   let lastSentAt = 0;
+  let playing = false; // lo último que se vio: decide con qué frecuencia mirar
   /** Mientras suena se repite el estado cada tanto (la barra de Gavriel interpola la posición entre avisos). */
   const HEARTBEAT_MS = 15_000;
 
@@ -200,6 +201,7 @@ function main(): void {
     try {
       const state = readState(source);
       if (!state) return;
+      playing = state.playing;
       // Sin cambios de fondo (la posición avanza sola) solo se repite cada HEARTBEAT_MS, y nunca en pausa
       const key = `${state.title}|${state.artist}|${state.playing}|${state.volume.toFixed(2)}|${state.muted}|${Math.round(state.duration)}`;
       const now = Date.now();
@@ -217,8 +219,13 @@ function main(): void {
   for (const type of ['play', 'pause', 'ended', 'volumechange', 'loadedmetadata', 'emptied', 'seeked']) {
     document.addEventListener(type, () => push(true), true);
   }
-  // Cambios sin evento (Spotify como control remoto, cambio de tema): una lectura barata cada 3 s
-  setInterval(() => push(), 3000);
+  // Cambios sin evento (Spotify como control remoto, cambio de tema): una lectura barata cada 3 s. Con la pestaña oculta y la
+  // música en pausa solo se mira una de cada 5 (cada 15 s): al reanudar llegan los eventos play/pause, que avisan al instante.
+  let skipped = 0;
+  setInterval(() => {
+    if (document.hidden && !playing && ++skipped % 5 !== 0) return;
+    push();
+  }, 3000);
   push(true);
 
   chrome.runtime.onMessage.addListener((message: unknown) => {

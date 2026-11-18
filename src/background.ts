@@ -9,28 +9,6 @@ import { installNotifications } from './notifications';
 import { installActionGate } from './action-gate';
 import { CACHE_RULESET, FONTS_RULESET, PUSH_RULESET, syncSoundRules } from './shared/sound-rules';
 
-const FONTS_URL = 'https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500;700&display=swap';
-
-/**
- * Diagnóstico: le pregunta a Chrome qué haría con el pedido del CSS de Google Fonts (¿nuestra regla
- * coincide?). Lo que se dispara de verdad lo cuenta onRuleMatchedDebug (getMatchedRules tiene un cupo muy bajo).
- */
-async function diagnoseFonts(): Promise<Record<string, unknown>> {
-  const out: Record<string, unknown> = {};
-  try {
-    const test = await chrome.declarativeNetRequest.testMatchOutcome({
-      url: FONTS_URL,
-      initiator: 'https://app.gavriel.com.ar',
-      type: 'stylesheet',
-      method: 'get',
-    });
-    out.testMatches = test.matchedRules.map((m) => `${m.rulesetId}#${m.ruleId}`);
-  } catch (error) {
-    out.testError = String(error);
-  }
-  return out;
-}
-
 /** Deja a la vista (Ajustes y atributo de <html>) qué reglas quedaron activas, o por qué fallaron. */
 async function publishStatus(error?: unknown): Promise<void> {
   try {
@@ -44,7 +22,6 @@ async function publishStatus(error?: unknown): Promise<void> {
         rulesets,
         dynamic: dynamic.length,
         error: error ? String(error) : null,
-        diag: { ...(await diagnoseFonts()), live: fired },
       },
     });
   } catch {
@@ -67,17 +44,6 @@ async function sync(): Promise<void> {
     await publishStatus(error);
   }
 }
-
-// Diagnóstico en vivo: cuántas veces se dispara cada conjunto de reglas en pedidos reales (solo extensiones
-// sin empaquetar). Se publica junto con el resto del estado.
-const fired: Record<string, number> = {};
-let publishTimer: ReturnType<typeof setTimeout> | undefined;
-chrome.declarativeNetRequest.onRuleMatchedDebug?.addListener((info) => {
-  const key = `${info.rule.rulesetId}:${info.request.type}:${new URL(info.request.url).host}`;
-  fired[key] = (fired[key] ?? 0) + 1;
-  clearTimeout(publishTimer);
-  publishTimer = setTimeout(() => void publishStatus(), 800);
-});
 
 installNotifications();
 installActionGate();

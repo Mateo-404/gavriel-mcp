@@ -24,11 +24,20 @@ export interface ApiReply {
   status: number;
   body?: unknown;
 }
+export interface SavedIndex {
+  updatedAt: number;
+  complete: boolean;
+  accounts: IndexedAccount[];
+}
 export interface IndexStore {
-  load: () => Promise<{ updatedAt: number; complete: boolean; accounts: IndexedAccount[] } | null>;
-  save: (data: { updatedAt: number; complete: boolean; accounts: IndexedAccount[] }) => Promise<void>;
-  /** true si esta pestaña consiguió el candado de armado (o lo renovó). */
-  lock: () => Promise<boolean>;
+  load: () => Promise<SavedIndex | null>;
+  save: (data: SavedIndex) => Promise<void>;
+  /**
+   * Corre `fn` con exclusión entre pestañas: una sola arma el índice y las demás esperan su turno (y después, al ver el
+   * índice al día, no arman nada). El candado lo suelta el navegador al terminar `fn` o al cerrarse la pestaña: no hay
+   * vencimientos ni renovaciones. Sin soporte (`navigator.locks`) corre `fn` directamente.
+   */
+  exclusive: (fn: () => Promise<void>) => Promise<void>;
 }
 export interface IndexDeps {
   request: (path: string) => Promise<ApiReply | null>;
@@ -73,15 +82,27 @@ export function createApiRequester(timeoutMs = 20000): (path: string) => Promise
 export function createAccountIndex({ request, store, sleep = defaultSleep, now = Date.now, onStatus = () => {} }: IndexDeps): AccountIndex {
   let rows: IndexRow[] = [];
   let accounts: IndexedAccount[] = [];
+  /** Esta pestaña está armando el índice ahora (no solo esperando su turno). */
   let building = false;
-  let retry: ReturnType<typeof setTimeout> | undefined;
-  /** Lo último que se leyó de lo guardado estaba completo y al día. */
-  let savedComplete = false;
+  let queued = false;
+  /** Versión de lo que hay en memoria (`updatedAt:cantidad:completo`): si lo guardado es igual, no se reconstruye el índice. */
+  let loadedKey = '';
   let progress: { done: number; total: number } | null = null;
+
+  const keyOf = (saved: SavedIndex): string => `${saved.updatedAt}:${saved.accounts.length}:${saved.complete}`;
+  const fresh = (saved: SavedIndex | null): saved is SavedIndex => !!saved && saved.complete && now() - saved.updatedAt <= STALE_MS;
 
   const setAccounts = (list: IndexedAccount[]): void => {
     accounts = list;
     rows = buildIndex(list);
+  };
+  /** Adopta lo guardado si es distinto (o más completo) que lo que hay en memoria. */
+  const adopt = (saved: SavedIndex): boolean => {
+    const key = keyOf(saved);
+    if (key === loadedKey || saved.accounts.length < accounts.length) return false;
+    loadedKey = key;
+    setAccounts(saved.accounts);
+    return true;
   };
 
   /** GET con reintentos: 429 y errores de red esperan más cada vez; sin sesión todavía, espera a que la página cargue. */
@@ -95,22 +116,25 @@ export function createAccountIndex({ request, store, sleep = defaultSleep, now =
     return undefined;
   };
 
+  /** Pone en la cola de armado a esta pestaña; cuando le toca, si otra ya dejó el índice al día, no hace nada. */
   async function build(): Promise<void> {
-    if (building) return;
-    if (!(await store.lock())) {
-      onStatus('otra pestaña lo está armando');
-      // Si esa pestaña se cierra sin terminar, el candado vence y esta toma la posta
-      if (retry === undefined) {
-        retry = setTimeout(() => {
-          retry = undefined;
-          if (!savedComplete) void build();
-        }, 130_000);
-      }
-      return;
+    if (queued) return;
+    queued = true;
+    onStatus('esperando su turno para armar el índice');
+    try {
+      await store.exclusive(async () => {
+        const saved = await store.load();
+        if (saved) adopt(saved);
+        if (fresh(saved)) return onStatus(`guardado por otra pestaña: ${saved.accounts.length} cuentas`);
+        await crawl();
+      });
+    } finally {
+      queued = false;
     }
+  }
+
+  async function crawl(): Promise<void> {
     building = true;
-    // El candado se renueva mientras se arma (vence a los 2 minutos): si no, otra pestaña lo toma a mitad de camino
-    const keepLock = setInterval(() => void store.lock(), 30_000);
     try {
       onStatus('pidiendo la lista de cuentas');
       const first = await get(`/api/accounts?page=1&limit=${PAGE_SIZE}`);
@@ -151,7 +175,6 @@ export function createAccountIndex({ request, store, sleep = defaultSleep, now =
             sinceSave = 0;
             setAccounts(list);
             await store.save({ updatedAt: now(), complete: false, accounts: list });
-            await store.lock();
           }
           await sleep(GAP_MS);
         }
@@ -161,7 +184,6 @@ export function createAccountIndex({ request, store, sleep = defaultSleep, now =
       await store.save({ updatedAt: failed ? 0 : now(), complete: !failed, accounts: list });
       onStatus(failed ? 'incompleto: falló un pedido de contactos' : `completo: ${list.length} cuentas`);
     } finally {
-      clearInterval(keepLock);
       building = false;
       progress = null;
     }
@@ -170,19 +192,14 @@ export function createAccountIndex({ request, store, sleep = defaultSleep, now =
   return {
     async start() {
       const saved = await store.load();
-      if (saved) setAccounts(saved.accounts);
-      savedComplete = !!saved && saved.complete && now() - saved.updatedAt <= STALE_MS;
-      if (!saved || !saved.complete || now() - saved.updatedAt > STALE_MS) void build();
-      else onStatus(`guardado: ${saved.accounts.length} cuentas`);
+      if (saved) adopt(saved);
+      if (fresh(saved)) onStatus(`guardado: ${saved.accounts.length} cuentas`);
+      else void build();
     },
     async reload() {
       if (building) return;
       const saved = await store.load();
-      if (saved && saved.accounts.length >= accounts.length) {
-        setAccounts(saved.accounts);
-        savedComplete = saved.complete && now() - saved.updatedAt <= STALE_MS;
-        onStatus(`${saved.complete ? 'completo' : 'parcial'} (armado por otra pestaña): ${saved.accounts.length} cuentas`);
-      }
+      if (saved && adopt(saved)) onStatus(`${saved.complete ? 'completo' : 'parcial'} (armado por otra pestaña): ${saved.accounts.length} cuentas`);
     },
     search: (query) => search(rows, query),
     byPhone: (number) => accountsByPhone(rows, number),
@@ -191,40 +208,64 @@ export function createAccountIndex({ request, store, sleep = defaultSleep, now =
   };
 }
 
-/** Almacén real: `chrome.storage.local` con un candado de 2 minutos para que solo una pestaña arme el índice. */
+/** Formato compacto para guardar: una cuenta es `[id, número, nombre, estado, teléfono, [[nombre, tel, tel2], …]]`. */
+export type PackedAccount = [string, string, string, string, string, [string, string, string][]];
+
+export const packAccounts = (accounts: readonly IndexedAccount[]): PackedAccount[] =>
+  accounts.map((a) => [a.id, a.number, a.name, a.status, a.phone, a.contacts.map((c) => [c.name, c.phone, c.phone2] as [string, string, string])]);
+
+export const unpackAccounts = (packed: readonly PackedAccount[]): IndexedAccount[] =>
+  packed.map(([id, number, name, status, phone, contacts]) => ({
+    id,
+    number,
+    name,
+    status,
+    phone,
+    contacts: contacts.map(([cname, cphone, cphone2]) => ({ name: cname, phone: cphone, phone2: cphone2 })),
+  }));
+
+export const INDEX_META_KEY = 'accountIndexMeta';
+const INDEX_DATA_KEY = 'accountIndexData';
+const LOCK_NAME = 'gv-account-index';
+
+/**
+ * Almacén real. Los datos van compactos en `accountIndexData` y la versión en `accountIndexMeta`; se guardan en la misma
+ * operación, y las otras pestañas escuchan solo la meta (chica) para saber cuándo volver a leer. La exclusión entre pestañas
+ * es un Web Lock del origen de Gavriel: la suelta el navegador solo, incluso si la pestaña se cierra a mitad del armado.
+ */
 export function chromeIndexStore(): IndexStore {
-  const KEY = 'accountIndex';
-  const LOCK = 'accountIndexLock';
   return {
     async load() {
       try {
-        const data = (await chrome.storage.local.get(KEY)) as Record<string, unknown>;
-        const value = data[KEY] as { updatedAt?: number; complete?: boolean; accounts?: IndexedAccount[] } | undefined;
-        return value && Array.isArray(value.accounts)
-          ? { updatedAt: Number(value.updatedAt ?? 0), complete: value.complete === true, accounts: value.accounts }
-          : null;
+        const data = (await chrome.storage.local.get([INDEX_META_KEY, INDEX_DATA_KEY, 'accountIndex'])) as Record<string, unknown>;
+        const meta = data[INDEX_META_KEY] as { updatedAt?: number; complete?: boolean } | undefined;
+        const packed = data[INDEX_DATA_KEY];
+        if (!meta || !Array.isArray(packed)) {
+          // Versión anterior: el objeto completo en una sola clave. Se aprovecha para no volver a pedir todo (se migra al guardar)
+          const old = data.accountIndex as { updatedAt?: number; complete?: boolean; accounts?: IndexedAccount[] } | undefined;
+          return old && Array.isArray(old.accounts) ? { updatedAt: Number(old.updatedAt ?? 0), complete: old.complete === true, accounts: old.accounts } : null;
+        }
+        return { updatedAt: Number(meta.updatedAt ?? 0), complete: meta.complete === true, accounts: unpackAccounts(packed as PackedAccount[]) };
       } catch {
         return null;
       }
     },
     async save(data) {
       try {
-        await chrome.storage.local.set({ [KEY]: data });
+        await chrome.storage.local.set({
+          [INDEX_META_KEY]: { updatedAt: data.updatedAt, complete: data.complete, count: data.accounts.length },
+          [INDEX_DATA_KEY]: packAccounts(data.accounts),
+        });
+        // Claves de versiones anteriores (objeto completo y candado con vencimiento): ya no se usan
+        await chrome.storage.local.remove(['accountIndex', 'accountIndexLock']);
       } catch {
         /* sin espacio o sin contexto: se rearma la próxima vez */
       }
     },
-    async lock() {
-      try {
-        const current = ((await chrome.storage.local.get(LOCK)) as Record<string, { by?: string; at?: number } | undefined>)[LOCK];
-        if (current && current.by !== TAB && Date.now() - Number(current.at ?? 0) < 120_000) return false; // otra pestaña lo está armando
-        await chrome.storage.local.set({ [LOCK]: { by: TAB, at: Date.now() } });
-        return true;
-      } catch {
-        return false;
-      }
+    async exclusive(fn) {
+      const locks = typeof navigator === 'undefined' ? undefined : navigator.locks;
+      if (!locks) return fn();
+      await locks.request(LOCK_NAME, fn);
     },
   };
 }
-/** Identifica a esta pestaña en el candado. */
-const TAB = Math.random().toString(36).slice(2);

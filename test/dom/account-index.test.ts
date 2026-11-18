@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import { GAPI_REQUEST_EVENT, GAPI_RESULT_EVENT } from '../../src/shared/constants';
 import { ALLOWED_PATH, installGavrielApi } from '../../src/content/gavriel-api';
-import { type IndexStore, STALE_MS, createAccountIndex } from '../../src/content/account-index';
+import { type IndexStore, STALE_MS, createAccountIndex, packAccounts, unpackAccounts } from '../../src/content/account-index';
 import { createIncomingBanner, createSearchUi } from '../../src/content/account-search-ui';
 import { callerNumber } from '../../src/content/sip-bridge';
 
@@ -51,14 +51,34 @@ const page = (n: number, pages: number, count: number): unknown => ({
   data: { data: Array.from({ length: count }, (_, i) => ({ id: `${n}-${i}`, accountNumber: `${n}${i}`, name: `Cuenta ${n}-${i}`, currentStatus: 'Activa', phone: '' })), meta: { pagination: { pages } } },
 });
 
-function fixture(opts: { saved?: Parameters<IndexStore['save']>[0] | null; lock?: boolean } = {}) {
-  const requests: string[] = [];
+/** Almacén y exclusión en memoria: la exclusión encadena los turnos igual que un Web Lock. */
+function memoryStore(initial: Parameters<IndexStore['save']>[0] | null = null, blocked = false) {
+  let saved = initial;
+  let tail: Promise<void> = Promise.resolve();
   const saves: { complete: boolean; n: number }[] = [];
   const store: IndexStore = {
-    load: async () => opts.saved ?? null,
-    save: async (d) => void saves.push({ complete: d.complete, n: d.accounts.length }),
-    lock: async () => opts.lock ?? true,
+    load: async () => saved,
+    save: async (d) => {
+      saved = d;
+      saves.push({ complete: d.complete, n: d.accounts.length });
+    },
+    exclusive: (fn) => {
+      if (blocked) return new Promise(() => {}); // otra pestaña lo tiene y no lo suelta
+      const turn = tail.then(fn);
+      tail = turn.catch(() => {});
+      return turn;
+    },
   };
+  return { store, saves };
+}
+
+const until = async (ok: () => boolean): Promise<void> => {
+  for (let i = 0; i < 100 && !ok(); i++) await wait(10);
+};
+
+function fixture(opts: { saved?: Parameters<IndexStore['save']>[0] | null; lock?: boolean } = {}) {
+  const requests: string[] = [];
+  const { store, saves } = memoryStore(opts.saved ?? null, opts.lock === false);
   let rateLimited = 1;
   const request = async (path: string) => {
     requests.push(path);
@@ -77,7 +97,7 @@ describe('índice de cuentas', () => {
   test('arma lista + contactos, reintenta el 429 y guarda completo', async () => {
     const { index, requests, saves } = fixture();
     await index.start();
-    await wait(30);
+    await until(() => saves.at(-1)?.complete === true);
     expect(requests.filter((r) => r.startsWith('/api/accounts?page=')).length).toBe(2);
     expect(requests.filter((r) => r.startsWith('/api/account-contacts')).length).toBe(4 + 1); // 4 cuentas + 1 reintento
     expect(saves.at(-1)).toEqual({ complete: true, n: 4 });
@@ -100,12 +120,36 @@ describe('índice de cuentas', () => {
     const old = { updatedAt: 1_000_000 - STALE_MS - 1, complete: true, accounts: [] };
     const a = fixture({ saved: old });
     await a.index.start();
-    await wait(30);
+    await until(() => a.requests.length > 0);
     expect(a.requests.length).toBeGreaterThan(0);
     const b = fixture({ saved: old, lock: false });
     await b.index.start();
-    await wait(10);
+    await wait(20);
     expect(b.requests).toHaveLength(0);
+  });
+
+  test('dos pestañas con el mismo almacén: la segunda espera su turno, ve el índice al día y no pide nada', async () => {
+    const shared = memoryStore();
+    const requests: string[] = [];
+    const request = async (path: string) => {
+      requests.push(path);
+      return path.startsWith('/api/accounts?page=') ? { status: 200, body: page(1, 1, 3) } : { status: 200, body: { data: [] } };
+    };
+    const make = () => createAccountIndex({ request, store: shared.store, sleep: () => Promise.resolve(), now: () => 1_000_000 });
+    const first = make();
+    const second = make();
+    await Promise.all([first.start(), second.start()]);
+    await until(() => shared.saves.at(-1)?.complete === true);
+    await until(() => second.size() === 3);
+    expect(requests.filter((r) => r.startsWith('/api/accounts?page=')).length).toBe(1); // una sola lista pedida
+    expect(requests.filter((r) => r.startsWith('/api/account-contacts')).length).toBe(3);
+    expect(second.size()).toBe(3);
+  });
+
+  test('el formato compacto de guardado va y vuelve sin perder nada', () => {
+    const accounts = [{ id: 'a', number: '0100', name: 'ESCUELA', status: 'Activa', phone: '342', contacts: [{ name: 'Ana', phone: '1', phone2: '2' }] }];
+    expect(unpackAccounts(packAccounts(accounts))).toEqual(accounts);
+    expect(JSON.stringify(packAccounts(accounts)).length).toBeLessThan(JSON.stringify(accounts).length);
   });
 });
 
