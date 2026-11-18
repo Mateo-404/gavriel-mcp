@@ -212,12 +212,27 @@ html[data-gv-noanim] [class*="spinner"] {
 .gv-media-face {
   position: relative;
   display: flex; align-items: center; gap: 9px;
-  height: 100%; padding: 0 14px 0 12px;
+  height: 100%; padding: 0 16px 0 4px;
   border-radius: inherit; overflow: hidden;
   cursor: default;
 }
-.gv-media-art { width: 28px; height: 28px; flex: none; border-radius: 6px; object-fit: cover; box-shadow: 0 0 0 1px var(--border, rgba(169, 230, 189, 0.25)); }
-.gv-media-art[hidden] { display: none; }
+/* Carátula (o ecualizador solo, si no hay imagen); con carátula el ecualizador es una chapita en la esquina */
+.gv-media-lead {
+  position: relative; flex: none; display: grid; place-items: center;
+  width: 28px; height: 28px; border-radius: 50%;
+  background: color-mix(in srgb, var(--primary, #a9e6bd) 16%, transparent);
+}
+.gv-media-art, .gv-pop-art, .gv-pop-ambient { object-fit: cover; }
+.gv-media-art { position: absolute; inset: 0; width: 100%; height: 100%; border-radius: inherit; }
+.gv-media-art[hidden], .gv-pop-art[hidden], .gv-pop-ambient[hidden] { display: none; }
+.gv-playing .gv-media-art { animation: gv-spin 14s linear infinite; }
+@keyframes gv-spin { to { transform: rotate(360deg); } }
+.gv-has-art .gv-media-lead .gv-eq {
+  position: absolute; right: -4px; bottom: -4px; z-index: 1;
+  width: 14px; height: 14px; padding: 2px; gap: 1.5px; box-sizing: border-box;
+  border-radius: 50%; background: var(--background, #0b1410); box-shadow: 0 0 0 1px var(--border, rgba(169, 230, 189, 0.3));
+}
+.gv-has-art .gv-media-lead .gv-eq i { width: 2px; height: 10px; }
 .gv-media-text { display: flex; flex-direction: column; min-width: 0; width: 132px; overflow: hidden; }
 .gv-media-title { white-space: nowrap; font-weight: 600; font-size: 12px; letter-spacing: 0.01em; }
 .gv-media-sub { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--muted-foreground, #9db8a8); font-size: 10.5px; }
@@ -227,12 +242,12 @@ html[data-gv-noanim] [class*="spinner"] {
 /* Panel de controles */
 .gv-media-pop {
   position: absolute; z-index: 60; top: calc(100% + 8px); right: 0;
-  display: flex; flex-direction: column; gap: 10px;
-  width: 264px; padding: 12px 12px 10px;
+  display: flex; flex-direction: column; gap: 12px;
+  width: 300px; padding: 14px 14px 12px; isolation: isolate;
   border: 1px solid var(--border, rgba(169, 230, 189, 0.25));
-  border-radius: 16px;
+  border-radius: 22px;
   background: var(--popover, var(--card, #0c1f16));
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35);
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.5), 0 2px 6px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.05);
   opacity: 0; visibility: hidden; transform: translateY(-4px) scale(0.98); transform-origin: top right;
   transition: opacity 0.16s, transform 0.16s, visibility 0s 0.16s;
 }
@@ -241,25 +256,52 @@ html[data-gv-noanim] [class*="spinner"] {
 .gv-media:hover .gv-media-pop, .gv-media:focus-within .gv-media-pop {
   opacity: 1; visibility: visible; transform: none; transition: opacity 0.16s, transform 0.16s;
 }
-.gv-media-status { font-size: 10.5px; color: var(--muted-foreground, #9db8a8); letter-spacing: 0.02em; }
-.gv-media-controls { display: flex; align-items: center; justify-content: center; gap: 6px; }
+/* Fondo: la carátula desenfocada tiñe el panel con los colores de la canción */
+.gv-pop-bg { position: absolute; inset: 0; z-index: -1; overflow: hidden; border-radius: inherit; pointer-events: none; }
+.gv-pop-ambient { position: absolute; inset: -30%; width: 160%; height: 160%; filter: blur(38px) saturate(1.5); opacity: 0.38; }
+.gv-pop-bg::after { content: ''; position: absolute; inset: 0; background: linear-gradient(180deg, transparent 0%, color-mix(in srgb, var(--popover, #0c1f16) 70%, transparent) 100%); }
+.gv-pop-head { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.gv-pop-art { flex: none; width: 64px; height: 64px; border-radius: 12px; box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(255, 255, 255, 0.08); }
+.gv-pop-meta { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
+.gv-pop-title { font-size: 14px; font-weight: 650; line-height: 1.25; letter-spacing: -0.005em; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.gv-pop-artist { font-size: 12px; color: var(--muted-foreground, #9db8a8); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.gv-media-status {
+  align-self: flex-start; margin-top: 4px; padding: 2px 8px 2px 14px; position: relative;
+  font-size: 9.5px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase;
+  color: color-mix(in srgb, var(--primary, #a9e6bd) 85%, white); border-radius: 9999px;
+  background: color-mix(in srgb, var(--primary, #a9e6bd) 14%, transparent);
+}
+.gv-media-status::before { content: ''; position: absolute; left: 6px; top: 50%; width: 5px; height: 5px; margin-top: -2.5px; border-radius: 50%; background: currentColor; opacity: 0.55; }
+.gv-playing .gv-media-status::before { opacity: 1; box-shadow: 0 0 6px currentColor; }
+.gv-media-controls { display: flex; align-items: center; justify-content: center; gap: 10px; }
 .gv-media-btn {
   display: inline-flex; align-items: center; justify-content: center; flex: none;
-  width: 30px; height: 30px; border: 0; border-radius: 9999px; padding: 0;
-  background: transparent; color: inherit; cursor: pointer; transition: background 0.12s, transform 0.12s;
+  width: 34px; height: 34px; border: 0; border-radius: 9999px; padding: 0;
+  background: transparent; color: var(--muted-foreground, #c3d8cb); cursor: pointer; transition: background 0.14s, color 0.14s, transform 0.14s;
 }
-.gv-media-btn:hover { background: var(--muted, rgba(255, 255, 255, 0.08)); }
-.gv-media-btn:active { transform: scale(0.92); }
+.gv-media-btn:hover { background: rgba(255, 255, 255, 0.09); color: var(--foreground, #fff); }
+.gv-media-btn:active { transform: scale(0.9); }
 .gv-media-btn:focus-visible { outline: 2px solid var(--ring, #a9e6bd); outline-offset: 1px; }
 /* El color de la marca (celadon) solo en el botón de reproducir */
-.gv-media-play { width: 38px; height: 38px; background: var(--primary, #a9e6bd); color: var(--primary-foreground, #00170e); }
-.gv-media-play:hover { background: var(--primary, #a9e6bd); filter: brightness(1.08); }
-.gv-media-timeline { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 8px; font-size: 10.5px; font-variant-numeric: tabular-nums; color: var(--muted-foreground, #9db8a8); }
-.gv-media-progress { position: relative; height: 4px; border-radius: 4px; background: var(--border, rgba(255, 255, 255, 0.14)); cursor: pointer; overflow: hidden; }
+.gv-media-play { width: 48px; height: 48px; background: var(--primary, #a9e6bd); color: var(--primary-foreground, #00170e); box-shadow: 0 6px 18px color-mix(in srgb, var(--primary, #a9e6bd) 35%, transparent); }
+.gv-media-play:hover { background: var(--primary, #a9e6bd); color: var(--primary-foreground, #00170e); filter: brightness(1.08); transform: scale(1.05); }
+.gv-media-play:active { transform: scale(0.95); }
+.gv-media-play svg { width: 20px; height: 20px; }
+.gv-media-timeline { display: grid; grid-template-columns: 34px 1fr 34px; align-items: center; gap: 8px; font-size: 10.5px; font-variant-numeric: tabular-nums; color: var(--muted-foreground, #9db8a8); }
+.gv-media-timeline span:last-child { text-align: right; }
+.gv-media-progress { position: relative; height: 4px; border-radius: 4px; background: rgba(255, 255, 255, 0.16); cursor: pointer; transition: height 0.12s; }
+.gv-media-progress:hover { height: 6px; }
 .gv-media-progress::after { content: ''; position: absolute; inset: -8px 0; } /* zona de clic más cómoda */
-.gv-media-progress i { display: block; height: 100%; border-radius: 4px; background: var(--primary, #a9e6bd); transform-origin: left; transform: scaleX(var(--gv-p, 0)); }
+.gv-media-progress i { display: block; height: 100%; border-radius: inherit; background: var(--primary, #a9e6bd); transform-origin: left; transform: scaleX(var(--gv-p, 0)); }
 .gv-media-bottom { display: flex; align-items: center; gap: 6px; }
-.gv-media-volume { flex: 1; min-width: 0; margin: 0; accent-color: var(--primary, #a9e6bd); }
+.gv-media-bottom .gv-media-btn { width: 28px; height: 28px; }
+.gv-media-volume {
+  flex: 1; min-width: 0; margin: 0; height: 14px; -webkit-appearance: none; appearance: none; background: transparent; cursor: pointer;
+  --gv-v: 50%;
+}
+.gv-media-volume::-webkit-slider-runnable-track { height: 4px; border-radius: 4px; background: linear-gradient(to right, var(--primary, #a9e6bd) var(--gv-v), rgba(255, 255, 255, 0.16) var(--gv-v)); }
+.gv-media-volume::-webkit-slider-thumb { -webkit-appearance: none; width: 12px; height: 12px; margin-top: -4px; border-radius: 50%; background: #fff; box-shadow: 0 1px 4px rgba(0, 0, 0, 0.5); transform: scale(0); transition: transform 0.12s; }
+.gv-media-volume:hover::-webkit-slider-thumb, .gv-media-volume:focus-visible::-webkit-slider-thumb { transform: scale(1); }
 .gv-media-swap[hidden] { display: none; }
 
 /* Ecualizador: barras que escalan desde abajo (transform) solo mientras suena */
@@ -274,8 +316,8 @@ html[data-gv-noanim] [class*="spinner"] {
 @keyframes gv-marquee { 0%, 15% { transform: translateX(0); } 85%, 100% { transform: translateX(calc(-100% + 132px)); } }
 .gv-media:hover .gv-media-title, .gv-media:focus-within .gv-media-title { animation-play-state: paused; }
 @media (max-width: 1000px) { .gv-media-text { display: none; } .gv-media-face { padding: 0 12px; } }
-@media (prefers-reduced-motion: reduce) { .gv-playing .gv-eq i, .gv-marquee .gv-media-title { animation: none; } .gv-playing .gv-eq i { transform: scaleY(0.7); } .gv-media-pop { transition: none; } }
-html[data-gv-noanim] .gv-playing .gv-eq i, html[data-gv-noanim] .gv-marquee .gv-media-title { animation: none !important; }
+@media (prefers-reduced-motion: reduce) { .gv-playing .gv-media-art { animation: none; } .gv-playing .gv-eq i, .gv-marquee .gv-media-title { animation: none; } .gv-playing .gv-eq i { transform: scaleY(0.7); } .gv-media-pop { transition: none; } }
+html[data-gv-noanim] .gv-playing .gv-eq i, html[data-gv-noanim] .gv-marquee .gv-media-title, html[data-gv-noanim] .gv-playing .gv-media-art { animation: none !important; }
 html[data-gv-noanim] .gv-playing .gv-eq i { transform: scaleY(0.7); }
 html[data-gv-noanim] .gv-media-pop { transition: none !important; }
 

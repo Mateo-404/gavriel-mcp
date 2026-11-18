@@ -101,16 +101,31 @@ export function createMediaBar({ send }: MediaBarDeps): MediaBar {
   eq.setAttribute('aria-hidden', 'true');
   eq.innerHTML = '<i></i><i></i><i></i>';
 
-  const cover = document.createElement('img');
-  cover.className = 'gv-media-art';
-  cover.alt = '';
-  cover.decoding = 'async';
-  cover.referrerPolicy = 'no-referrer'; // no se le cuenta a Spotify/YouTube desde qué página se ve
-  cover.hidden = true;
-  cover.addEventListener('error', () => {
-    cover.hidden = true;
-    cover.removeAttribute('src');
-  });
+  /** Carátula: la misma imagen se usa en la píldora, en el panel y (desenfocada) de fondo del panel. */
+  const artImg = (cls: string): HTMLImageElement => {
+    const img = document.createElement('img');
+    img.className = cls;
+    img.alt = '';
+    img.decoding = 'async';
+    img.referrerPolicy = 'no-referrer'; // no se le cuenta a Spotify/YouTube desde qué página se ve
+    img.hidden = true;
+    img.addEventListener('error', () => setArt(''));
+    return img;
+  };
+  const cover = artImg('gv-media-art');
+  const popArt = artImg('gv-pop-art');
+  const ambient = artImg('gv-pop-ambient');
+  const lead = document.createElement('span');
+  lead.className = 'gv-media-lead';
+  const setArt = (src: string): void => {
+    for (const img of [cover, popArt, ambient]) {
+      if (src) {
+        if (img.getAttribute('src') !== src) img.src = src;
+      } else img.removeAttribute('src');
+      img.hidden = !src;
+    }
+    root.classList.toggle('gv-has-art', !!src);
+  };
 
   const text = document.createElement('div');
   text.className = 'gv-media-text';
@@ -123,7 +138,8 @@ export function createMediaBar({ send }: MediaBarDeps): MediaBar {
   const line = document.createElement('i');
   line.className = 'gv-media-line';
   line.setAttribute('aria-hidden', 'true');
-  face.append(eq, cover, text, line);
+  lead.append(cover, eq);
+  face.append(lead, text, line);
 
   const back = button('Retroceder 5 segundos', 'back');
   const fwd = button('Adelantar 5 segundos', 'fwd');
@@ -165,7 +181,20 @@ export function createMediaBar({ send }: MediaBarDeps): MediaBar {
 
   const pop = document.createElement('div');
   pop.className = 'gv-media-pop';
-  pop.append(status, controls, timeline, bottom);
+  const popTitle = document.createElement('div');
+  popTitle.className = 'gv-pop-title';
+  const popArtist = document.createElement('div');
+  popArtist.className = 'gv-pop-artist';
+  const meta = document.createElement('div');
+  meta.className = 'gv-pop-meta';
+  meta.append(popTitle, popArtist, status);
+  const head = document.createElement('div');
+  head.className = 'gv-pop-head';
+  head.append(popArt, meta);
+  const bg = document.createElement('div'); // recorta la carátula desenfocada sin recortar el puente invisible del panel
+  bg.className = 'gv-pop-bg';
+  bg.append(ambient);
+  pop.append(bg, head, timeline, controls, bottom);
 
   root.append(face, pop);
 
@@ -184,6 +213,7 @@ export function createMediaBar({ send }: MediaBarDeps): MediaBar {
   });
   let volumeTimer: ReturnType<typeof setTimeout> | undefined;
   volume.addEventListener('input', () => {
+    volume.style.setProperty('--gv-v', `${volume.value}%`);
     clearTimeout(volumeTimer);
     volumeTimer = setTimeout(() => act('volume', Number(volume.value) / 100), 60);
   });
@@ -235,22 +265,19 @@ export function createMediaBar({ send }: MediaBarDeps): MediaBar {
     const key = `${current.tabId}|${current.title}|${current.artist}|${current.art ?? ''}|${current.playing}|${Math.round(current.volume * 100)}|${current.muted}|${tabs.length}`;
     if (key !== renderedKey) {
       renderedKey = key;
-      if (current.art) {
-        if (cover.getAttribute('src') !== current.art) cover.src = current.art;
-        cover.hidden = false;
-      } else {
-        cover.hidden = true;
-        cover.removeAttribute('src');
-      }
+      setArt(current.art ?? '');
       title.textContent = current.title || 'Sin título';
+      popTitle.textContent = current.title || 'Sin título';
+      popArtist.textContent = current.artist;
       sub.textContent = [current.artist, SOURCE_LABELS[current.source]].filter(Boolean).join(' · ');
       root.title = `${current.title} — ${current.artist} (${SOURCE_LABELS[current.source]})`;
-      status.textContent = `${current.playing ? '🎧 Sonando' : '⏸️ En pausa'} · ${SOURCE_LABELS[current.source]}`;
+      status.textContent = `${current.playing ? 'Sonando' : 'En pausa'} · ${SOURCE_LABELS[current.source]}`;
       root.classList.toggle('gv-playing', current.playing);
       root.dataset.source = current.source;
       setIcon(toggle, current.playing ? 'pause' : 'play', current.playing ? 'Pausar' : 'Reproducir');
       setIcon(mute, current.muted || current.volume === 0 ? 'muted' : 'volume', current.muted ? 'Activar sonido' : 'Silenciar');
       volume.value = String(current.muted ? 0 : Math.round(current.volume * 100));
+      volume.style.setProperty('--gv-v', `${volume.value}%`);
       swap.hidden = tabs.length < 2;
       // El título se desplaza solo si no entra
       root.classList.remove('gv-marquee');
