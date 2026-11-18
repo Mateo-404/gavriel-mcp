@@ -1,48 +1,59 @@
-/** Configuración guardada en chrome.storage.local (la comparten popup y content scripts). */
-export type Settings = {
+/**
+ * Interruptores de la extensión (todos activados por defecto). Un ajuste nuevo = una línea acá + su <label> en options.html
+ * + su id en SWITCH_IDS (options.ts, el compilador avisa si falta). El tipo, la lectura segura (storage.ts), «Restablecer»
+ * y la actualización en vivo de Opciones salen de esta tabla.
+ */
+export const SWITCH_DEFAULTS = {
   /** Interruptor general del silenciador. */
-  muteEnabled: boolean;
+  muteEnabled: true,
   /** Interruptor general de los atajos de teclado. */
-  shortcutsEnabled: boolean;
+  shortcutsEnabled: true,
   /** Al abrir una cuenta, entrar directo a la pestaña Contactos. */
-  openContactsTab: boolean;
+  openContactsTab: true,
   /** Al abrir una cuenta, mostrar la clave y la contraclave (toca el ojito). */
-  revealSecrets: boolean;
+  revealSecrets: true,
   /** Durante una llamada, mostrar una tarjeta flotante con a quién se llama. */
-  showCallCard: boolean;
+  showCallCard: true,
   /** Oculta el aviso naranja "Alerta sonora · N pendientes" del panel de monitoreo. */
-  hideSoundBanner: boolean;
+  hideSoundBanner: true,
   /** Quita el fondo de color de las tarjetas de eventos (queda la franja de color a la izquierda). */
-  plainEvents: boolean;
+  plainEvents: true,
   /** Oculta el botón de la vista Grilla del panel (quedan Kanban y Mapa). */
-  hideGridView: boolean;
+  hideGridView: true,
   /** Modo ahorro: sin desenfoque ni animaciones continuas y con dibujado perezoso de las tarjetas. */
-  liteMode: boolean;
+  liteMode: true,
   /** Guarda en el navegador los archivos con hash de Gavriel (el servidor pide no guardarlos nunca). */
-  cacheAssets: boolean;
+  cacheAssets: true,
   /** Usa las tipografías Geist de la extensión y bloquea el CSS de Google Fonts (cero pedidos externos). */
-  localFonts: boolean;
+  localFonts: true,
   /** Bloquea las notificaciones push de Gavriel (Firebase): ni se suscribe ni se piden al servidor. */
-  blockPush: boolean;
+  blockPush: true,
   /** Responde desde memoria el segundo pedido idéntico de la cuenta (abrir una cuenta es ~1 s más rápido). */
-  dedupeAccount: boolean;
+  dedupeAccount: true,
   /** Apaga todas las animaciones y transiciones CSS de Gavriel (quedan los indicadores de carga). */
-  disableAnimations: boolean;
+  disableAnimations: true,
   /** Avisos del navegador por tipo de evento nuevo (hace falta una pestaña de Gavriel abierta). */
-  notifyEnabled: boolean;
+  notifyEnabled: true,
+  /** Reproductor de Spotify Web / YouTube Music en la barra de arriba de Gavriel. */
+  mediaPlayer: true,
+  /** Ronda de llamadas a contactos con Alt+Enter (tildes, colores y contador de ronda). */
+  callRound: true,
+  /** Índice de cuentas y contactos: búsqueda a fondo y cuenta de la llamada entrante (ver account-index.ts). */
+  accountIndex: true,
+} as const;
+
+export type SwitchKey = keyof typeof SWITCH_DEFAULTS;
+export const SWITCH_KEYS = Object.keys(SWITCH_DEFAULTS) as SwitchKey[];
+
+/** Configuración guardada en chrome.storage.local (la comparten popup y content scripts). */
+export type Settings = { [K in SwitchKey]: boolean } & {
   /** Tipos que avisan: BUR, POW, PAN, MED, INC. */
   notifyTypes: string[];
-  /** Reproductor de Spotify Web / YouTube Music en la barra de arriba de Gavriel. */
-  mediaPlayer: boolean;
-  /** Ronda de llamadas a contactos con Alt+Enter (tildes, colores y contador de ronda). */
-  callRound: boolean;
-  /** Índice de cuentas y contactos: búsqueda a fondo y cuenta de la llamada entrante (ver account-index.ts). */
-  accountIndex: boolean;
   /** Nombres (sin extensión) de los sonidos de /sounds/ que se silencian. */
   mutedSounds: string[];
   /** Sonidos que Gavriel ya reprodujo (lista que muestra el popup). */
   knownSounds: string[];
-}
+};
 
 /**
  * Sonidos que Gavriel reproduce en el panel (verificado en su código):
@@ -52,25 +63,8 @@ export type Settings = {
 export const DEFAULT_SOUNDS: readonly string[] = ['alarm', 'siren', 'beep'];
 
 export const DEFAULT_SETTINGS: Settings = {
-  muteEnabled: true,
-  shortcutsEnabled: true,
-  openContactsTab: true,
-  revealSecrets: true,
-  showCallCard: true,
-  hideSoundBanner: true,
-  plainEvents: true,
-  hideGridView: true,
-  liteMode: true,
-  cacheAssets: true,
-  localFonts: true,
-  blockPush: true,
-  dedupeAccount: true,
-  disableAnimations: true,
-  notifyEnabled: true,
+  ...SWITCH_DEFAULTS,
   notifyTypes: ['BUR', 'POW', 'PAN', 'MED', 'INC'],
-  mediaPlayer: true,
-  callRound: true,
-  accountIndex: true,
   mutedSounds: [...DEFAULT_SOUNDS],
   knownSounds: [...DEFAULT_SOUNDS],
 };

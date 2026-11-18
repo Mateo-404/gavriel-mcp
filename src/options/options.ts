@@ -3,32 +3,35 @@
  * chrome://extensions). Los sonidos se manejan en el popup; acá van los atajos y las opciones de
  * cuenta. Todo se guarda al instante en chrome.storage.local y las páginas de Gavriel reaccionan solas.
  */
-import { DEFAULT_SETTINGS, FRIENDLY_SOUND_NAMES, type Settings } from '../shared/constants';
+import { DEFAULT_SETTINGS, FRIENDLY_SOUND_NAMES, SWITCH_DEFAULTS, type Settings, type SwitchKey } from '../shared/constants';
 import { SCOPE_TITLES, shortcutsFor, type Shortcut, type ShortcutScope } from '../shared/shortcut-catalog';
 import { ALERT_LABELS, ALERT_TYPES } from '../shared/event-alerts';
 import { readSettings, touches, writeSettings } from '../shared/storage';
 
-type SwitchKey = 'shortcutsEnabled' | 'openContactsTab' | 'revealSecrets' | 'showCallCard' | 'hideSoundBanner' | 'plainEvents' | 'hideGridView' | 'liteMode' | 'cacheAssets' | 'localFonts' | 'blockPush' | 'dedupeAccount' | 'disableAnimations' | 'notifyEnabled' | 'mediaPlayer' | 'callRound' | 'accountIndex';
-
-const SWITCHES: readonly { key: SwitchKey; id: string }[] = [
-  { key: 'shortcutsEnabled', id: 'keys' },
-  { key: 'openContactsTab', id: 'opt-contacts' },
-  { key: 'revealSecrets', id: 'opt-secrets' },
-  { key: 'showCallCard', id: 'opt-callcard' },
-  { key: 'hideSoundBanner', id: 'opt-banner' },
-  { key: 'plainEvents', id: 'opt-plain' },
-  { key: 'hideGridView', id: 'opt-grid' },
-  { key: 'liteMode', id: 'opt-lite' },
-  { key: 'cacheAssets', id: 'opt-cache' },
-  { key: 'localFonts', id: 'opt-fonts' },
-  { key: 'blockPush', id: 'opt-nopush' },
-  { key: 'dedupeAccount', id: 'opt-dedupe' },
-  { key: 'disableAnimations', id: 'opt-noanim' },
-  { key: 'notifyEnabled', id: 'opt-notify' },
-  { key: 'mediaPlayer', id: 'opt-media' },
-  { key: 'callRound', id: 'opt-round' },
-  { key: 'accountIndex', id: 'opt-index' },
-];
+/**
+ * Id del <input> de cada interruptor en options.html. Es exhaustivo: si se agrega un ajuste en SWITCH_DEFAULTS y falta acá,
+ * no compila. (`muteEnabled` se maneja en el popup, no en esta página.)
+ */
+const SWITCH_IDS: Record<Exclude<SwitchKey, 'muteEnabled'>, string> = {
+  shortcutsEnabled: 'keys',
+  openContactsTab: 'opt-contacts',
+  revealSecrets: 'opt-secrets',
+  showCallCard: 'opt-callcard',
+  hideSoundBanner: 'opt-banner',
+  plainEvents: 'opt-plain',
+  hideGridView: 'opt-grid',
+  liteMode: 'opt-lite',
+  cacheAssets: 'opt-cache',
+  localFonts: 'opt-fonts',
+  blockPush: 'opt-nopush',
+  dedupeAccount: 'opt-dedupe',
+  disableAnimations: 'opt-noanim',
+  notifyEnabled: 'opt-notify',
+  mediaPlayer: 'opt-media',
+  callRound: 'opt-round',
+  accountIndex: 'opt-index',
+};
+const SWITCHES = (Object.entries(SWITCH_IDS) as [keyof typeof SWITCH_IDS, string][]).map(([key, id]) => ({ key, id }));
 
 const SCOPES: readonly ShortcutScope[] = ['panel', 'cuenta', 'llamadas'];
 
@@ -164,26 +167,9 @@ const showResetConfirm = (confirming: boolean): void => {
 $('reset').addEventListener('click', () => showResetConfirm(true));
 $('reset-no').addEventListener('click', () => showResetConfirm(false));
 $('reset-yes').addEventListener('click', () => {
-  void writeSettings({
-    shortcutsEnabled: DEFAULT_SETTINGS.shortcutsEnabled,
-    openContactsTab: DEFAULT_SETTINGS.openContactsTab,
-    revealSecrets: DEFAULT_SETTINGS.revealSecrets,
-    showCallCard: DEFAULT_SETTINGS.showCallCard,
-    hideSoundBanner: DEFAULT_SETTINGS.hideSoundBanner,
-    plainEvents: DEFAULT_SETTINGS.plainEvents,
-    hideGridView: DEFAULT_SETTINGS.hideGridView,
-    liteMode: DEFAULT_SETTINGS.liteMode,
-    cacheAssets: DEFAULT_SETTINGS.cacheAssets,
-    localFonts: DEFAULT_SETTINGS.localFonts,
-    blockPush: DEFAULT_SETTINGS.blockPush,
-    dedupeAccount: DEFAULT_SETTINGS.dedupeAccount,
-    disableAnimations: DEFAULT_SETTINGS.disableAnimations,
-    notifyEnabled: DEFAULT_SETTINGS.notifyEnabled,
-    notifyTypes: [...DEFAULT_SETTINGS.notifyTypes],
-    mediaPlayer: DEFAULT_SETTINGS.mediaPlayer,
-    callRound: DEFAULT_SETTINGS.callRound,
-    accountIndex: DEFAULT_SETTINGS.accountIndex,
-  }).then(async () => {
+  // Los interruptores de esta página y los tipos de aviso vuelven a su valor; el silenciador y sus sonidos son del popup
+  const { muteEnabled: _mute, ...pageSwitches } = SWITCH_DEFAULTS;
+  void writeSettings({ ...pageSwitches, notifyTypes: [...DEFAULT_SETTINGS.notifyTypes] }).then(async () => {
     render(await readSettings());
     showResetConfirm(false);
     flashSaved();
@@ -215,7 +201,7 @@ void showNetStatus();
 
 // Si algo cambia desde otro lado (el popup, otra pestaña), esta página se actualiza sola
 chrome.storage.onChanged.addListener((changes, area) => {
-  if (touches(changes, area, 'shortcutsEnabled', 'openContactsTab', 'revealSecrets', 'showCallCard', 'hideSoundBanner', 'plainEvents', 'hideGridView', 'liteMode', 'cacheAssets', 'localFonts', 'blockPush', 'dedupeAccount', 'disableAnimations', 'notifyEnabled', 'notifyTypes', 'mediaPlayer', 'callRound', 'accountIndex', 'muteEnabled', 'mutedSounds')) {
+  if (touches(changes, area, ...(Object.keys(DEFAULT_SETTINGS) as (keyof Settings)[]))) {
     void readSettings().then(render);
     setTimeout(() => void showNetStatus(), 500); // el fondo actualiza las reglas un instante después
   }

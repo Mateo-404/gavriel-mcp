@@ -1,5 +1,5 @@
 import { isAlertType } from './event-alerts';
-import { DEFAULT_SETTINGS, SOUND_NAME_PATTERN, type Settings } from './constants';
+import { DEFAULT_SETTINGS, SOUND_NAME_PATTERN, SWITCH_DEFAULTS, SWITCH_KEYS, type Settings, type SwitchKey } from './constants';
 
 const isNames = (value: unknown): value is string[] =>
   Array.isArray(value) && value.every((v) => typeof v === 'string' && SOUND_NAME_PATTERN.test(v));
@@ -9,30 +9,11 @@ const isNames = (value: unknown): value is string[] =>
  * ausente o corrupto cae al valor por defecto (nunca rompe la extensión).
  */
 export function sanitizeSettings(raw: Record<string, unknown>): Settings {
+  const switches = {} as Record<SwitchKey, boolean>;
+  for (const key of SWITCH_KEYS) switches[key] = typeof raw[key] === 'boolean' ? (raw[key] as boolean) : SWITCH_DEFAULTS[key];
   return {
-    muteEnabled: typeof raw.muteEnabled === 'boolean' ? raw.muteEnabled : DEFAULT_SETTINGS.muteEnabled,
-    shortcutsEnabled:
-      typeof raw.shortcutsEnabled === 'boolean' ? raw.shortcutsEnabled : DEFAULT_SETTINGS.shortcutsEnabled,
-    openContactsTab:
-      typeof raw.openContactsTab === 'boolean' ? raw.openContactsTab : DEFAULT_SETTINGS.openContactsTab,
-    revealSecrets: typeof raw.revealSecrets === 'boolean' ? raw.revealSecrets : DEFAULT_SETTINGS.revealSecrets,
-    showCallCard: typeof raw.showCallCard === 'boolean' ? raw.showCallCard : DEFAULT_SETTINGS.showCallCard,
-    hideSoundBanner:
-      typeof raw.hideSoundBanner === 'boolean' ? raw.hideSoundBanner : DEFAULT_SETTINGS.hideSoundBanner,
-    plainEvents: typeof raw.plainEvents === 'boolean' ? raw.plainEvents : DEFAULT_SETTINGS.plainEvents,
-    hideGridView: typeof raw.hideGridView === 'boolean' ? raw.hideGridView : DEFAULT_SETTINGS.hideGridView,
-    liteMode: typeof raw.liteMode === 'boolean' ? raw.liteMode : DEFAULT_SETTINGS.liteMode,
-    cacheAssets: typeof raw.cacheAssets === 'boolean' ? raw.cacheAssets : DEFAULT_SETTINGS.cacheAssets,
-    localFonts: typeof raw.localFonts === 'boolean' ? raw.localFonts : DEFAULT_SETTINGS.localFonts,
-    blockPush: typeof raw.blockPush === 'boolean' ? raw.blockPush : DEFAULT_SETTINGS.blockPush,
-    dedupeAccount: typeof raw.dedupeAccount === 'boolean' ? raw.dedupeAccount : DEFAULT_SETTINGS.dedupeAccount,
-    disableAnimations:
-      typeof raw.disableAnimations === 'boolean' ? raw.disableAnimations : DEFAULT_SETTINGS.disableAnimations,
-    notifyEnabled: typeof raw.notifyEnabled === 'boolean' ? raw.notifyEnabled : DEFAULT_SETTINGS.notifyEnabled,
+    ...switches,
     notifyTypes: Array.isArray(raw.notifyTypes) ? [...new Set(raw.notifyTypes.filter(isAlertType))] : [...DEFAULT_SETTINGS.notifyTypes],
-    mediaPlayer: typeof raw.mediaPlayer === 'boolean' ? raw.mediaPlayer : DEFAULT_SETTINGS.mediaPlayer,
-    callRound: typeof raw.callRound === 'boolean' ? raw.callRound : DEFAULT_SETTINGS.callRound,
-    accountIndex: typeof raw.accountIndex === 'boolean' ? raw.accountIndex : DEFAULT_SETTINGS.accountIndex,
     mutedSounds: isNames(raw.mutedSounds) ? raw.mutedSounds : [...DEFAULT_SETTINGS.mutedSounds],
     knownSounds: isNames(raw.knownSounds) ? raw.knownSounds : [...DEFAULT_SETTINGS.knownSounds],
   };
